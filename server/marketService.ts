@@ -1,0 +1,947 @@
+import { exchangeFetch as fetch } from './exchangeGateway';
+import { MarketLocationCache } from '../src/utils/marketLocationCache';
+import { normalizeExchangeSymbol } from '../src/utils/marketSymbols';
+import { ExchangeId, MarketType, Timeframe, Kline, ScannedCoin, MarketCoin } from '../src/types';
+import { detectFormations } from '../src/utils/patternRecognition';
+import { marketTickerFeed, type RawTicker } from './marketTickerFeed';
+
+// Cache structure
+interface CacheEntry {
+  timestamp: number;
+  data: ScannedCoin[];
+}
+
+const scanCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 45 * 1000; // 45 seconds
+
+// Helper to map timeframe to exchange interval
+function toBinanceInterval(tf: Timeframe): string {
+  switch (tf) {
+    case '1m': return '1m';
+    case '5m': return '5m';
+    case '15m': return '15m';
+    case '1h': return '1h';
+    case '4h': return '4h';
+    case '1d': return '1d';
+    default: return '1h';
+  }
+}
+
+function toBybitInterval(tf: Timeframe): string {
+  switch (tf) {
+    case '1m': return '1';
+    case '5m': return '5';
+    case '15m': return '15';
+    case '1h': return '60';
+    case '4h': return '240';
+    case '1d': return 'D';
+    default: return '60';
+  }
+}
+
+const BROWSER_HEADERS = { 'User-Agent': 'SignalHook/1.0', Accept: 'application/json' };
+
+async function fetchBinanceTickers(market: MarketType, minVolume = 0, maxVolume = 10_000_000_000): Promise<RawTicker[]> {
+  return (await marketTickerFeed.get('binance', market)).filter(t => t.volumeUsd >= minVolume && t.volumeUsd <= maxVolume);
+}
+
+async function fetchBybitTickers(market: MarketType, minVolume = 0, maxVolume = 10_000_000_000): Promise<RawTicker[]> {
+  return (await marketTickerFeed.get('bybit', market)).filter(t => t.volumeUsd >= minVolume && t.volumeUsd <= maxVolume);
+}
+
+// In-memory cache for high-frequency kline requests to reduce latency to < 1ms
+interface KlineCacheEntry {
+  data: Kline[];
+  timestamp: number;
+}
+const klinesMemoryCache = new Map<string, KlineCacheEntry>();
+const KLINES_CACHE_TTL_MS = 1500; // 1.5s TTL for ultra-fast repeated requests
+
+// Historical and live callers share the same guarded request/cache in exchangeGateway.
+export async function fetchKlines(exchange: ExchangeId, market: MarketType, symbol: string, timeframe: Timeframe,
+  limit = 70, startTime?: number, endTime?: number): Promise<Kline[]> {
+  const cleanSymbol = normalizeExchangeSymbol(symbol), safeLimit = Math.min(Math.max(limit, 10), 1000);
+  const cacheKey = `${exchange}:${market}:${cleanSymbol}:${timeframe}:${safeLimit}:${startTime || ''}:${endTime || ''}`;
+  const cached = klinesMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < KLINES_CACHE_TTL_MS) return cached.data;
+  const url = new URL(exchange === 'bybit' ? 'https://api.bybit.com/v5/market/kline'
+    : market === 'futures' ? 'https://fapi.binance.com/fapi/v1/klines' : 'https://api.binance.com/api/v3/klines');
+  url.search = new URLSearchParams({ symbol: cleanSymbol, interval: exchange === 'bybit' ? toBybitInterval(timeframe) : toBinanceInterval(timeframe), limit: String(safeLimit) }).toString();
+  if (exchange === 'bybit') url.searchParams.set('category', market === 'futures' ? 'linear' : 'spot');
+  if (startTime) url.searchParams.set(exchange === 'bybit' ? 'start' : 'startTime', String(startTime));
+  if (endTime) url.searchParams.set(exchange === 'bybit' ? 'end' : 'endTime', String(endTime));
+  try {
+    const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) return [];
+    const body = await response.json();
+    if (exchange === 'bybit' && body?.retCode !== 0) return [];
+    const rows = exchange === 'binance' ? body : body?.result?.list;
+    if (!Array.isArray(rows)) return [];
+    const result: Kline[] = rows.map((row: any) => ({ time: Math.floor(Number(row[0]) / 1000), open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]), volume: Number(row[5]) })).sort((a, b) => a.time - b.time);
+    if (!result.length || result.some(row => !Object.values(row).every(Number.isFinite) || row.close <= 0 || row.volume < 0)) return [];
+    klinesMemoryCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    if (klinesMemoryCache.size > 500) klinesMemoryCache.delete(klinesMemoryCache.keys().next().value!);
+    return result;
+  } catch { return []; }
+}
+
+// A fixed worker pool bounds total scan concurrency, including after the first result.
+async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency = 6): Promise<R[]> {
+  const results: R[] = new Array(items.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) { const index = next++; results[index] = await fn(items[index]); }
+  }));
+  return results;
+}
+
+// Build trade URL
+function getExchangeUrl(exchange: ExchangeId, market: MarketType, symbol: string): string {
+  if (exchange === 'binance') {
+    return market === 'futures'
+      ? `https://www.binance.com/en/futures/${symbol}`
+      : `https://www.binance.com/en/trade/${symbol}`;
+  } else {
+    return market === 'futures'
+      ? `https://www.bybit.com/trade/usdt/${symbol}`
+      : `https://www.bybit.com/en/trade/spot/${symbol.replace('USDT', '')}/USDT`;
+  }
+}
+
+// Main screener scan engine
+
+function roundStep(price: number): number {
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  const base = 10 ** Math.floor(Math.log10(price));
+  return base >= 1000 ? base : base >= 100 ? base : base >= 10 ? base : base >= 1 ? base : base / 10;
+}
+
+async function findRoundNumberDensity(
+  exchange: ExchangeId,
+  marketType: MarketType,
+  symbol: string,
+  price: number
+): Promise<ScannedCoin['roundNumberDensity']> {
+  if (!Number.isFinite(price) || price <= 0) return undefined;
+  const step = roundStep(price);
+  if (!step) return undefined;
+  const level = Math.round(price / step) * step;
+  const distancePct = Math.abs(price - level) / price * 100;
+  const tolerancePct = Math.min(0.8, Math.max(0.12, step / price * 12));
+  if (distancePct > tolerancePct) return undefined;
+
+  const book = await fetchOrderBook(exchange, marketType, symbol, 50).catch(() => ({ bids: [], asks: [] } as any));
+  const levels: Array<{ price: number; quantity: number; side: 'BID' | 'ASK'; notional: number }> = [
+    ...(book.bids || []).map((x: [number, number]) => ({ price: x[0], quantity: x[1], side: 'BID' as const, notional: x[0] * x[1] })),
+    ...(book.asks || []).map((x: [number, number]) => ({ price: x[0], quantity: x[1], side: 'ASK' as const, notional: x[0] * x[1] })),
+  ].filter((x) => Number.isFinite(x.price) && Number.isFinite(x.notional) && x.notional > 0);
+  if (!levels.length) return undefined;
+  const near = levels.filter((x) => Math.abs(x.price - level) / Math.max(level, 1e-12) * 100 <= Math.max(tolerancePct, step / price * 3));
+  if (!near.length) return undefined;
+  const sorted = levels.map((x) => x.notional).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 1;
+  const best = near.sort((a, b) => b.notional - a.notional)[0];
+  const multiple = best.notional / Math.max(median, 1);
+  const quality = Math.round(Math.max(0, Math.min(100, 35 + Math.log10(Math.max(1, multiple)) * 45)));
+  if (multiple < 6 || quality < 70) return undefined;
+  return {
+    level: Number(level.toFixed(8)),
+    side: best.side,
+    notionalUsd: Number(best.notional.toFixed(2)),
+    distancePct: Number((Math.abs(best.price - level) / Math.max(level, 1e-12) * 100).toFixed(3)),
+    quality,
+  };
+}
+
+const scanPending = new Map<string, Promise<ScannedCoin[]>>();
+export async function runScreenerScan(params: Parameters<typeof runScreenerScanInternal>[0]): Promise<ScannedCoin[]> {
+  const key = `${params.exchange}:${params.marketType}:${params.timeframe}:${params.minVolumeUsd ?? 50000}`;
+  if (scanPending.has(key)) return scanPending.get(key)!;
+  const work = runScreenerScanInternal(params); scanPending.set(key, work);
+  try { return await work; } finally { scanPending.delete(key); }
+}
+
+async function runScreenerScanInternal(params: {
+  exchange: 'all' | ExchangeId;
+  marketType: 'all' | MarketType;
+  timeframe: Timeframe;
+  minVolumeUsd?: number;
+}): Promise<ScannedCoin[]> {
+  const minVol = typeof params.minVolumeUsd === 'number' ? params.minVolumeUsd : 50_000;
+  const cacheKey = `${params.exchange}_${params.marketType}_${params.timeframe}_${minVol}`;
+  const cached = scanCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  // Determine tickers to fetch
+  const tickerPromises: Promise<RawTicker[]>[] = [];
+
+  if (params.exchange === 'all' || params.exchange === 'binance') {
+    if (params.marketType === 'all' || params.marketType === 'futures') {
+      tickerPromises.push(fetchBinanceTickers('futures', minVol));
+    }
+    if (params.marketType === 'all' || params.marketType === 'spot') {
+      tickerPromises.push(fetchBinanceTickers('spot', minVol));
+    }
+  }
+
+  if (params.exchange === 'all' || params.exchange === 'bybit') {
+    if (params.marketType === 'all' || params.marketType === 'futures') {
+      tickerPromises.push(fetchBybitTickers('futures', minVol));
+    }
+    if (params.marketType === 'all' || params.marketType === 'spot') {
+      tickerPromises.push(fetchBybitTickers('spot', minVol));
+    }
+  }
+
+  const tickerBatches = await Promise.all(tickerPromises);
+  const allTickers = tickerBatches.flat();
+
+  // Deduplicate tickers by exchange + symbol + marketType and sort by volume
+  const seenKeys = new Set<string>();
+  const uniqueTickers: RawTicker[] = [];
+
+  for (const t of allTickers) {
+    const key = `${t.exchange}_${t.symbol}_${t.marketType}`;
+    if (!seenKeys.has(key) && t.volumeUsd >= minVol) {
+      seenKeys.add(key);
+      uniqueTickers.push(t);
+    }
+  }
+
+  uniqueTickers.sort((a, b) => b.volumeUsd - a.volumeUsd);
+
+  // Scan candidates (up to 75 coins to scan all active liquid coins swiftly)
+  const selectedTickers = uniqueTickers.slice(0, 75);
+
+  // Scan klines and detect patterns in parallel
+  const scannedCoins: ScannedCoin[] = [];
+
+  // Batch process with higher concurrency
+  const BATCH_SIZE = 25;
+  for (let i = 0; i < selectedTickers.length; i += BATCH_SIZE) {
+    const batch = selectedTickers.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (ticker) => {
+        const klines = await fetchKlines(ticker.exchange, ticker.marketType, ticker.symbol, params.timeframe, 70);
+        if (!klines || klines.length < 25) return null;
+
+        const formations = detectFormations(klines, ticker.symbol).filter((f) => f.validation && f.validation.enoughData && f.validation.finiteData);
+        const bestFormation = formations[0];
+        const roundNumberDensity = bestFormation
+          ? await findRoundNumberDensity(ticker.exchange, ticker.marketType, ticker.symbol, bestFormation.levels.necklinePrice ?? bestFormation.levels.entryPrice)
+          : undefined;
+        const enrichedFormations = roundNumberDensity
+          ? formations.map((f) => {
+              const ref = f.levels.necklinePrice ?? f.levels.entryPrice;
+              const same = Math.abs(ref - roundNumberDensity.level) / Math.max(roundNumberDensity.level, 1e-12) * 100 <= 0.8;
+              return same ? {
+                ...f,
+                roundNumberContext: {
+                  ...(f.roundNumberContext || { detected: true, distancePct: 0, step: 0, strength: 0 }),
+                  detected: true,
+                  level: roundNumberDensity.level,
+                  distancePct: roundNumberDensity.distancePct,
+                  densityConfirmed: true,
+                  densityUsd: roundNumberDensity.notionalUsd,
+                  side: roundNumberDensity.side,
+                  strength: Math.max(f.roundNumberContext?.strength || 0, roundNumberDensity.quality),
+                },
+              } : f;
+            })
+          : formations;
+
+        const scanned: ScannedCoin = {
+          symbol: ticker.symbol,
+          baseAsset: ticker.baseAsset,
+          quoteAsset: ticker.quoteAsset,
+          exchange: ticker.exchange,
+          marketType: ticker.marketType,
+          currentPrice: ticker.price,
+          priceChange24h: ticker.change24h,
+          highPrice24h: ticker.high24h,
+          lowPrice24h: ticker.low24h,
+          volume24hUsd: ticker.volumeUsd,
+          formations: enrichedFormations,
+          roundNumberDensity,
+          timeframe: params.timeframe,
+          lastUpdated: Date.now(),
+          exchangeUrl: getExchangeUrl(ticker.exchange, ticker.marketType, ticker.symbol),
+        };
+        return scanned;
+      })
+    );
+
+    for (const res of batchResults) {
+      if (res) scannedCoins.push(res);
+    }
+  }
+
+  // Update cache
+  scanCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data: scannedCoins,
+  });
+
+  return scannedCoins;
+}
+
+// Optional volatility enrichment must never delay the current quote snapshot.
+let volatilityRefresh: Promise<unknown> | null = null;
+
+// Cache for 5m volatility per coin
+const volatility5mCache = new Map<string, { timestamp: number; volatility5mPct: number }>();
+const VOL_5M_CACHE_TTL = 30 * 1000; // 30 seconds
+
+// Compute the range of the most recently closed 5-minute candle. Missing data stays missing.
+async function resolve5mVolatilityForCoins(coins: { exchange: ExchangeId; symbol: string; marketType: MarketType; volatility24hPct: number }[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>(), now = Date.now();
+  const pending = coins.filter(coin => {
+    const key = `${coin.exchange}_${coin.symbol}_${coin.marketType}`, cached = volatility5mCache.get(key);
+    if (cached && now - cached.timestamp < VOL_5M_CACHE_TTL) { result.set(key, cached.volatility5mPct); return false; }
+    return true;
+  }).slice(0, 100);
+  await pMap(pending, async coin => {
+    const rows = await fetchKlines(coin.exchange, coin.marketType, coin.symbol, '5m', 10);
+    const candle = rows.filter(row => row.time * 1000 + 300000 <= Date.now()).at(-1);
+    if (!candle || candle.low <= 0 || Date.now() - candle.time * 1000 > 900000) return;
+    const value = Number(((candle.high - candle.low) / candle.low * 100).toFixed(2));
+    const key = `${coin.exchange}_${coin.symbol}_${coin.marketType}`;
+    if (!Number.isFinite(value)) return;
+    result.set(key, value); volatility5mCache.set(key, { timestamp: Date.now(), volatility5mPct: value });
+  }, 4);
+  while (volatility5mCache.size > 2000) volatility5mCache.delete(volatility5mCache.keys().next().value!);
+  return result;
+}
+
+const marketLocationCache = new MarketLocationCache((exchange, market, symbol) =>
+  fetchKlines(exchange, market, symbol, '1d', 731));
+
+export async function fetchMarketCoins(params: {
+  exchange?: 'all' | ExchangeId;
+  marketType?: 'all' | MarketType;
+  minVolumeUsd?: number;
+  maxVolumeUsd?: number;
+}): Promise<MarketCoin[]> {
+  const exchange = params.exchange || 'all';
+  const marketType = params.marketType || 'all';
+  const minVol = params.minVolumeUsd !== undefined ? params.minVolumeUsd : 50_000;
+  const maxVol = params.maxVolumeUsd !== undefined ? params.maxVolumeUsd : 10_000_000_000;
+  const tickerPromises: Promise<RawTicker[]>[] = [];
+
+  if (exchange === 'all' || exchange === 'binance') {
+    if (marketType === 'all' || marketType === 'futures') {
+      tickerPromises.push(fetchBinanceTickers('futures', minVol, maxVol));
+    }
+    if (marketType === 'all' || marketType === 'spot') {
+      tickerPromises.push(fetchBinanceTickers('spot', minVol, maxVol));
+    }
+  }
+
+  if (exchange === 'all' || exchange === 'bybit') {
+    if (marketType === 'all' || marketType === 'futures') {
+      tickerPromises.push(fetchBybitTickers('futures', minVol, maxVol));
+    }
+    if (marketType === 'all' || marketType === 'spot') {
+      tickerPromises.push(fetchBybitTickers('spot', minVol, maxVol));
+    }
+  }
+
+  const batches = await Promise.all(tickerPromises);
+  const allTickers = batches.flat();
+
+  const seenKeys = new Set<string>();
+  const coins: MarketCoin[] = [];
+
+  for (const t of allTickers) {
+    const key = `${t.exchange}_${t.symbol}_${t.marketType}`;
+    if (!seenKeys.has(key) && t.volumeUsd >= minVol && t.volumeUsd <= maxVol && t.price > 0) {
+      seenKeys.add(key);
+
+      const high = t.high24h > 0 ? t.high24h : t.price;
+      const low = t.low24h > 0 ? t.low24h : t.price;
+
+      const distanceToHighPct = high > 0 ? Math.max(0, ((high - t.price) / high) * 100) : 0;
+      const distanceToLowPct = low > 0 ? Math.max(0, ((t.price - low) / low) * 100) : 0;
+      const volatility24hPct = low > 0 ? Math.max(0, ((high - low) / low) * 100) : 0;
+
+      // Daily-history enrichment below owns the mutually exclusive location flags.
+      const isNearHigh = false;
+      const isNearLow = false;
+
+      coins.push({
+        symbol: t.symbol,
+        baseAsset: t.baseAsset,
+        quoteAsset: t.quoteAsset,
+        exchange: t.exchange,
+        marketType: t.marketType,
+        price: t.price,
+        change24h: Number(t.change24h.toFixed(2)),
+        volumeUsd: t.volumeUsd,
+        high24h: high,
+        low24h: low,
+        distanceToHighPct: Number(distanceToHighPct.toFixed(2)),
+        distanceToLowPct: Number(distanceToLowPct.toFixed(2)),
+        volatility24hPct: Number(volatility24hPct.toFixed(2)),
+        isNearHigh,
+        isNearLow,
+        isActiveCoin: (volatility24hPct >= 4 && t.volumeUsd >= 2_000_000) || Math.abs(t.change24h) >= 5,
+        exchangeUrl: getExchangeUrl(t.exchange, t.marketType, t.symbol),
+      });
+    }
+  }
+
+  // Sort by volume descending by default
+  coins.sort((a, b) => b.volumeUsd - a.volumeUsd);
+
+  for (const coin of coins) {
+    const cached = volatility5mCache.get(`${coin.exchange}_${coin.symbol}_${coin.marketType}`);
+    if (cached && Date.now() - cached.timestamp < VOL_5M_CACHE_TTL) coin.volatility5mPct = cached.volatility5mPct;
+    const effectiveVol = coin.volatility5mPct ?? 0;
+    coin.isActiveCoin = (effectiveVol >= 0.8 && coin.volumeUsd >= 1_000_000)
+      || coin.volatility24hPct >= 4 || Math.abs(coin.change24h) >= 5;
+  }
+  if (coins.length && !volatilityRefresh) {
+    volatilityRefresh = resolve5mVolatilityForCoins(coins)
+      .catch(err => console.warn('Error resolving 5m volatility:', err))
+      .finally(() => { volatilityRefresh = null; });
+  }
+
+  return marketLocationCache.enrich(coins);
+}
+
+export interface OrderBookData {
+  symbol: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  bids: [number, number][]; // [price, qty]
+  asks: [number, number][]; // [price, qty]
+  lastUpdateId?: number;
+  timestamp: number;
+  error?: string; // available only when the exchange could not deliver depth
+}
+
+const domTickCache = new Map<string, { tick: number; time: number }>();
+
+/** Tick size is instrument metadata, not a price-dependent heuristic. */
+export async function fetchDomTickSize(exchange: ExchangeId, market: MarketType, symbol: string): Promise<number | null> {
+  const cleanSymbol = normalizeExchangeSymbol(symbol);
+  const key = `${exchange}:${market}:${cleanSymbol}`;
+  const cached = domTickCache.get(key);
+  if (cached && Date.now() - cached.time < 3_600_000) return cached.tick;
+  const urls = exchange === 'bybit'
+    ? [
+        `https://api.bybit.com/v5/market/instruments-info?category=${market === 'futures' ? 'linear' : 'spot'}&symbol=${encodeURIComponent(cleanSymbol)}`,
+        `https://api.bytick.com/v5/market/instruments-info?category=${market === 'futures' ? 'linear' : 'spot'}&symbol=${encodeURIComponent(cleanSymbol)}`,
+      ]
+    : market === 'futures'
+    ? [`https://fapi.binance.com/fapi/v1/exchangeInfo?symbol=${encodeURIComponent(cleanSymbol)}`]
+    : [
+        `https://data-api.binance.vision/api/v3/exchangeInfo?symbol=${encodeURIComponent(cleanSymbol)}`,
+        `https://api.binance.com/api/v3/exchangeInfo?symbol=${encodeURIComponent(cleanSymbol)}`,
+      ];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(4000) });
+      if (!response.ok) continue;
+      const json = await response.json();
+      let tick: number;
+      if (exchange === 'bybit') {
+        if (json.retCode !== 0) continue;
+        tick = Number(json.result?.list?.[0]?.priceFilter?.tickSize);
+      } else {
+        const filter = json.symbols?.find((s: any) => s.symbol === cleanSymbol)?.filters?.find((f: any) => f.filterType === 'PRICE_FILTER');
+        tick = Number(filter?.tickSize);
+      }
+      if (!Number.isFinite(tick) || tick <= 0) continue;
+      domTickCache.set(key, { tick, time: Date.now() });
+      return tick;
+    } catch {
+      // Alternate host or local observed-gap fallback.
+    }
+  }
+  return null;
+}
+
+// Fetch orderbook depth snapshot
+export async function fetchOrderBook(
+  exchange: ExchangeId = 'binance',
+  market: MarketType = 'futures',
+  symbol: string = 'BTCUSDT',
+  limit: number = 500
+): Promise<OrderBookData> {
+  const cleanSymbol = normalizeExchangeSymbol(symbol);
+  const safeLimit = Math.min(Math.max(limit, 20), 1000);
+  // Binance USD-M Futures accepts discrete depth limits only. In particular,
+  // limit=200 returns -4021 INVALID_DEPTH_LIMIT, so round UP to a valid limit.
+  const binanceDepthLimit = market === 'futures'
+    ? [20, 50, 100, 500, 1000].find(value => value >= safeLimit) ?? 1000
+    : safeLimit;
+  let lastFailure = 'Стакан відсутній у відповіді біржі';
+
+  if (exchange === 'bybit') {
+    const category = market === 'futures' ? 'linear' : 'spot';
+    const mirrors = [
+      `https://api.bybit.com/v5/market/orderbook?category=${category}&symbol=${encodeURIComponent(cleanSymbol)}&limit=${Math.min(safeLimit, 500)}`,
+      `https://api.bytick.com/v5/market/orderbook?category=${category}&symbol=${encodeURIComponent(cleanSymbol)}&limit=${Math.min(safeLimit, 500)}`,
+    ];
+
+    for (const url of mirrors) {
+      try {
+        const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(4000) });
+        if (!res.ok) {
+          lastFailure = `Bybit HTTP ${res.status}`;
+          continue;
+        }
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.retCode !== 0) {
+            lastFailure = `Bybit API code ${json?.retCode ?? 'unknown'}`;
+            continue;
+          }
+          const result = json?.result;
+          if (result && Array.isArray(result.b) && Array.isArray(result.a)) {
+            const bids: [number, number][] = result.b.map((item: [string, string]) => [parseFloat(item[0]), parseFloat(item[1])]);
+            const asks: [number, number][] = result.a.map((item: [string, string]) => [parseFloat(item[0]), parseFloat(item[1])]);
+            return {
+              symbol: cleanSymbol,
+              exchange,
+              marketType: market,
+              bids,
+              asks,
+              timestamp: result.ts || Date.now(),
+            };
+          }
+        }
+      } catch (error) {
+        lastFailure = error instanceof Error ? `Bybit ${error.name}` : 'Bybit: помилка мережі';
+      }
+    }
+    return { symbol: cleanSymbol, exchange, marketType: market, bids: [], asks: [], timestamp: Date.now(), error: lastFailure };
+  }
+
+  // Binance (Futures or Spot with multi-mirror)
+  const mirrors = market === 'futures'
+    ? [`https://fapi.binance.com/fapi/v1/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${binanceDepthLimit}`]
+    : [
+        `https://data-api.binance.vision/api/v3/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+        `https://api.binance.com/api/v3/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+      ];
+
+  for (const url of mirrors) {
+    try {
+      const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(4000) });
+      if (!res.ok) {
+        lastFailure = `Binance HTTP ${res.status}`;
+        continue;
+      }
+      const data = await res.json();
+      if (!data.bids || !data.asks) {
+        lastFailure = 'Binance: відсутні заявки у відповіді';
+        continue;
+      }
+
+      const bids: [number, number][] = (data.bids || []).map((item: [string, string]) => [parseFloat(item[0]), parseFloat(item[1])]);
+      const asks: [number, number][] = (data.asks || []).map((item: [string, string]) => [parseFloat(item[0]), parseFloat(item[1])]);
+
+      return {
+        symbol: cleanSymbol,
+        exchange: 'binance',
+        marketType: market,
+        bids,
+        asks,
+        lastUpdateId: data.lastUpdateId,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      lastFailure = error instanceof Error ? `Binance ${error.name}` : 'Binance: помилка мережі';
+    }
+  }
+
+  // Fallback empty orderbook structure
+  return {
+    symbol: cleanSymbol,
+    exchange,
+    marketType: market,
+    bids: [],
+    asks: [],
+    timestamp: Date.now(),
+    error: lastFailure,
+  };
+}
+
+export interface RawTradeItem {
+  id: string;
+  price: number;
+  qty: number;
+  volumeUsd: number;
+  isBuyerMaker: boolean; // true = sell, false = buy
+  timestamp: number;
+}
+
+// Fetch recent market trades
+export async function fetchRecentTrades(
+  exchange: ExchangeId = 'binance',
+  market: MarketType = 'futures',
+  symbol: string = 'BTCUSDT',
+  limit: number = 60
+): Promise<RawTradeItem[]> {
+  const cleanSymbol = normalizeExchangeSymbol(symbol);
+  const safeLimit = Math.min(Math.max(limit, 10), 100);
+
+  if (exchange === 'bybit') {
+    const category = market === 'futures' ? 'linear' : 'spot';
+    const mirrors = [
+      `https://api.bybit.com/v5/market/recent-trade?category=${category}&symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+      `https://api.bytick.com/v5/market/recent-trade?category=${category}&symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+    ];
+
+    for (const url of mirrors) {
+      try {
+        const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(3500) });
+        if (res.ok) {
+          const json = await res.json();
+          const list = json?.result?.list;
+          if (Array.isArray(list) && list.length > 0) {
+            return list.map((item: any) => {
+              const price = parseFloat(item.price) || 0;
+              const qty = parseFloat(item.size || item.v || 0);
+              const isBuyerMaker = item.side === 'Sell';
+              const time = parseInt(item.time, 10) || Date.now();
+              return {
+                id: item.execId || `${time}-${Math.random()}`,
+                price,
+                qty,
+                volumeUsd: price * qty,
+                isBuyerMaker,
+                timestamp: time,
+              };
+            });
+          }
+        }
+      } catch {}
+    }
+    return [];
+  }
+
+  // Binance
+  const mirrors = market === 'futures'
+    ? [`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`]
+    : [
+        `https://data-api.binance.vision/api/v3/aggTrades?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+        `https://api.binance.com/api/v3/aggTrades?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
+      ];
+
+  for (const url of mirrors) {
+    try {
+      const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(3500) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const parsed = data.map((item: any) => {
+          const price = Number(item.p);
+          const qty = Number(item.q);
+          const volumeUsd = price * qty;
+          const isBuyerMaker = !!item.m;
+          return {
+            id: String(item.a),
+            price, qty, volumeUsd, isBuyerMaker,
+            timestamp: Number(item.T),
+          };
+        });
+        return parsed.sort((a, b) => b.timestamp - a.timestamp);
+      }
+    } catch {}
+  }
+
+  return [];
+}
+
+// ----------------------------------------------------
+// DUAL EXCHANGE OPEN INTEREST (Binance Futures & Bybit Linear)
+// ----------------------------------------------------
+
+export interface ExchangeOIData {
+  exchange: 'binance' | 'bybit';
+  symbol: string;
+  valueUsd: number;
+  amountCoins: number;
+  change5mPct: number | null;
+  lastUpdated: number;
+}
+
+let binanceSymbolsSet = new Set<string>();
+let bybitSymbolsSet = new Set<string>();
+let lastOiSymbolsFetchTime = 0;
+const OI_SYMBOLS_CACHE_TTL = 30 * 60 * 1000;
+
+const oiResultCache = new Map<string, { timestamp: number; data: { binance: ExchangeOIData | null; bybit: ExchangeOIData | null; totalOIUsd: number } }>();
+const OI_RESULT_CACHE_TTL = 6000;
+
+async function refreshOiExchangeSymbols(): Promise<void> {
+  const now = Date.now();
+  if (binanceSymbolsSet.size > 0 && bybitSymbolsSet.size > 0 && (now - lastOiSymbolsFetchTime) < OI_SYMBOLS_CACHE_TTL) {
+    return;
+  }
+
+  try {
+    const [binanceRes, bybitRes] = await Promise.allSettled([
+      fetch('https://fapi.binance.com/fapi/v1/ticker/price', {
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(4000),
+      }).then((r) => (r.ok ? r.json() : [])),
+      fetch('https://api.bybit.com/v5/market/tickers?category=linear', {
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(4000),
+      }).then((r) => (r.ok ? r.json() : {})),
+    ]);
+
+    if (binanceRes.status === 'fulfilled' && Array.isArray(binanceRes.value)) {
+      const bSet = new Set<string>();
+      for (const item of binanceRes.value) {
+        if (item.symbol) bSet.add(item.symbol);
+      }
+      if (bSet.size > 0) binanceSymbolsSet = bSet;
+    }
+
+    if (bybitRes.status === 'fulfilled') {
+      const bybitData = bybitRes.value as any;
+      if (Array.isArray(bybitData?.result?.list)) {
+        const bySet = new Set<string>();
+        for (const item of bybitData.result.list) {
+          if (item.symbol) bySet.add(item.symbol);
+        }
+        if (bySet.size > 0) bybitSymbolsSet = bySet;
+      }
+    }
+
+    lastOiSymbolsFetchTime = now;
+  } catch (err) {
+    console.warn('Failed to refresh exchange symbols cache:', err);
+  }
+}
+
+function resolveOiSymbols(
+  rawSymbol: string,
+  baseAsset?: string
+): { binanceSymbol: string | null; bybitSymbol: string | null } {
+  let clean = (rawSymbol || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[-_:](SWAP|PERP|USDT|USDC)$/i, '')
+    .replace(/[-_:\/]/g, '')
+    .replace(/(SWAP|PERP)$/i, '');
+
+  if (clean.endsWith('USDT')) {
+    clean = clean.replace(/USDT$/, '');
+  } else if (clean.endsWith('USDC')) {
+    clean = clean.replace(/USDC$/, '');
+  }
+
+  let core = (baseAsset || clean)
+    .toUpperCase()
+    .replace(/[-_:\/]/g, '')
+    .replace(/(USDT|USDC|BUSD|PERP|SWAP)$/i, '')
+    .replace(/^(10000000|1000000|100000|10000|1000)/i, '');
+
+  const candidates = [
+    `${clean}USDT`,
+    `${core}USDT`,
+    `1000${core}USDT`,
+    `10000${core}USDT`,
+    `1000000${core}USDT`,
+    `1M${core}USDT`,
+    `${core}1000USDT`,
+    `1000${core}CTOUSDT`,
+    `${clean}USDC`,
+    `${core}USDC`,
+  ];
+
+  let binanceSymbol: string | null = null;
+  let bybitSymbol: string | null = null;
+
+  if (binanceSymbolsSet.size > 0) {
+    for (const cand of candidates) {
+      if (binanceSymbolsSet.has(cand)) {
+        binanceSymbol = cand;
+        break;
+      }
+    }
+  } else {
+    binanceSymbol = candidates[0];
+  }
+
+  if (bybitSymbolsSet.size > 0) {
+    for (const cand of candidates) {
+      if (bybitSymbolsSet.has(cand)) {
+        bybitSymbol = cand;
+        break;
+      }
+    }
+  } else {
+    bybitSymbol = candidates[0];
+  }
+
+  return { binanceSymbol, bybitSymbol };
+}
+
+async function binanceNotional(symbol: string, coins: number): Promise<number | null> {
+  const tickers = await marketTickerFeed.get('binance', 'futures');
+  const ticker = tickers.find(item => item.symbol === symbol);
+  return ticker && marketTickerFeed.status('binance', 'futures').status === 'live' && ticker.price > 0 ? coins * ticker.price : null;
+}
+
+async function fetchBinanceOiSingle(symbol: string): Promise<ExchangeOIData | null> {
+  const histUrls = [
+    `https://fapi.binance.com/futures/data/openInterestHist?symbol=${symbol}&period=5m&limit=2`,
+    `https://data-api.binance.vision/futures/data/openInterestHist?symbol=${symbol}&period=5m&limit=2`,
+  ];
+
+  for (const url of histUrls) {
+    try {
+      const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const latest = data[data.length - 1];
+          if (Number(latest.timestamp) > 0 && Date.now() - Number(latest.timestamp) > 900_000) continue;
+          const val = parseFloat(latest.sumOpenInterestValue) || 0;
+          const coins = parseFloat(latest.sumOpenInterest) || 0;
+
+          let change5mPct: number | null = null;
+          if (data.length > 1) {
+            const prevVal = parseFloat(data[0].sumOpenInterestValue) || 0;
+            if (prevVal > 0 && val > 0) {
+              change5mPct = Number((((val - prevVal) / prevVal) * 100).toFixed(2));
+            }
+          }
+
+          if (val > 0 || coins > 0) {
+            const finalVal = val > 0 ? val : await binanceNotional(symbol, coins);
+            if (finalVal === null) continue;
+            return {
+              exchange: 'binance',
+              symbol,
+              valueUsd: finalVal,
+              amountCoins: coins,
+              change5mPct,
+              lastUpdated: Number(latest.timestamp) || Date.now(),
+            };
+          }
+        }
+      }
+    } catch {}
+  }
+
+  try {
+    const res = await fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(2000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const coins = parseFloat(data?.openInterest) || 0;
+      if (coins > 0) {
+        const valueUsd = await binanceNotional(symbol, coins);
+        if (valueUsd === null) return null;
+        return {
+          exchange: 'binance',
+          symbol,
+          valueUsd,
+          amountCoins: coins,
+          change5mPct: null,
+          lastUpdated: Date.now(),
+        };
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+async function fetchBybitOiSingle(symbol: string): Promise<ExchangeOIData | null> {
+  const mirrors = [
+    `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${symbol}`,
+    `https://api.bytick.com/v5/market/tickers?category=linear&symbol=${symbol}`,
+  ];
+
+  for (const url of mirrors) {
+    try {
+      const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(2500) });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const item = json?.result?.list?.[0];
+      if (item) {
+        const val = parseFloat(item.openInterestValue) || 0;
+        const coins = parseFloat(item.openInterest) || 0;
+        const lastPrice = parseFloat(item.lastPrice);
+
+        if (val > 0 || coins > 0) {
+          let change5mPct: number | null = null;
+          try {
+            const hRes = await fetch(
+              `https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${symbol}&intervalTime=5min&limit=2`,
+              { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(2000) }
+            );
+            if (hRes.ok) {
+              const hJson = await hRes.json();
+              const list = hJson?.result?.list;
+              if (Array.isArray(list) && list.length >= 2) {
+                const latestOi = parseFloat(list[0].openInterest) || 0;
+                const prevOi = parseFloat(list[1].openInterest) || 0;
+                if (prevOi > 0 && latestOi > 0) {
+                  change5mPct = Number((((latestOi - prevOi) / prevOi) * 100).toFixed(2));
+                }
+              }
+            }
+          } catch {}
+
+          const finalVal = val > 0 ? val : coins * lastPrice;
+          if (!Number.isFinite(finalVal) || finalVal <= 0) continue;
+          return {
+            exchange: 'bybit',
+            symbol,
+            valueUsd: finalVal,
+            amountCoins: coins,
+            change5mPct,
+            lastUpdated: Date.now(),
+          };
+        }
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+export async function fetchDualExchangeOI(
+  rawSymbol: string,
+  baseAsset?: string,
+  curPrice?: number
+): Promise<{ binance: ExchangeOIData | null; bybit: ExchangeOIData | null; totalOIUsd: number }> {
+  const cacheKey = `${rawSymbol}_${baseAsset || ''}`.toUpperCase();
+  const cached = oiResultCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < OI_RESULT_CACHE_TTL) {
+    return cached.data;
+  }
+
+  await refreshOiExchangeSymbols();
+
+  const { binanceSymbol, bybitSymbol } = resolveOiSymbols(rawSymbol, baseAsset);
+
+  const [binanceResult, bybitResult] = await Promise.allSettled([
+    binanceSymbol ? fetchBinanceOiSingle(binanceSymbol) : Promise.resolve(null),
+    bybitSymbol ? fetchBybitOiSingle(bybitSymbol) : Promise.resolve(null),
+  ]);
+
+  const binance = binanceResult.status === 'fulfilled' ? binanceResult.value : null;
+  const bybit = bybitResult.status === 'fulfilled' ? bybitResult.value : null;
+  const totalOIUsd = (binance?.valueUsd || 0) + (bybit?.valueUsd || 0);
+
+  const result = { binance, bybit, totalOIUsd };
+  oiResultCache.set(cacheKey, { timestamp: Date.now(), data: result });
+  return result;
+}
+
+

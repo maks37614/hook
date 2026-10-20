@@ -1,0 +1,64 @@
+name: Live DOM Exchange Reconciliation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 4 * * *'
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  verify-live-dom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LIVE_CHECK_TOKEN: ${{ secrets.HOOK2_LIVE_CHECK_TOKEN }}
+    steps:
+      - name: Explain authenticated monitoring setup
+        if: env.LIVE_CHECK_TOKEN == ''
+        run: echo "Live DOM verification is skipped until HOOK2_LIVE_CHECK_TOKEN is configured for a registered monitoring account. No public data exception is enabled."
+      - uses: actions/checkout@v4
+        if: env.LIVE_CHECK_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.LIVE_CHECK_TOKEN != ''
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+        if: env.LIVE_CHECK_TOKEN != ''
+      - name: Install Chrome test driver
+        if: env.LIVE_CHECK_TOKEN != ''
+        run: |
+          for attempt in 1 2 3; do
+            if npm install --prefix "$RUNNER_TEMP/hook2-browser-driver" --no-save --package-lock=false --fetch-retries=4 playwright-core@1.62.1; then
+              ln -s "$RUNNER_TEMP/hook2-browser-driver/node_modules/playwright-core" node_modules/playwright-core
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+      - name: Compare live DOM with Binance and Bybit
+        if: env.LIVE_CHECK_TOKEN != ''
+        env:
+          SITE_URL: https://h00k.top
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node tests/fixtures/dom-live-check.mjs
+      - name: Publish live DOM check success
+        if: success() && env.LIVE_CHECK_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            -d "{\"state\":\"success\",\"context\":\"live-dom-reconciliation\",\"description\":\"Binance + Bybit live DOM checks passed\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"
+      - name: Publish live DOM check failure
+        if: failure() && env.LIVE_CHECK_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            -d "{\"state\":\"failure\",\"context\":\"live-dom-reconciliation\",\"description\":\"Live DOM reconciliation failed; inspect GitHub Action logs\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}"

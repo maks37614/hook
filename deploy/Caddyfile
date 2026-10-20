@@ -1,0 +1,22 @@
+{$DOMAIN} {
+	encode zstd gzip
+	# Serve Firebase password reset links locally without breaking
+	# Google OAuth callbacks or other Firebase email actions.
+	@firebase_password_reset {
+		path /__/auth/action
+		query mode=resetPassword
+	}
+	handle @firebase_password_reset {
+		header Cache-Control "no-store"
+		reverse_proxy hook2:3000
+	}
+	@firebase_auth path /__/auth/* /__/firebase/*
+	handle @firebase_auth {
+		reverse_proxy https://{$FIREBASE_AUTH_HOST:knowledgeable-text-whh41.firebaseapp.com} {
+			header_up Host {$FIREBASE_AUTH_HOST:knowledgeable-text-whh41.firebaseapp.com}
+		}
+	}
+	handle {
+		reverse_proxy hook2:3000
+	}
+}

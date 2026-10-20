@@ -1,0 +1,300 @@
+.hookchart-root .chartWrap{flex:1;min-height:0;position:relative}.hookchart-root .chartWrap canvas{width:100%;height:100%;display:block;cursor:crosshair}.hookchart-root .chartWrap canvas{user-select:none}
+.hookchart-root .chartWrap canvas{image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges}.hookchart-root .chartWrap{background:#11151b}
+
+.hookchart-root .chartWrap{position:relative;touch-action:none;overflow:hidden}.hookchart-root .chartWrap canvas{touch-action:none;user-select:none}
+.hookchart-root .chartStage{flex:1;min-height:0;position:relative;overflow:hidden}.hookchart-root .chartStage>.chartWrap{height:100%;width:100%;}.hookchart-root .scaleTools{display:flex;align-items:center;gap:2px}.hookchart-root .scaleTools button{height:26px;min-width:26px;padding:0 5px;background:transparent!important;color:#b8c2cf;border:0!important;border-radius:3px!important;box-shadow:none!important;outline:0!important;font-size:13px;font-weight:700;justify-content:center}.hookchart-root .scaleTools button:hover{background:rgba(120,123,134,.12)!important;color:#fff!important}.hookchart-root .scaleTools .scaleReset{font-size:9px;min-width:40px;padding:0 5px}.hookchart-root .scaleTools .scaleHistory{width:29px;min-width:29px;padding:0;display:grid;place-items:center}.hookchart-root .scaleTools .scaleHistory.active{color:#7ca7ff!important;background:rgba(91,141,239,.13)!important}.hookchart-root .scaleTools span{font-size:9px;color:#7f8b99;padding:0 3px;white-space:nowrap}.hookchart-root .scaleDockToggle{width:22px;min-width:22px;height:26px;padding:0;display:grid;place-items:center;background:transparent!important;border:0!important;border-radius:3px!important;box-shadow:none!important;outline:0!important;color:#a6b1bf;font-size:18px;line-height:1}.hookchart-root .scaleDockToggle:hover{background:rgba(120,123,134,.12)!important;color:#fff!important}.hookchart-root .barCountdown{height:26px;display:flex;align-items:center;padding:0 6px;border:0;color:#8f9cac;white-space:nowrap}.hookchart-root .barCountdown b{font-size:10.5px;font-weight:700;color:#d7dee8;letter-spacing:.15px}
+.hookchart-root .chartStage{width:100%;}
+.hookchart-root .timeJumpDock{position:absolute;z-index:18;left:7px;bottom:6px;font-variant-numeric:tabular-nums}.hookchart-root .timeJumpButton{width:26px;height:26px;padding:0;display:grid;place-items:center;background:transparent!important;border:0!important;border-radius:0!important;color:#aab5c4;box-shadow:none!important;outline:0!important}.hookchart-root .timeJumpButton:hover,.hookchart-root .timeJumpButton.active{background:transparent!important;border:0!important;color:#eef3f9!important;box-shadow:none!important;outline:0!important}.hookchart-root .timeJumpPopover{position:absolute;left:0;bottom:33px;width:270px;padding:9px;background:rgba(14,18,24,.98);border:1px solid #303a47;border-radius:7px;box-shadow:0 12px 34px rgba(0,0,0,.48);display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(6px)}.hookchart-root .jumpQuick,.hookchart-root .jumpMode,.hookchart-root .jumpHours{display:flex;gap:4px;flex-wrap:wrap}.hookchart-root .jumpQuick button,.hookchart-root .jumpMode button,.hookchart-root .jumpHours button{height:24px;padding:0 7px;border:1px solid #2e3946;background:#151b23;color:#8e9aaa;font-size:9px}.hookchart-root .jumpMode button{flex:1;justify-content:center}.hookchart-root .jumpMode button.sel{background:#1e5d96!important;border-color:#2c82ca;color:#fff!important}.hookchart-root .jumpField{display:grid;grid-template-columns:42px 1fr;align-items:center;gap:7px;color:#7f8b99;font-size:9px}.hookchart-root .jumpField input{height:28px;width:100%;background:#0b1016;border:1px solid #303946;border-radius:4px;color:#dbe3ed;padding:0 7px;font:10px system-ui;color-scheme:dark}.hookchart-root .jumpHours button{flex:1;justify-content:center}.hookchart-root .jumpGo{height:29px;justify-content:center;background:#1f67a5!important;border:1px solid #2d83c9;color:#fff!important;font-size:10px}.hookchart-root .jumpGo:disabled{opacity:.55;cursor:default}.hookchart-root .jumpMessage{color:#e58b92;font-size:9px;line-height:1.3}.hookchart-root .jumpZone{color:#667383;font-size:8px;text-align:right}.hookchart-root .chartWrap .timeJumpDock+ .chartScaleDock{z-index:12}@keyframes strategyPulse{from{opacity:.4}to{opacity:1}}.hookchart-root .strategyHud{position:absolute;z-index:9;left:82px;top:7px;max-width:min(440px,calc(100% - 210px));padding:6px 8px;background:rgba(12,16,22,.76);border:1px solid rgba(72,86,103,.5);border-radius:5px;backdrop-filter:blur(4px);pointer-events:none}.hookchart-root .strategyHud>div{display:flex;align-items:center;gap:7px}.hookchart-root .strategyHud b{font-size:9px;color:#e5ebf2}.hookchart-root .strategyHud span{font-size:8px;color:#8c9aab}.hookchart-root .strategyHud span.bull{color:#61cdb2}.hookchart-root .strategyHud span.bear{color:#ed8388}.hookchart-root .strategyHud span.neutral{color:#9eacbd}.hookchart-root .strategyHud small{display:block;margin-top:3px;font-size:8px;line-height:1.3;color:#aeb8c5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hookchart-root .strategyHud em{display:block;margin-top:2px;font-style:normal;font-size:7.5px;color:#657486;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:760px){.hookchart-root .strategyHud{max-width:calc(100% - 120px)}}
+.hookchart-root .indicatorToolBtn{width:28px;height:28px;padding:0;display:grid!important;place-items:center;background:transparent!important;border:0!important;color:#8591a1}.hookchart-root .indicatorToolBtn:hover,.hookchart-root .indicatorToolBtn.active{color:#62b7ff!important;background:rgba(47,139,231,.10)!important}.hookchart-root .indicatorDrawer{position:absolute;z-index:19;left:48px;top:285px;width:190px;padding:5px;background:rgba(13,17,23,.97);border:1px solid #303946;border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.46);backdrop-filter:blur(5px)}.hookchart-root .indicatorDrawerHead{height:29px;display:flex;align-items:center;padding:0 5px 4px;border-bottom:1px solid #252d37;margin-bottom:4px}.hookchart-root .indicatorDrawerHead b{font-size:10px;color:#dce4ee}.hookchart-root .indicatorDrawerHead button{margin-left:auto;width:25px;height:25px;padding:0;display:grid;place-items:center;font-size:17px;color:#8793a2}.hookchart-root .indicatorDrawer>button{width:100%;height:31px;padding:0 7px;display:grid;grid-template-columns:20px 1fr auto;gap:7px;align-items:center;text-align:left;color:#909dab}.hookchart-root .indicatorDrawer>button span{font-size:10px}.hookchart-root .indicatorDrawer>button em{font-style:normal;font-size:8px;color:#657486}.hookchart-root .indicatorDrawer>button.on{color:#dcecff!important;background:#14283a!important}.hookchart-root .indicatorDrawer>button.on em{color:#65b9ff}
+.hookchart-root .indicatorDrawer{top:258px;width:224px;max-height:min(440px,calc(100% - 270px));display:flex;flex-direction:column}.hookchart-root .indicatorDrawerList{overflow:auto;display:flex;flex-direction:column;gap:2px}.hookchart-root .indicatorDrawerList>button{width:100%;min-height:34px;padding:3px 7px;display:grid;grid-template-columns:34px 1fr auto;gap:7px;align-items:center;text-align:left;color:#909dab}.hookchart-root .indicatorDrawerList>button i{height:23px;min-width:30px;display:grid;place-items:center;border:1px solid #2f3946;border-radius:4px;font-style:normal;font-size:8px;font-weight:800;color:#7f8c9d;letter-spacing:.15px}.hookchart-root .indicatorDrawerList>button span{font-size:10px;color:inherit}.hookchart-root .indicatorDrawerList>button em{font-style:normal;font-size:8px;color:#657486}.hookchart-root .indicatorDrawerList>button.on{color:#dcecff!important;background:#14283a!important}.hookchart-root .indicatorDrawerList>button.on i{border-color:#3b79ab;color:#72c1ff;background:#102c42}.hookchart-root .indicatorDrawerList>button.on em{color:#65b9ff}
+.hookchart-root .indicatorDock{flex:0 1 auto;max-height:42%;min-height:0;overflow-y:auto;border-top:1px solid #20252d;background:#0e1217}.hookchart-root .indicatorPanel{height:104px;min-height:104px;position:relative;border-bottom:1px solid #222a33;background:#10151b}.hookchart-root .indicatorPanelHead{position:absolute;z-index:2;left:7px;right:4px;top:3px;height:17px;display:flex;align-items:center;gap:8px;pointer-events:none}.hookchart-root .indicatorPanelHead b{font-size:9px;color:#d8e1eb}.hookchart-root .indicatorPanelHead>span{font-size:7.5px;color:#596777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}.hookchart-root .indicatorPanelHead button{pointer-events:auto;margin-left:auto;width:20px;height:18px;padding:0;display:grid;place-items:center;color:#657282;font-size:14px}.hookchart-root .indicatorLatest{margin-left:auto;display:flex;align-items:center;gap:8px;white-space:nowrap}.hookchart-root .indicatorLatest em{font-style:normal;font-size:8px;font-weight:650}.hookchart-root .indicatorPanelHead button+.noop{display:none}.hookchart-root .indicatorPanel svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:hidden}.hookchart-root .indicatorGuide{stroke:#313b47;stroke-width:.7;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}.hookchart-root .indicatorLine{fill:none;stroke:#54b6ff;stroke-width:1.25;vector-effect:non-scaling-stroke}.hookchart-root .indicatorLine.series-1{stroke:#e2ad57}.hookchart-root .indicatorLine.series-2{stroke:#a879e5}.hookchart-root .indicatorBars rect{fill:#6b8298;opacity:.78}.hookchart-root .indicatorBars rect.pos{fill:#20D6C7}.hookchart-root .indicatorBars rect.neg{fill:#FF5964}.hookchart-root .indicatorBars.series-2 rect{fill:#9474bf}.hookchart-root .indicatorAxis{fill:#5f6e7e;font:8px system-ui}.hookchart-root .indicatorLatest .series-0{color:#62bcff}.hookchart-root .indicatorLatest .series-1{color:#e7b55e}.hookchart-root .indicatorLatest .series-2{color:#b18ae8}@media(max-width:760px){.hookchart-root .indicatorPanel{height:90px;min-height:90px}.hookchart-root .indicatorPanelHead>span{display:none}.hookchart-root .indicatorDock{max-height:36%}}
+.hookchart-root .liqRiskHud{position:absolute;z-index:17;top:7px;display:flex;align-items:flex-start;gap:2px;font-variant-numeric:tabular-nums;pointer-events:auto;overflow:hidden}.hookchart-root .liqRiskHud.open{padding:0}.hookchart-root .liqRiskContent{display:flex;flex-direction:column;align-items:flex-end;gap:1px;min-width:0;width:max-content;max-width:220px;padding:2px 3px;background:transparent;border:0;box-shadow:none;overflow:hidden}.hookchart-root .liqRiskContent b{font-size:10px;line-height:1.2;font-weight:750;color:#dbe4ee;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hookchart-root .liqRiskContent span{display:flex;align-items:baseline;gap:3px;font-size:8px;color:#7f8b9b;line-height:1.2}.hookchart-root .liqRiskContent span strong{font-weight:800}.hookchart-root .liqRiskContent span em{font-style:normal;font-size:7px;color:#697687}.hookchart-root .liqRiskContent small{font-size:7.25px;color:#626f80;line-height:1.2;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}.hookchart-root .liqRiskToggle{width:16px;min-width:16px;height:18px;padding:0;display:grid;place-items:center;background:transparent!important;border:0!important;box-shadow:none!important;outline:0!important;color:#778495;font-size:10px;line-height:1}.hookchart-root .liqRiskToggle:hover{background:transparent!important;color:#dce5ef!important}.hookchart-root .liqRiskHud.collapsed{top:5px}.hookchart-root .liqRiskHud.collapsed .liqRiskToggle{opacity:.7}.hookchart-root .indicatorDrawer{top:8px;bottom:8px;max-height:none}
+.hookchart-root .indicatorDock{flex:0 1 auto;max-height:42%;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;border-top:1px solid #20252d;background:#0e1217;overscroll-behavior:contain}.hookchart-root .indicatorDock::-webkit-scrollbar{width:0;height:0}.hookchart-root .indicatorPanel{height:104px;min-height:104px}.hookchart-root .indicatorPriceDivider{stroke:#364150;stroke-width:.7;vector-effect:non-scaling-stroke}
+.hookchart-root .chartTimeAxis{height:32px;min-height:32px;flex:0 0 32px;display:flex;position:relative;background:#11151b;border-top:1px solid #2b3541;overflow:hidden;user-select:none;font-variant-numeric:tabular-nums}.hookchart-root .chartTimePlot{height:100%;position:relative;flex:0 0 auto;overflow:hidden;contain:paint}.hookchart-root .chartTimeScaleSpacer{height:100%;flex:0 0 auto;position:relative;z-index:3;border-left:1px solid #364150;background:#11151b;color:#596777;font-size:7px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;overflow:hidden;white-space:nowrap;box-shadow:-1px 0 0 rgba(10,13,17,.8)}.hookchart-root .chartTimeTick{position:absolute;top:0;width:0;height:100%;pointer-events:none}.hookchart-root .chartTimeTick i{position:absolute;top:0;left:0;width:1px;height:5px;background:#536071}.hookchart-root .chartTimeTick span{position:absolute;top:8px;left:0;transform:translateX(-50%);font:10px system-ui;color:#7f8b9e;white-space:nowrap;line-height:14px}.hookchart-root .chartTimeTick.align-left span{left:4px;transform:none}.hookchart-root .chartTimeTick.align-right span{left:auto;right:4px;transform:none}.hookchart-root .chartTimeTick.major i{height:7px;background:#8996a7}.hookchart-root .chartTimeTick.major span{color:#bec8d4;font-weight:600}
+@media(max-width:760px){.hookchart-root .indicatorPanel{height:90px;min-height:90px}.hookchart-root .chartTimeAxis{height:30px;min-height:30px;flex-basis:30px}.hookchart-root .chartTimeTick span{font-size:9px}}
+.hookchart-root .chartWrap{background:#131722!important;isolation:isolate}
+.hookchart-root .chartWrap canvas{background:#131722;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;filter:none!important;opacity:1!important;transform:none!important;will-change:auto;outline:0}
+.hookchart-root .indicatorDock{background:#131722!important;border-top-color:#2A2E39!important}
+.hookchart-root .indicatorPanel{background:#131722!important;border-bottom-color:#2A2E39!important}
+.hookchart-root .indicatorPanel svg{shape-rendering:geometricPrecision;text-rendering:geometricPrecision}
+.hookchart-root .indicatorGuide{stroke:#2A2E39!important;stroke-width:1!important;stroke-dasharray:3 4!important}
+.hookchart-root .indicatorLine{stroke:#5B8DEF!important;stroke-width:1.35!important}
+.hookchart-root .indicatorLine.series-1{stroke:#F4B860!important}.hookchart-root .indicatorLine.series-2{stroke:#9B7EDE!important}
+.hookchart-root .indicatorBars rect{fill:#6F7D90!important;opacity:.72!important}.hookchart-root .indicatorBars rect.pos{fill:#0ECB81!important}.hookchart-root .indicatorBars rect.neg{fill:#F6465D!important}.hookchart-root .indicatorBars.series-2 rect{fill:#8A72C7!important}
+.hookchart-root .indicatorAxis{fill:#787B86!important;font:500 8px Inter,system-ui,sans-serif!important}
+.hookchart-root .indicatorPanelHead b{color:#D1D4DC!important}.hookchart-root .indicatorPanelHead>span{color:#787B86!important}
+.hookchart-root .indicatorLatest .series-0{color:#7CA7FF!important}.hookchart-root .indicatorLatest .series-1{color:#F4B860!important}.hookchart-root .indicatorLatest .series-2{color:#B59CE5!important}
+.hookchart-root .indicatorPriceDivider{stroke:#2A2E39!important;stroke-width:1!important}
+.hookchart-root .chartTimeAxis{background:#131722!important;border-top-color:#2A2E39!important}
+.hookchart-root .chartTimeScaleSpacer{background:#131722!important;border-left-color:#2A2E39!important;color:#787B86!important;box-shadow:-1px 0 0 #0F1218!important}
+.hookchart-root .chartTimeTick i{background:#4C525E!important}.hookchart-root .chartTimeTick span{color:#9598A1!important;font:500 10px Inter,system-ui,sans-serif!important}.hookchart-root .chartTimeTick.major i{background:#787B86!important}.hookchart-root .chartTimeTick.major span{color:#D1D4DC!important;font-weight:600!important}
+.hookchart-root .indicatorLiveBadge{display:inline-flex;align-items:center;height:13px;padding:0 4px;border:1px solid rgba(34,171,148,.45);border-radius:4px;background:rgba(34,171,148,.10);color:#4DD6BC;font:700 7px/1 system-ui;letter-spacing:.06em}
+.hookchart-root .indicatorLiveDot{stroke:#131722;stroke-width:1.2;vector-effect:non-scaling-stroke;animation:oiLivePulse 1.35s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.hookchart-root .indicatorLiveDot.series-0{fill:#7CA7FF}.hookchart-root .indicatorLiveDot.series-1{fill:#F4B860}.hookchart-root .indicatorLiveDot.series-2{fill:#B59CE5}
+@keyframes oiLivePulse{0%,100%{opacity:.72;transform:scale(.9)}50%{opacity:1;transform:scale(1.35)}}
+@media (prefers-reduced-motion:reduce){.hookchart-root .indicatorLiveDot{animation:none}}
+.hookchart-root .chartStage>.chartWrap{
+  padding-bottom:10px;
+}
+.hookchart-root .chartStage>.chartWrap>canvas{
+  height:100%;
+}
+.hookchart-root .barCountdown{
+  height:24px;
+  padding:0 5px;
+}
+.hookchart-root .barCountdown b{
+  font-size:10px;
+}
+.hookchart-root .scaleTools{
+  gap:1px;
+}
+.hookchart-root .scaleTools button,
+.hookchart-root .scaleDockToggle{
+  height:24px;
+}
+.hookchart-root .scaleTools button{
+  min-width:24px;
+  padding:0 4px;
+}
+.hookchart-root .scaleTools .scaleReset{
+  min-width:38px;
+  font-size:9px;
+}
+.hookchart-root .scaleTools .scaleHistory{
+  width:27px;
+  min-width:27px;
+}
+.hookchart-root .scaleTools>span{
+  display:none!important;
+}
+.hookchart-root .chartTimeAxis{
+  height:24px!important;
+  min-height:24px!important;
+  flex:0 0 24px!important;
+}
+.hookchart-root .chartTimeTick i{
+  height:4px!important;
+}
+.hookchart-root .chartTimeTick.major i{
+  height:6px!important;
+}
+.hookchart-root .chartTimeTick span{
+  top:6px!important;
+  font-size:9px!important;
+  line-height:12px!important;
+}
+.hookchart-root .chartTimeScaleSpacer{
+  padding-bottom:2px!important;
+  font-size:6.5px!important;
+}
+@media(max-width:760px){
+  .hookchart-root .chartStage>.chartWrap{padding-bottom:9px}
+  .hookchart-root .chartTimeAxis{height:23px!important;min-height:23px!important;flex-basis:23px!important}
+  .hookchart-root .chartTimeTick span{top:6px!important;font-size:8.5px!important}
+}
+.hookchart-root .chartStage>.chartWrap{
+  height:calc(100% - 8px);
+  overflow:visible;
+}
+@media(max-width:760px){
+  .hookchart-root .chartStage>.chartWrap{height:calc(100% - 7px)}
+}
+.hookchart-root .chartStage{
+  overflow:visible!important;
+  z-index:4;
+}
+.hookchart-root .chartStage>.chartWrap{
+  height:100%!important;
+  padding-bottom:0!important;
+  overflow:visible!important;
+}
+.hookchart-root .chartTimeAxis{
+  z-index:2;
+}
+@media(max-width:760px){
+  .hookchart-root .chartStage>.chartWrap{height:100%!important;padding-bottom:0!important}
+}
+
+@media(max-width:900px){
+  .hookchart-root .chartStage,.hookchart-root .chartWrap{min-width:0;min-height:0}
+  .hookchart-root .indicatorToolBtn{width:32px;height:32px;min-width:32px}
+
+  .hookchart-root .chartStage{flex:1 1 auto;min-height:180px}
+  .hookchart-root .indicatorDrawer{
+    left:48px;
+    top:6px;
+    bottom:6px;
+    width:min(236px,calc(100vw - 62px - env(safe-area-inset-right)));
+    max-height:none;
+  }
+  .hookchart-root .indicatorDrawerList>button{min-height:38px}
+  .hookchart-root .strategyHud{left:48px;top:5px;max-width:calc(100% - 150px);padding:5px 7px}
+  .hookchart-root .liqRiskContent{max-width:125px}
+
+  .hookchart-root .indicatorDock{max-height:34%}
+  .hookchart-root .indicatorPanel{height:86px;min-height:86px}
+  .hookchart-root .indicatorPanelHead{right:3px;gap:5px}
+  .hookchart-root .indicatorLatest{gap:5px;max-width:58%;overflow:hidden}
+  .hookchart-root .indicatorLatest em{font-size:7.5px}
+  .hookchart-root .indicatorPanelHead>span{display:none}
+
+  .hookchart-root .chartTimeAxis{height:23px!important;min-height:23px!important;flex-basis:23px!important}
+  .hookchart-root .chartTimeTick span{font-size:8.5px!important}
+  .hookchart-root .timeJumpPopover{
+    width:min(300px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height:min(420px,calc(100dvh - 100px));
+    overflow:auto;
+  }
+}
+
+@media(max-width:520px){
+  .hookchart-root .strategyHud{max-width:calc(100% - 112px)}
+  .hookchart-root .strategyHud em{display:none}
+  .hookchart-root .liqRiskContent{max-width:108px}
+  .hookchart-root .liqRiskContent small{display:none}
+  .hookchart-root .indicatorDock{max-height:31%}
+  .hookchart-root .indicatorPanel{height:78px;min-height:78px}
+  .hookchart-root .indicatorLatest{max-width:52%;gap:4px}
+  .hookchart-root .indicatorLatest em{font-size:7px}
+  .hookchart-root .barCountdown{padding:0 3px}.hookchart-root .barCountdown b{font-size:9px}
+  .hookchart-root .scaleTools{gap:0}.hookchart-root .scaleTools button{min-width:24px;height:23px;padding:0 3px}.hookchart-root .scaleTools .scaleReset{min-width:36px;font-size:8px}.hookchart-root .scaleTools .scaleHistory{min-width:25px;width:25px}
+}
+
+@media(max-height:520px) and (orientation:landscape){
+  .hookchart-root .indicatorDock{max-height:28%}
+  .hookchart-root .indicatorPanel{height:68px;min-height:68px}
+}
+
+@media(pointer:coarse){
+  .hookchart-root .indicatorDrawer button{touch-action:manipulation}
+}
+.hookchart-root .indicatorPanel.oiPanel{
+  height:118px;
+  min-height:118px;
+  background:#131722!important;
+  border-bottom:1px solid #2A2E39!important;
+}
+.hookchart-root .oiPanel .indicatorPanelHead{
+  top:4px;
+  height:18px;
+  left:8px;
+  right:4px;
+  gap:6px;
+}
+.hookchart-root .oiPanel .indicatorPanelHead b{
+  color:#D1D4DC!important;
+  font:600 10px/1 Inter,system-ui,sans-serif;
+  letter-spacing:.01em;
+}
+.hookchart-root .oiPanel .indicatorPanelHead b i{
+  color:#787B86;
+  font-style:normal;
+  font-weight:500;
+}
+.hookchart-root .oiPanel .indicatorLatest{
+  gap:10px;
+  margin-left:8px;
+  margin-right:auto;
+}
+.hookchart-root .oiPanel .indicatorLatest em{
+  font:600 8px/1 Inter,system-ui,sans-serif;
+}
+.hookchart-root .oiPanel .indicatorLatest .series-total{color:#5B8DEF!important}
+.hookchart-root .oiPanel .indicatorLatest .series-bin{color:#26A69A!important}
+.hookchart-root .oiPanel .indicatorLatest .series-byb{color:#F4B860!important}
+.hookchart-root .oiPanel .indicatorLiveBadge{
+  height:14px;
+  padding:0 5px;
+  border-color:rgba(38,166,154,.40);
+  background:rgba(38,166,154,.10);
+  color:#4DD6BC;
+  font-size:7px;
+}
+.hookchart-root .oiPanel .indicatorLine{
+  fill:none;
+  vector-effect:non-scaling-stroke;
+}
+.hookchart-root .oiPanel .indicatorLine.series-total{
+  stroke:#5B8DEF!important;
+  stroke-width:1.65!important;
+}
+.hookchart-root .oiPanel .indicatorLine.series-bin{
+  stroke:#26A69A!important;
+  stroke-width:1.05!important;
+  opacity:.86;
+}
+.hookchart-root .oiPanel .indicatorLine.series-byb{
+  stroke:#F4B860!important;
+  stroke-width:1.05!important;
+  opacity:.82;
+}
+.hookchart-root .oiArea{
+  fill:url(#oi-total-fill);
+  stroke:none;
+  pointer-events:none;
+}
+.hookchart-root .oiGrid{
+  stroke:#2A2E39;
+  stroke-width:1;
+  vector-effect:non-scaling-stroke;
+  opacity:.82;
+}
+.hookchart-root .oiCrosshair{
+  stroke:#758696;
+  stroke-width:.8;
+  stroke-dasharray:3 3;
+  vector-effect:non-scaling-stroke;
+  pointer-events:none;
+  opacity:.72;
+}
+.hookchart-root .oiCrosshair.horizontal{
+  opacity:.46;
+}
+.hookchart-root .oiPanel .indicatorLiveDot{
+  animation:none!important;
+  vector-effect:non-scaling-stroke;
+  stroke:#131722;
+  stroke-width:1.1;
+}
+.hookchart-root .oiPanel .indicatorLiveDot.series-total{fill:#5B8DEF}
+.hookchart-root .oiPanel .indicatorLiveDot.series-bin{fill:#26A69A}
+.hookchart-root .oiPanel .indicatorLiveDot.series-byb{fill:#F4B860}
+.hookchart-root .oiPanel .indicatorAxis{
+  fill:#787B86!important;
+  font:500 8px/1 Inter,system-ui,sans-serif!important;
+}
+.hookchart-root .oiLastValue rect{
+  fill:#2962FF;
+}
+.hookchart-root .oiLastValue text{
+  fill:#fff;
+  font:600 8px/1 Inter,system-ui,sans-serif;
+  dominant-baseline:middle;
+}
+.hookchart-root .oiPanel svg{
+  cursor:crosshair;
+  touch-action:pan-y;
+}
+@media(max-width:760px){
+  .hookchart-root .indicatorPanel.oiPanel{height:100px;min-height:100px}
+  .hookchart-root .oiPanel .indicatorLatest{gap:5px;max-width:62%;overflow:hidden}
+  .hookchart-root .oiPanel .indicatorLatest em{font-size:7px}
+  .hookchart-root .oiPanel .indicatorPanelHead b{font-size:9px}
+}
+@media(max-width:480px){
+  .hookchart-root .indicatorPanel.oiPanel{height:92px;min-height:92px}
+  .hookchart-root .oiPanel .indicatorLatest{max-width:54%}
+  .hookchart-root .oiPanel .indicatorLatest .series-byb{display:none}
+}
+
+/* Price scale is a transparent overlay: chart/time content continues underneath it. */
+.hookchart-root .chartTimeScaleSpacer{
+  position:absolute!important;
+  top:0;
+  right:0;
+  flex:none!important;
+  background:transparent!important;
+  border-left:0!important;
+  box-shadow:none!important;
+}

@@ -1,0 +1,65 @@
+name: Validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - name: Install browser test driver
+        run: |
+          for attempt in 1 2 3; do
+            if npm install --prefix "$RUNNER_TEMP/hook2-browser-driver" --no-save --package-lock=false --fetch-retries=4 playwright-core@1.62.1; then
+              ln -s "$RUNNER_TEMP/hook2-browser-driver/node_modules/playwright-core" node_modules/playwright-core
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+      - name: Test real Chrome wheel input
+        run: CHROME_BIN="$(command -v google-chrome)" node tests/fixtures/hookchart-wheel-browser.mjs
+      - name: Test free registration and permanent account access in production Chrome
+        run: CHROME_BIN="$(command -v google-chrome)" node tests/fixtures/access-browser.mjs
+      - run: npm test
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate VPS Compose and HTTPS configuration
+        run: |
+          cp .env.example .env
+          docker compose -p hook2 -f compose.yaml -f compose.vps.yaml config --quiet
+          docker run --rm -e DOMAIN=h00k.top -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+          bash -n deploy/install-docker-ubuntu.sh deploy/backup-vps.sh deploy/enable-auto-deploy.sh
+      - name: Build production image
+        run: docker build --build-arg SOURCE_COMMIT=${{ github.sha }} -t hook2:ci .
+      - name: Verify production sessions and rules across container restart
+        run: |
+          export SMOKE_RELEASE=${{ github.sha }}
+          docker volume create hook2-ci-data
+          docker run -d --name hook2-ci -p 127.0.0.1:19228:3000 -v hook2-ci-data:/data -e TELEGRAM_BOT_TOKEN= hook2:ci
+          node tests/fixtures/container-smoke.mjs create "$RUNNER_TEMP/hook2-smoke.json"
+          docker restart -t 30 hook2-ci
+          node tests/fixtures/container-smoke.mjs verify "$RUNNER_TEMP/hook2-smoke.json"
+      - name: Container diagnostics and cleanup
+        if: always()
+        run: |
+          docker logs --tail=50 hook2-ci 2>/dev/null || true
+          docker rm -f hook2-ci 2>/dev/null || true
+          docker volume rm hook2-ci-data 2>/dev/null || true
+

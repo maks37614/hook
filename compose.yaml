@@ -1,0 +1,28 @@
+services:
+  hook2:
+    image: ${HOOK2_IMAGE:-hook2:local}
+    build:
+      context: .
+      args:
+        SOURCE_COMMIT: ${HOOK2_RELEASE_SHA:-manual}
+        FIREBASE_AUTH_DOMAIN_OVERRIDE: ${FIREBASE_AUTH_DOMAIN_OVERRIDE:-}
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - hook2-data:/data
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  hook2-data:

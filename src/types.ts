@@ -1,0 +1,895 @@
+export type ExchangeId = 'binance' | 'bybit';
+export type MarketType = 'futures' | 'spot';
+export type ChartProvider = 'tradingview' | 'hookchart';
+export type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+export type ActivePageType = 'patterns' | 'screener' | 'terminal' | 'surveillance' | 'densities' | 'replay';
+
+export type TerminalBlockMode = 'tradingview' | 'pattern' | 'orderbook' | 'combined';
+
+export interface TerminalChartBlock {
+  id: string;
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  timeframe: Timeframe;
+  mode: TerminalBlockMode;
+  formationId?: string;
+  colSpan?: 1 | 2 | 3 | 4 | 'full';
+  heightPx?: number;
+  domSettings?: {
+    compression?: number; // 1, 2, 5, 10, 20, 50, 100
+    depth?: 'all' | 'deep' | 'medium' | 'small';
+    densityThresholdUsd?: number;
+    bubbleThresholdUsd?: number;
+    soundAlertEnabled?: boolean;
+    clusterTimeframe?: Timeframe;
+    heightPreset?: 'md' | 'lg' | 'xl';
+  };
+}
+
+export interface TerminalWorkspaceConfig {
+  layoutPreset: '1x1' | '1x2' | '2x1' | '2x2' | '2x3' | '3x3' | '4x4' | '5x5' | '6x6' | 'custom';
+  columns: 1 | 2 | 3 | 4 | 5 | 6;
+  autoFitScreen: boolean;
+  blocks: TerminalChartBlock[];
+  showFormations: boolean;
+  blockHeight: 'compact' | 'medium' | 'large';
+  globalTimeframe?: Timeframe;
+  coinPresetExchange?: 'all' | ExchangeId;
+  coinPresetMarketType?: 'all' | MarketType;
+  coinPresetLimit?: number;
+}
+
+export type PatternCategory = 'reversal' | 'continuation' | 'breakout' | 'compression' | 'candlestick';
+export type PatternBias = 'bullish' | 'bearish' | 'neutral';
+export type PatternStatus = 'forming' | 'breakout' | 'ready_to_break' | 'retest' | 'target_reached';
+
+export interface Kline {
+  time: number; // Unix timestamp in seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface PatternLevel {
+  label: string;
+  price: number;
+  type: 'support' | 'resistance' | 'neckline' | 'target' | 'stop_loss' | 'trigger';
+}
+
+export type ExtremeRole = 'UPPER_EXTREME' | 'LOWER_EXTREME' | 'MID_RANGE';
+export type ExtremeApproach = 'APPROACHING' | 'TESTING' | 'REJECTING' | 'BREAKING' | 'MOVING_AWAY' | 'NEUTRAL';
+
+export interface ExtremeContext {
+  role: ExtremeRole;
+  referencePrice: number;
+  distancePct: number;
+  rangePositionPct: number;
+  approach: ExtremeApproach;
+  approachStrength: number; // 0-100
+  barsToExtreme: number;
+  velocityPct: number;
+  rejectionStrength: number; // 0-100
+  sweepDetected: boolean;
+  testsCount: number;
+  aligned: boolean;
+  reason: string;
+}
+
+export interface ConfluenceComponent {
+  score: number;
+  max: number;
+  status: 'CONFIRMED' | 'PARTIAL' | 'MISSING' | 'CONFLICT';
+  evidence: string;
+}
+
+export interface ConfluenceBreakdown {
+  total: number;
+  grade: 'A+' | 'A' | 'B' | 'C' | 'D';
+  components: {
+    formation: ConfluenceComponent;
+    extremeLocation: ConfluenceComponent;
+    trigger: ConfluenceComponent;
+    retest: ConfluenceComponent;
+    volume: ConfluenceComponent;
+    volatility: ConfluenceComponent;
+    level: ConfluenceComponent;
+    riskReward: ConfluenceComponent;
+    dataQuality: ConfluenceComponent;
+  };
+  independentConfirmations: number;
+  conflicts: string[];
+  missing: string[];
+  notes: string[];
+}
+
+export interface FormationValidation {
+  passed: boolean;
+  confirmed: boolean;
+  closedCandleOnly: boolean;
+  lookAheadSafe: boolean;
+  enoughData: boolean;
+  finiteData: boolean;
+  swingQuality: number;
+  equalExtremaTolerancePct: number;
+  atrPct: number;
+  breakoutConfirmed: boolean;
+  breakoutPrice?: number;
+  breakoutIndex?: number;
+  entryMode: 'BREAKOUT' | 'RETEST' | 'WAIT_RETEST' | 'WAIT_BREAKOUT';
+  entryPrice: number;
+  stopPrice: number;
+  targetPrice: number;
+  riskReward: number;
+  minRiskReward: number;
+  volumeRatio: number;
+  volatilityPct: number;
+  nearbyLevelDistancePct: number;
+  filters: { volume: boolean; volatility: boolean; nearbyLevel: boolean; structure: boolean };
+  rejectionReasons: string[];
+  confluence?: ConfluenceBreakdown;
+}
+
+export interface RoundNumberContext {
+  detected: boolean;
+  level?: number;
+  distancePct: number;
+  step: number;
+  strength: number;
+  densityConfirmed: boolean;
+  densityUsd?: number;
+  side?: 'BID' | 'ASK';
+}
+
+export interface DetectedFormation {
+  id: string;
+  patternKey: string;
+  name: string;
+  nameEn: string;
+  category: PatternCategory;
+  bias: PatternBias;
+  confidence: number; // 0 - 100
+  extremeContext?: ExtremeContext;
+  validation?: FormationValidation;
+  roundNumberContext?: RoundNumberContext;
+  status: PatternStatus;
+  statusLabel: string;
+  description: string;
+  levels: {
+    entryPrice: number;
+    targetPrice: number;
+    stopLossPrice: number;
+    supportPrice?: number;
+    resistancePrice?: number;
+    necklinePrice?: number;
+  };
+  riskRewardRatio: number;
+  potentialProfitPct: number;
+  potentialRiskPct: number;
+  detectedAt: number;
+  candleStartIndex?: number;
+  candleEndIndex?: number;
+  structureEndIndex?: number;
+}
+
+export interface RoundNumberDensity {
+  level: number;
+  side: 'BID' | 'ASK';
+  notionalUsd: number;
+  distancePct: number;
+  quality: number;
+}
+
+export interface ScannedCoin {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  currentPrice: number;
+  priceChange24h: number;
+  highPrice24h: number;
+  lowPrice24h: number;
+  volume24hUsd: number;
+  volumeUsd?: number;
+  formations: DetectedFormation[];
+  roundNumberDensity?: RoundNumberDensity;
+  timeframe: Timeframe;
+  lastUpdated: number;
+  exchangeUrl: string;
+  high24h?: number;
+  low24h?: number;
+  hasFormations?: boolean;
+  bestFormation?: DetectedFormation;
+}
+
+export interface ScreenerFilterState {
+  exchange: 'all' | ExchangeId;
+  marketType: 'all' | MarketType;
+  timeframe: Timeframe;
+  category: 'all' | PatternCategory;
+  bias: 'all' | PatternBias;
+  status: 'all' | PatternStatus;
+  minVolumeUsd: number; // in USD
+  searchQuery: string;
+  sortBy: 'confidence' | 'volume' | 'priceChange' | 'profitPotential';
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface FormationAIAnalysis {
+  summary: string;
+  patternConfirmation: string;
+  targetAnalysis: string;
+  invalidationCriteria: string;
+  volumeRecommendation: string;
+  tradeScenario: {
+    recommendedEntry: string;
+    tp1: string;
+    tp2: string;
+    stopLoss: string;
+    rrRatio: string;
+  };
+  keyRisks: string[];
+}
+
+export type AlertCondition = 'gte' | 'lte';
+export type AlertLevelType = 'entry' | 'target' | 'stop_loss' | 'custom';
+
+export interface PriceAlert {
+  id: string;
+  userId?: string;
+  symbol: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  targetPrice: number;
+  condition: AlertCondition; // 'gte' (>=) or 'lte' (<=)
+  note?: string;
+  formationName?: string;
+  levelType?: AlertLevelType;
+  setupId?: string; // Grouping ID: setupId ├── ENTRY, ├── TARGET, └── STOP
+  setupRole?: 'ENTRY' | 'TARGET' | 'STOP';
+  createdAt: number;
+  isActive: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  triggeredPrice?: number;
+  deliveryGeneration?: number;
+  // Per-user telegram credentials
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  language?: 'uk' | 'en' | 'ru' | 'pl';
+}
+
+export interface AlertHistoryItem {
+  id: string;
+  userId: string;
+  alertId?: string;
+  symbol: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  condition: AlertCondition;
+  targetPrice: number;
+  triggeredPrice: number;
+  formationName?: string;
+  levelType?: AlertLevelType;
+  note?: string;
+  triggeredAt: number;
+  telegramSent: boolean;
+  telegramError?: string;
+  telegramStatus?: 'sent' | 'failed' | 'not_configured';
+  createdAt?: string;
+}
+
+export interface MetaScalpSettings {
+  enabled: boolean;
+  port: number;
+  binding: string; // '001' - '500'
+  autoSwitchOnClick: boolean;
+  soundFeedback?: boolean;
+}
+
+export interface ChartTradeMarkerSettings {
+  showEntry: boolean;
+  showTarget: boolean;
+  showStop: boolean;
+  entryColor?: string;
+  targetColor?: string;
+  stopColor?: string;
+  customLevels?: Record<string, { entry?: number; target?: number; stop?: number; note?: string }>;
+}
+
+export interface OrderbookUserSettings {
+  compression?: number;
+  depth?: 'all' | 'deep' | 'medium' | 'small';
+  densityThresholdUsd?: number;
+  bubbleThresholdUsd?: number;
+  soundAlertEnabled?: boolean;
+  heightPreset?: 'md' | 'lg' | 'xl';
+  showClusters?: boolean;
+}
+
+export interface TerminalWorkspaceSettings {
+  columns: number;
+  blockHeight: 'compact' | 'medium' | 'large' | 'tall';
+  blocks: any[];
+  config?: Omit<TerminalWorkspaceConfig, 'blocks'>;
+  customPresets?: TerminalSavedPreset[];
+}
+
+export interface TerminalSavedPreset {
+  id: string;
+  name: string;
+  blocks: TerminalChartBlock[];
+  columns: TerminalWorkspaceConfig['columns'];
+  blockHeight: TerminalWorkspaceConfig['blockHeight'];
+  createdAt: number;
+}
+
+export interface SearchUserSettings {
+  minVolumeUsd?: number;
+  presetFilter?: ScreenerPresetFilter;
+  sortBy?: ScreenerSortBy;
+  sortDirection?: 'asc' | 'desc';
+}
+
+export interface UserProfile {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  telegramBotUsername?: string;
+  defaultExchange?: 'all' | ExchangeId;
+  defaultMarketType?: 'all' | MarketType;
+  defaultTimeframe?: Timeframe;
+  defaultChartProvider?: ChartProvider;
+  /** Shared layout preference for TradingView and HookChart formation details. */
+  formationPanelCollapsed?: boolean;
+  /** Smart analysis visibility shared by both chart providers; collapsed by default. */
+  smartAnalysisCollapsed?: boolean;
+  hookChartPreferences?: HookChartPreferences;
+  timeZone?: string;
+  soundAlertsEnabled?: boolean;
+  watchlist?: string[];
+  watchlistFolders?: Record<string, string[]>;
+  metaScalpSettings?: MetaScalpSettings;
+  chartTradeMarkers?: ChartTradeMarkerSettings;
+  orderbookSettings?: OrderbookUserSettings;
+  terminalSettings?: TerminalWorkspaceSettings;
+  searchSettings?: SearchUserSettings;
+  inviteCode?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  chartLabelSettings?: { entry: boolean; target: boolean; stop: boolean };
+  exchangeApiCredentials?: ExchangeApiCredentials[];
+}
+
+export interface HookChartDrawing {
+  id: string;
+  type: string;
+  pts: Array<{ t: number; p: number }>;
+  text?: string;
+}
+
+export interface HookChartAlert {
+  id: string;
+  p: number;
+  kind: 'level' | 'ray';
+  created: number;
+  fired?: boolean;
+}
+
+export interface HookChartPreferences {
+  drawingToolbarOpen?: boolean;
+  indicators?: string[];
+  overlays?: string[];
+  drawings?: Record<string, HookChartDrawing[]>;
+  alerts?: Record<string, HookChartAlert[]>;
+
+  language?: 'uk' | 'pl' | 'ru' | 'en';
+  /** Site language when the chart language was last selected or synchronized. */
+  siteLanguageAtSelection?: 'uk' | 'pl' | 'ru' | 'en';
+  timezone?: string;
+  tooltips?: boolean;
+  notificationOpenNew?: boolean;
+
+  /** Space after the latest candle, measured in candles with rightPaddingVersion 2. */
+  rightPadding?: number;
+  rightPaddingEnabled?: boolean;
+  rightPaddingVersion?: number;
+  chartToolbar?: boolean;
+  showTopToolbarIcons?: boolean;
+  notificationDialog?: boolean;
+  singleWindowSize?: number;
+  pagingButtons?: boolean;
+  sharedDrawings?: boolean;
+  duplicateCrosshair?: boolean;
+  showMarketPrintSums?: boolean;
+  showVolumes?: boolean;
+  showMarketStatsBar?: boolean;
+  showLiquidations?: boolean;
+  showLiqRiskBlock?: boolean;
+
+  gridHorizontal?: boolean;
+  gridVertical?: boolean;
+  candleLongColor?: string;
+  candleShortColor?: string;
+  densityLineColor?: string;
+  densityLabelColor?: string;
+  densityLineWidth?: number;
+  densityLineStyle?: 'solid' | 'dash' | 'dot';
+  densityLabelSize?: number;
+
+  sortEnabled?: string[];
+  sortDisabled?: string[];
+  analyzedIntervals?: string[];
+  scoring?: boolean;
+
+  roundDistance?: boolean;
+  roundness?: number;
+  roundGrid?: boolean;
+
+  levelIntervals?: string[];
+  showNearestLevels?: boolean;
+  levelCandleCount?: number;
+  levelHistory?: number;
+  levelCount?: number;
+  levelDiff?: number;
+  levelBreak?: number;
+  levelLabelMode?: 'always' | 'hover' | 'off';
+  levelLabelColor?: string;
+  levelLabelSize?: number;
+  levelLabelStyle?: 'text' | 'filled' | 'outline';
+  levelLineStyle?: 'solid' | 'dash' | 'dot';
+  showBrokenLevels?: boolean;
+  allowWick?: boolean;
+
+  trendIntervals?: string[];
+  trendHistory?: number;
+
+  densityAnalysis?: boolean;
+  densityTop?: boolean;
+  densityBaseVolume?: boolean;
+  densityImbalance?: boolean;
+  showDensityLines?: boolean;
+  showDensityLabels?: boolean;
+  showDensityAmounts?: boolean;
+  densityTimeoutMin?: number;
+  densityDiffPct?: number;
+  densityAutoMultiplier?: number;
+  densityNearLevelsOnly?: boolean;
+  densityMode?: 'auto' | 'manual';
+  densityThreshold?: number;
+
+  oiColumn?: boolean;
+  oiDisplay?: 'value' | 'change';
+  oiBaseChange?: boolean;
+  oiPeriod?: '1h' | '12h' | '24h';
+  fundingColumn?: boolean;
+  change24?: boolean;
+  volume24?: boolean;
+
+  natrTf?: string;
+  natrPeriod?: number;
+  vrTf?: string;
+  vrCandles?: number;
+  pDeltaTf?: string;
+  pAvgTf?: string;
+  pAvgCandles?: number;
+  rBtcTf?: string;
+  rBtcCandles?: number;
+  tradesWindow?: string;
+  tradesTA?: boolean;
+  tradesTR?: boolean;
+  tradesCandles?: number;
+
+  autoSR?: boolean;
+  showSRLabels?: boolean;
+  autoPrevDay?: boolean;
+  autoDayOpen?: boolean;
+  autoVWAP?: boolean;
+  autoLocalHL?: boolean;
+  autoRoundLevels?: boolean;
+  autoChannel?: boolean;
+  autoPOC?: boolean;
+  autoStops?: boolean;
+
+  strategyId?: string;
+  hotkeys?: Record<string, string>;
+}
+
+export interface TelegramConfig {
+  botToken?: string;
+  chatId?: string;
+}
+
+export interface TelegramStatus {
+  isConfigured: boolean;
+  botUsername?: string;
+  chatId?: string;
+  hasEnvToken: boolean;
+  hasEnvChatId: boolean;
+}
+
+export type ScreenerPresetFilter =
+  | 'all'
+  | 'active'
+  | 'top_gainers'
+  | 'top_losers'
+  | 'near_highs'
+  | 'near_lows';
+
+export type ScreenerSortBy =
+  | 'volume'
+  | 'priceChange'
+  | 'price'
+  | 'volatility'
+  | 'distanceToHigh'
+  | 'distanceToLow';
+
+export interface MarketCoin {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  price: number;
+  change24h: number;
+  volumeUsd: number;
+  high24h: number;
+  low24h: number;
+  distanceToHighPct: number;
+  distanceToLowPct: number;
+  volatility24hPct: number;
+  volatility5mPct?: number;
+  location?: import('./utils/marketLocation').MarketLocation;
+  isNearHigh: boolean;
+  isNearLow: boolean;
+  isActiveCoin: boolean;
+  exchangeUrl: string;
+  hasFormations?: boolean;
+  formationsCount?: number;
+}
+
+export interface ChartMarkerInfo {
+  id: string;
+  type: 'entry' | 'target' | 'stop_loss' | 'neckline' | 'resistance' | 'support' | 'custom' | 'pattern_point';
+  label: string;
+  price: number;
+  color: string;
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  lineWidth?: number;
+  timeframe?: Timeframe; // Source interval for support/resistance labels
+  time?: number; // Candle timestamp in seconds
+  position?: 'aboveBar' | 'belowBar' | 'inBar';
+  shape?: 'circle' | 'square' | 'arrowUp' | 'arrowDown';
+  notes?: string;
+}
+
+export interface ChartRestoreParams {
+  timeframe: Timeframe;
+  historyLimit: number;
+  lastClosePrice: number;
+  visibleRange?: { from: number; to: number };
+  savedAtCandleTime?: number;
+}
+
+export interface ArchivedFormation {
+  id: string;
+  userId: string;
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  timeframe: Timeframe;
+  formationName: string;
+  bias: PatternBias;
+  confidence?: number;
+  status?: PatternStatus;
+  entryPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  necklinePrice?: number;
+  resistancePrice?: number;
+  supportPrice?: number;
+  savedPrice: number;
+  formation: DetectedFormation;
+  markers: ChartMarkerInfo[];
+  chartParams: ChartRestoreParams;
+  notes?: string;
+  createdAt: string;
+  savedAtTimestamp: number;
+}
+
+export type { SmartAnalysisData } from './types/smartAnalysis';
+
+export interface MarketSentimentData {
+  compositeScore: number; // 0 to 100
+  sentimentState: 'extreme_fear' | 'fear' | 'neutral' | 'greed' | 'extreme_greed';
+  sentimentLabel: string;
+  summary: string;
+
+  priceTrendDynamics: {
+    advancingCount: number;
+    decliningCount: number;
+    advancingPct: number;
+    trendBias: 'bullish' | 'bearish' | 'neutral';
+    avgChange24h: number;
+  };
+
+  tradingVolume: {
+    total24hUsd: number;
+    volumeVelocity: 'high' | 'normal' | 'low';
+    volumeChangePct: number;
+  };
+
+  marketVolatility: {
+    index: number; // 0 - 100
+    label: string;
+    avgDailyRangePct: number;
+  };
+
+  marketBreadth: {
+    aboveEma20Pct: number;
+    nearHighsPct: number;
+    nearLowsPct: number;
+    breadthScore: number;
+    verdict: string;
+  };
+
+  capitalFlow: {
+    netInflow24hUsd: number;
+    direction: 'inflow' | 'outflow' | 'neutral';
+    label: string;
+  };
+
+  derivativesOverview: {
+    aggregatedOIUsd: number;
+    oiChange24hPct: number;
+    avgFundingRate: number;
+    fundingBias: 'long_heavy' | 'short_heavy' | 'balanced';
+  };
+
+  lastUpdated: number;
+}
+
+export type SurveillanceEventType = 'structure' | 'level' | 'momentum' | 'risk';
+
+export type TriggerModeType = 'bar_close' | 'realtime' | 'bar_close_15m' | 'bar_close_1h';
+
+export interface SurveillanceConfig {
+  timeframe: Timeframe;
+  triggerModes: TriggerModeType[];
+  triggerMode?: TriggerModeType; // Backward compatibility
+  levelsEnabled: boolean; // Senior 4H/1D & 15m/1H levels
+  structureEnabled: boolean; // Market structure BOS/CHoCH
+  momentumEnabled: boolean; // Moving Up/Down % in N bars
+  momentumPct: number; // e.g. 2.5%
+  momentumBars: number; // e.g. 3 bars
+  momentumTf: '15m' | '1h' | '4h';
+  channelEnabled: boolean; // Donchian/Bollinger breakout
+  fibonacciEnabled: boolean; // 0.618 Golden Pocket zones
+  cooldownMinutes: number; // Minutes between alerts for same event
+  densityMode?: 'AUTO' | 'MANUAL' | 'HYBRID';
+  manualDensityThresholdUsd?: number;
+  formationThreshold?: number;
+  confluenceThreshold?: number;
+  thirdTouchAlerts?: boolean;
+  densityAlerts?: boolean;
+  oiAlerts?: boolean;
+  newsAlerts?: boolean;
+  setupsEnabled?: boolean;
+  telegramEnabled?: boolean;
+}
+
+export interface SurveillanceEvent {
+  id: string;
+  type: SurveillanceEventType;
+  title: string;
+  description: string;
+  price: number;
+  timestamp: number;
+  severity: 'info' | 'warning' | 'critical';
+  details?: Record<string, any>;
+}
+
+export interface SurveillanceState {
+  currentPrice: number;
+  change24h: number;
+  high1d: number;
+  low1d: number;
+  swingHigh4h: number;
+  swingLow4h: number;
+  localHigh1h: number;
+  localLow1h: number;
+  localHigh15m: number;
+  localLow15m: number;
+  rangePositionPct: number; // 0 - 100% position in 4H range
+  resistance4h: number;
+  support4h: number;
+  nextZoneUp: number;
+  nextZoneDown: number;
+  fib618: number;
+  fib786: number;
+  structureTrend: 'bullish' | 'bearish' | 'consolidation';
+  channelUpper: number;
+  channelLower: number;
+  momentumRecentPct?: number;
+  momentumPct?: number;
+  structureStatus?: string;
+  lastEvent?: SurveillanceEvent;
+  recentEvents?: SurveillanceEvent[];
+  lastCalculated?: number;
+  // 24/7 Engine Live Properties
+  engineStatus?: 'LIVE' | 'SYNCING' | 'CONNECTING' | 'STALE' | 'ERROR';
+  spreadPct?: number;
+  bestBid?: number;
+  bestAsk?: number;
+  densitiesCount?: number;
+  topDensityUsd?: number;
+  topDensityPrice?: number;
+  topDensitySide?: 'BID' | 'ASK';
+  thirdTouchState?: string;
+  thirdTouchDistancePct?: number;
+  activeSetupType?: string;
+  activeSetupStage?: string;
+  activeSetupConfluence?: number;
+  oiRegime?: string;
+  oiChange15mPct?: number;
+  oiAnomaly?: boolean;
+  tradeFlowBuyUsd?: number;
+  tradeFlowSellUsd?: number;
+  tradeFlowImbalance?: number;
+  btcTrend4h?: string;
+  formationName?: string;
+  formationScore?: number;
+  lastProcessedCandleTimes?: {
+    '15m'?: number;
+    '1h'?: number;
+    '4h'?: number;
+  };
+}
+
+export interface SurveillanceCoin {
+  id: string;
+  userId: string;
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastCheckedAt?: string;
+  lastNotifiedAt?: string;
+  config: SurveillanceConfig;
+  state?: SurveillanceState;
+}
+
+export type OrderSide = 'BUY' | 'SELL';
+export type OrderType = 'LIMIT' | 'MARKET' | 'STOP' | 'STOP_MARKET' | 'TAKE_PROFIT' | 'TAKE_PROFIT_MARKET';
+
+export interface ExchangeApiCredentials {
+  exchange: ExchangeId;
+  apiKey: string;
+  apiSecret: string;
+  isTestnet?: boolean;
+  marketType?: MarketType;
+}
+
+export interface PlacedOrder {
+  orderId: string;
+  clientOrderId?: string;
+  exchange?: string;
+  marketType?: MarketType;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  price?: number;
+  stopPrice?: number;
+  origQty: number;
+  executedQty?: number;
+  status: string;
+  time: number;
+}
+
+export interface AccountBalanceInfo {
+  exchange?: string;
+  marketType?: MarketType;
+  isTestnet?: boolean;
+  totalEquityUsd?: number;
+  totalWalletBalance?: number;
+  marginBalance?: number;
+  availableBalanceUsd?: number;
+  availableBalance?: number;
+  unrealizedPnlUsd?: number;
+  unrealizedPnl?: number;
+  currency?: string;
+  assets?: { asset: string; free: number; locked: number }[];
+}
+
+// ==========================================
+// Market Replay & Trading Simulator Types
+// ==========================================
+
+export type ReplayOrderType = 'market' | 'limit' | 'stop';
+export type ReplayOrderSide = 'buy' | 'sell';
+export type ReplayPositionSide = 'long' | 'short';
+
+export interface ReplayPosition {
+  id: string;
+  symbol: string;
+  side: ReplayPositionSide;
+  entryPrice: number;
+  currentPrice: number;
+  sizeUsd: number;
+  marginUsd: number;
+  quantity: number;
+  leverage: number;
+  slPrice?: number;
+  tpPrice?: number;
+  entryTime: number;
+  unrealizedPnlUsd: number;
+  unrealizedPnlPct: number;
+  liquidationPrice: number;
+  tag?: string;
+  entryScreenshot?: string;
+}
+
+export interface ReplayPendingOrder {
+  id: string;
+  symbol: string;
+  side: ReplayOrderSide;
+  orderType: 'limit' | 'stop';
+  price: number;
+  sizeUsd: number;
+  leverage: number;
+  slPrice?: number;
+  tpPrice?: number;
+  tag?: string;
+  createdAtTime: number;
+}
+
+export interface ReplayTradeJournalItem {
+  id: string;
+  symbol: string;
+  exchange: ExchangeId;
+  marketType: MarketType;
+  timeframe: Timeframe;
+  side: ReplayPositionSide;
+  entryPrice: number;
+  exitPrice: number;
+  entryTime: number;
+  exitTime: number;
+  sizeUsd: number;
+  marginUsd: number;
+  leverage: number;
+  slPrice?: number;
+  tpPrice?: number;
+  pnlUsd: number;
+  pnlPct: number;
+  commissionUsd: number;
+  tag: string;
+  notes?: string;
+  screenshotUrl?: string;
+  exitReason: 'tp' | 'sl' | 'manual' | 'liquidation' | 'limit';
+}
+
+export interface ReplaySimulationSettings {
+  balance: number;
+  leverage: number;
+  positionSizeUsd: number;
+  commissionPct: number; // e.g. 0.05
+  spreadPct: number;     // e.g. 0.02
+  slippagePct: number;   // e.g. 0.02
+  autoSlPct?: number;
+  autoTpPct?: number;
+}
+
