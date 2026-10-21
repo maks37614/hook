@@ -100,7 +100,12 @@ export class SharedCoinMarket extends EventEmitter {
     if (this.stopped) return;
     frames.forEach(([tf], i) => { if (history[i].length) this.candles.setCandles(tf, history[i]); });
     if (!this.price.price && history[3].length) this.price.price = history[3].at(-1)!.close;
-    this.analysisTimer = setInterval(() => this.emit('tick'), 6000);
+    this.analysisTimer = setInterval(() => {
+      // A timer can fire just before the cache's age reaches exactly 6000 ms.
+      // Start a new shared analysis cycle so this never delays signals by a cycle.
+      this.analysis = undefined;
+      this.emit('tick');
+    }, 6000);
     this.oiTimer = setInterval(() => void this.fetchOI(), 15_000);
     void this.fetchOI();
   }

@@ -111,6 +111,25 @@ test('reading trade flow for UI polling never changes the history used by signal
   assert.deepEqual(control.getTradeFlowSnapshot(), observed.getTradeFlowSnapshot());
 });
 
+test('a scheduled analysis never skips a cycle when its timer fires before the cache age boundary', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const nativeNow = Date.now;
+  let clock = nativeNow();
+  Date.now = () => clock;
+  const f = fixture(), lease = f.pool.acquire(instrument);
+  try {
+    await lease.market.ready;
+    f.price();
+    const first = lease.market.getAnalysis();
+    let next: typeof first = null;
+    lease.market.on('tick', () => { next = lease.market.getAnalysis(); });
+    clock += 5999;
+    t.mock.timers.tick(6000);
+    assert.ok(next);
+    assert.notEqual(next, first, 'the six-second scheduler must force a new calculation');
+  } finally { lease.release(); Date.now = nativeNow; t.mock.timers.reset(); }
+});
+
 test('two users share public analysis while thresholds, events and stopping remain independent', async () => {
   const directory = fs.mkdtempSync(path.join(process.cwd(), '.test-surveillance-shared-'));
   const previousDir = process.env.DATA_DIR;
