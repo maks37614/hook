@@ -20,7 +20,7 @@ class Runner:
         self.calls = []
         self.conclusion = "success"
         self.ci_status = "completed"
-        self.head_repo = "maks37614/hook2"
+        self.head_repo = "maks37614/hook"
         self.branch = "main"
         self.fetches = 0
         self.superseded = False
@@ -89,8 +89,17 @@ class DeploymentTests(unittest.TestCase):
     def test_fork_and_other_branch_success_cannot_deploy(self):
         self.runner.head_repo = "other/hook2"
         self.assertEqual(self.deployer.deploy_once(), "waiting")
-        self.runner.head_repo, self.runner.branch = "maks37614/hook2", "feature"
+        self.runner.head_repo = "maks37614/hook2"
         self.assertEqual(self.deployer.deploy_once(), "waiting")
+        self.runner.head_repo, self.runner.branch = "maks37614/hook", "feature"
+        self.assertEqual(self.deployer.deploy_once(), "waiting")
+
+    def test_candidate_fetches_and_validates_the_current_repository(self):
+        self.assertEqual(self.deployer.candidate(), GOOD)
+        self.assertTrue(any(c[:4] == ["git", "fetch", "--no-tags", "https://github.com/maks37614/hook.git"]
+                            for c in self.commands()))
+        self.assertTrue(any(c[:2] == ["gh", "api"] and c[2].startswith("repos/maks37614/hook/actions/workflows/")
+                            for c in self.commands()))
 
     def test_validated_release_builds_before_stop_and_backs_up_before_start(self):
         self.assertEqual(self.deployer.deploy_once(), "deployed")

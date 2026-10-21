@@ -52,7 +52,7 @@ class Deployer:
         self.url = public_url.rstrip("/")
         self.run = run
         self.health = health
-        self.repo = "maks37614/hook2"
+        self.repo = "maks37614/hook"
         self.branch = "main"
         self.state_file = self.root / "deployed.json"
         self.failure_file = self.root / "failed.json"

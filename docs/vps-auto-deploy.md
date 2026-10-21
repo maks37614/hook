@@ -2,7 +2,9 @@
 
 Ціль: Ubuntu 22.04, користувач `ubuntu`, VPS `57.129.171.244`, сайт `https://h00k.top`. Railway більше не використовується.
 
-Після одноразового встановлення VPS сам перевіряє `main` приблизно щохвилини. Новий commit запускається лише після успішного GitHub Actions **Validate** для цього самого commit у `main`. Гілки та pull requests проходять тести, але не змінюють робочий сайт до об’єднання з `main`.
+Після одноразового встановлення VPS сам перевіряє `main` репозиторію `maks37614/hook` приблизно щохвилини. Новий commit запускається лише після успішного GitHub Actions **Validate** для цього самого commit у `main`. Гілки та pull requests проходять тести, але не змінюють робочий сайт до об’єднання з `main`.
+
+Старий агент із копії `hook2` продовжує стежити за старим репозиторієм. Для переходу на `hook` виконайте наведений нижче блок для наявного клону: він оновлює адресу джерела та встановлює поточну копію агента. Каталог `~/hook2` і назви Docker volumes зберігаються, щоб застосунок використовував наявні дані.
 
 ## Встановлення на вже підготовленому VPS
 
@@ -13,6 +15,7 @@ Docker і GitHub CLI вже мають бути встановлені. Вико
 ```bash
 bash -e <<'HOOK2_VPS'
 cd "$HOME/hook2"
+git remote set-url origin https://github.com/maks37614/hook.git
 git fetch origin main
 git switch --detach FETCH_HEAD
 sudo bash deploy/enable-auto-deploy.sh
@@ -25,7 +28,7 @@ HOOK2_VPS
 Для нового клону після об’єднання змін:
 
 ```bash
-git clone --branch main --single-branch https://github.com/maks37614/hook2.git "$HOME/hook2"
+git clone --branch main --single-branch https://github.com/maks37614/hook.git "$HOME/hook2"
 cd "$HOME/hook2"
 sudo bash deploy/install-docker-ubuntu.sh
 sudo bash deploy/enable-auto-deploy.sh
