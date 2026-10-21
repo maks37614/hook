@@ -49,7 +49,6 @@ export interface UserTelegramData {
 let userTelegramMap = new Map<string, UserTelegramData>();
 let isUserTelegramLoaded = false;
 
-let monitorInterval: any = null;
 const deletedAlertIds = new Set<string>();
 let areDeletedAlertIdsLoaded = false;
 const alertIdentity = (userId: string, id: string) => `${userId}:${id}`;
@@ -92,7 +91,8 @@ export function loadUserTelegram(): Map<string, UserTelegramData> {
 export function saveUserTelegram(userId: string, creds: { botToken?: string; chatId?: string; language?: SupportedLanguage; mode?: UserTelegramData['mode'] }, replace = false): void {
   if (!userId) return;
   loadUserTelegram();
-  const existing = replace ? {} : userTelegramMap.get(userId) || {};
+  const previous = userTelegramMap.get(userId);
+  const existing = replace ? {} : previous || {};
   const updated: UserTelegramData = {
     mode: creds.mode || existing.mode,
     botToken: creds.botToken && creds.botToken.trim() ? creds.botToken.trim() : existing.botToken,
@@ -100,11 +100,14 @@ export function saveUserTelegram(userId: string, creds: { botToken?: string; cha
     language: creds.language ? normalizeLanguage(creds.language) : existing.language,
     updatedAt: new Date().toISOString(),
   };
-  userTelegramMap.set(userId, updated);
+  if (previous && previous.mode === updated.mode && previous.botToken === updated.botToken &&
+      previous.chatId === updated.chatId && previous.language === updated.language) return;
   try {
     ensureDataDir();
     const obj = Object.fromEntries(userTelegramMap.entries());
+    obj[userId] = updated;
     writeJson(USER_TELEGRAM_FILE, obj);
+    userTelegramMap.set(userId, updated);
   } catch (err) {
     throw new Error('Failed to persist Telegram settings');
   }
@@ -573,8 +576,14 @@ export function syncUserAlerts(
     }
   }
 
-  const otherAlerts = all.filter((a) => a.userId !== userId);
-  const updatedAll = [...mergedUserAlerts, ...otherAlerts];
+  // Preserve global order: polling two accounts must not rewrite the same alerts
+  // merely because each account used to move its own records to the front.
+  let nextUserAlert = 0;
+  const updatedAll = all.flatMap(alert => {
+    if (alert.userId !== userId) return [alert];
+    return nextUserAlert < mergedUserAlerts.length ? [mergedUserAlerts[nextUserAlert++]] : [];
+  });
+  updatedAll.push(...mergedUserAlerts.slice(nextUserAlert));
   saveAlerts(updatedAll);
 
   return mergedUserAlerts;
@@ -810,26 +819,3 @@ async function checkAlertsInternal(userId?: string) {
     saveAlerts(loadAlerts());
   }
 }
-
-// Start background monitor loop
-export function startAlertMonitor(intervalMs: number = 6000) {
-  if (monitorInterval) return;
-  loadAlerts();
-  loadHistory();
-  loadUserTelegram();
-  monitorInterval = setInterval(() => {
-    checkAlertsOnce().catch((err) => {
-      console.error('Error during alert check iteration:', err);
-    });
-  }, intervalMs);
-  console.log(`Telegram price alert monitor started (interval: ${intervalMs}ms)`);
-}
-
-// Stop monitor
-export function stopAlertMonitor() {
-  if (monitorInterval) {
-    clearInterval(monitorInterval);
-    monitorInterval = null;
-  }
-}
-

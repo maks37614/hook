@@ -1,23 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  X,
-  User,
-  Mail,
-  Send,
-  Sliders,
-  Bell,
-  Clock3,
-  LogOut,
-  Save,
-  CheckCircle2,
-  AlertCircle,
-  Key,
-  MessageSquare,
-  Sparkles,
-  ExternalLink,
-  Shield,
-  FolderArchive,
-} from 'lucide-react';
+import { X, User, Send, Sliders, Bell, Clock3, LogOut, Save, CheckCircle2, AlertCircle, Key, MessageSquare, Sparkles, ExternalLink, Shield, FolderArchive } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAlerts } from '../context/AlertsContext';
 import { useArchive } from '../context/ArchiveContext';

@@ -1,34 +1,7 @@
 import { normalizeExchangeSymbol } from '../utils/marketSymbols';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  X,
-  ExternalLink,
-  Sparkles,
-  Target,
-  ShieldAlert,
-  CheckCircle,
-  AlertTriangle,
-  ArrowRight,
-  ArrowLeft,
-  RefreshCw,
-  Zap,
-  Send,
-  Bell,
-  Check,
-  Plus,
-  Trash2,
-  Pause,
-  Play,
-  ArrowUpRight,
-  ArrowDownRight,
-  AlertCircle,
-  CheckCircle2,
-  Lock,
-  LogIn,
-  PanelRightClose,
-  PanelRightOpen,
-} from 'lucide-react';
-import { ScannedCoin, DetectedFormation, Kline, FormationAIAnalysis, Timeframe, PriceAlert, ArchivedFormation } from '../types';
+import { Sparkles, Target, ShieldAlert, AlertTriangle, ArrowLeft, RefreshCw, Zap, Send, Bell, Plus, Trash2, Pause, Play, ArrowUpRight, ArrowDownRight, AlertCircle, CheckCircle2, Lock, LogIn, PanelRightClose } from 'lucide-react';
+import { ScannedCoin, DetectedFormation, Kline, FormationAIAnalysis, Timeframe, ArchivedFormation } from '../types';
 import { TradingViewChart } from './TradingViewChart';
 import { FullscreenChartModal } from './FullscreenChartModal';
 import { formatCryptoPrice } from '../utils/formatters';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Zap, X } from 'lucide-react';
 
 export interface MetaScalpToastState {
   id: number;

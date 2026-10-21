@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, SlidersHorizontal, LayoutGrid, List, ArrowUpDown } from 'lucide-react';
-import { ScreenerFilterState, ExchangeId, MarketType, Timeframe, PatternCategory, PatternBias, PatternStatus } from '../types';
+import { ScreenerFilterState, Timeframe } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 
 interface ScreenerFiltersProps {

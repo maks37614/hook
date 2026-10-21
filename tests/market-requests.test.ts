@@ -209,3 +209,27 @@ test('polling pauses in background/offline and resumes on visibility/online; unm
   browser.dispatchEvent(new Event('online'));
   assert.equal(refreshes, 3);
 });
+
+test('visibility and interval events cannot overlap an unfinished refresh', async () => {
+  let interval: (() => void) | undefined;
+  const browser = Object.assign(new EventTarget(), {
+    setInterval: ((callback: () => void, ms: number) => {
+      assert.equal(ms, 2000); interval = callback; return 1;
+    }) as Window['setInterval'],
+    clearInterval: () => { interval = undefined; },
+  });
+  const page = Object.assign(new EventTarget(), { visibilityState: 'visible' as DocumentVisibilityState });
+  let calls = 0;
+  let finish!: () => void;
+  const stop = subscribeMarketRefresh(() => { calls++; return new Promise<void>(resolve => { finish = resolve; }); },
+    { window: browser, document: page, navigator: { onLine: true } }, 2000);
+  try {
+    interval!(); interval!(); page.dispatchEvent(new Event('visibilitychange')); browser.dispatchEvent(new Event('online'));
+    assert.equal(calls, 1);
+    finish(); await new Promise(resolve => setImmediate(resolve));
+    page.visibilityState = 'hidden'; interval!(); assert.equal(calls, 1);
+    page.visibilityState = 'visible'; page.dispatchEvent(new Event('visibilitychange')); assert.equal(calls, 2);
+    finish();
+  } finally { stop(); }
+  assert.equal(interval, undefined);
+});

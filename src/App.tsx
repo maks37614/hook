@@ -1,5 +1,6 @@
+import { subscribeMarketRefresh } from './utils/marketRefresh';
 import { useChartPageRoute } from './utils/useChartPageRoute';
-import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { ScreenerFilters } from './components/ScreenerFilters';
 import { FormationCard } from './components/FormationCard';
@@ -32,24 +33,9 @@ import {
   saveStoredMetaScalpSettings,
   sendTickerToMetaScalp,
 } from './utils/metaScalpService';
-import { ScannedCoin, DetectedFormation, ScreenerFilterState, PriceAlert, ArchivedFormation, ActivePageType } from './types';
+import { ScannedCoin, DetectedFormation, ScreenerFilterState, ArchivedFormation, ActivePageType } from './types';
 import { runDirectClientScan, getFallbackScannedCoins } from './utils/directExchangeClient';
-import {
-  AlertCircle,
-  RefreshCw,
-  Layers,
-  Sparkles,
-  Lock,
-  Key,
-  Send,
-  ShieldAlert,
-  Zap,
-  ExternalLink,
-  ShieldCheck,
-  Sliders,
-  CheckCircle2,
-} from 'lucide-react';
-import { AUTHOR_TELEGRAM_CHANNEL_URL, AUTHOR_TELEGRAM_USERNAME } from './utils/accessCodes';
+import { AlertCircle, Layers, Sparkles, Zap } from 'lucide-react';
 import { getStoredPreferences, useAppPreferences } from './utils/userPreferences';
 
 const DEFAULT_FILTERS: ScreenerFilterState = {
@@ -558,10 +544,7 @@ export default function App() {
 
   // Auto-refresh interval (every 60 seconds)
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchScreenerData();
-    }, 60000);
-    return () => clearInterval(interval);
+    return subscribeMarketRefresh(fetchScreenerData, undefined, 60_000);
   }, [fetchScreenerData]);
 
   // Toggle watchlist (isolated per user profile or local guest storage)

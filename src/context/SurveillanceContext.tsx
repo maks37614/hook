@@ -1,3 +1,4 @@
+import { subscribeMarketRefresh } from '../utils/marketRefresh';
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { SurveillanceRequestGuard } from '../utils/surveillanceRequests';
@@ -90,10 +91,7 @@ export const SurveillanceProvider: React.FC<{ children: React.ReactNode; enabled
     setLoading(true);
     fetchCoins();
     if (!user) return;
-    const interval = setInterval(() => {
-      fetchCoins();
-    }, 6000);
-    return () => clearInterval(interval);
+    return subscribeMarketRefresh(fetchCoins, undefined, 6000);
   }, [fetchCoins]);
 
   const mutate = async (userId: string, url: string, options: RequestInit) => {

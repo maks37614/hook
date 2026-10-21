@@ -1,4 +1,4 @@
-import React, { forwardRef, lazy, Suspense } from 'react';
+import { forwardRef, lazy, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { HookChartCanvasProps } from './hookchart/HookChartCanvas';
 import type { HookChartHandle } from './hookchart/engine';

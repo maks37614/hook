@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, CheckCircle2, X } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 
 export interface AlertToastState {
   id: number;

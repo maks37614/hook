@@ -1,23 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  BookOpen,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Calendar,
-  Clock,
-  Camera,
-  Download,
-  Trash2,
-  Tag,
-  ExternalLink,
-  X,
-  Target,
-  Shield,
-  Layers,
-  Award,
-  AlertCircle,
-} from 'lucide-react';
+import { BookOpen, BarChart3, Clock, Camera, Download, Trash2, Tag, X, Award } from 'lucide-react';
 import { ReplayTradeJournalItem, ReplayPendingOrder } from '../../types';
 import { formatCryptoPrice, formatLargeNumber } from '../../utils/formatters';
 

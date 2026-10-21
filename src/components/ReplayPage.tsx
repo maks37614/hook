@@ -28,19 +28,7 @@ import {
   saveReplaySettings,
   DEFAULT_SIMULATION_SETTINGS,
 } from '../utils/replayService';
-import {
-  History,
-  Sparkles,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Info,
-  X,
-  Volume2,
-  GripVertical,
-  MoveHorizontal,
-  MoveVertical,
-} from 'lucide-react';
+import { History, CheckCircle2, AlertCircle, Info, X, GripVertical, MoveHorizontal } from 'lucide-react';
 import { TOP_POPULAR_PAIRS, fetchDirectBinanceTickers, fetchDirectBybitTickers } from '../utils/directExchangeClient';
 
 interface ReplayPageProps {

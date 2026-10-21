@@ -40,18 +40,7 @@ import {
   getUserTelegram,
   createSetupAlertsGroup,
 } from './server/alertService';
-import {
-  loadSurveillanceList,
-  saveSurveillanceList,
-  getDefaultSurveillanceConfig,
-  checkCoinSurveillance,
-  checkAllUserCoins,
-  findSurveillanceCoinById,
-  updateSurveillanceCoinActive,
-  setAllSurveillanceCoinsActive,
-  commitSurveillanceCheck,
-  validateSurveillanceConfig,
-} from './server/surveillanceService';
+import { loadSurveillanceList, saveSurveillanceList, getDefaultSurveillanceConfig, checkCoinSurveillance, checkAllUserCoins, findSurveillanceCoinById, setAllSurveillanceCoinsActive, commitSurveillanceCheck, validateSurveillanceConfig } from './server/surveillanceService';
 import { ExchangeId, MarketType, Timeframe } from './src/types';
 import { normalizeLanguage, telegramText } from './src/locales';
 import { normalizeExchangeSymbol } from './src/utils/marketSymbols';

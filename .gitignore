@@ -22,4 +22,5 @@ bun.lock*
 __pycache__/
 /.test-background-*/
 /.test-access-*/
+/.test-market-relay-*/
 /server/data/*.key

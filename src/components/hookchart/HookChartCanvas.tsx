@@ -1,3 +1,4 @@
+import { subscribeMarketRefresh } from '../../utils/marketRefresh';
 import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Crosshair, Minus, MoveUpRight, Square, Type, Ruler, Bell, BarChart3, Layers, Settings, Trash2, X } from 'lucide-react';
@@ -184,8 +185,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       if (!cancelled && !controller.signal.aborted) setRemoteSeries(Object.fromEntries(rows.filter(([, values]) => values.length)));
     };
     void pull();
-    const timer = setInterval(() => void pull(), 60_000);
-    return () => { cancelled = true; controller.abort(); clearInterval(timer); };
+    const stopRefresh = subscribeMarketRefresh(pull, undefined, 60_000);
+    return () => { cancelled = true; controller.abort(); stopRefresh(); };
   }, [exchange, marketType, symbol, timeframe, replay, analysisTfKey, settings.levelHistory, settings.trendHistory]);
 
   const analysisSeries = useMemo(() => {
@@ -492,8 +493,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       } catch { if (!controller.signal.aborted) setOiError(true); }
     };
     void poll();
-    const timer = setInterval(() => void poll(), 60_000);
-    return () => { controller.abort(); clearInterval(timer); };
+    const stopRefresh = subscribeMarketRefresh(poll, undefined, 60_000);
+    return () => { controller.abort(); stopRefresh(); };
   }, [showOi, symbol, timeframe, replay, marketType]);
 
   const assignRef = useCallback((handle: HookChartHandle | null) => {

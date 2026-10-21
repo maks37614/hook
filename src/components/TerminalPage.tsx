@@ -1,38 +1,8 @@
+import { subscribeMarketRefresh } from '../utils/marketRefresh';
 import { useChartProvider } from '../utils/useChartProvider';
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  ListChecks,
-  ChevronDown,
-  Send,
-  Zap,
-  Star,
-  Search,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Trash2,
-  RefreshCw,
-  Loader2,
-  Plus,
-  SlidersHorizontal,
-  Maximize2,
-  Minimize2,
-  ArrowLeft,
-  X,
-  Grid,
-} from 'lucide-react';
-import {
-  TerminalChartBlock,
-  TerminalWorkspaceConfig,
-  ScannedCoin,
-  DetectedFormation,
-  Timeframe,
-  ExchangeId,
-  MarketType,
-  Kline,
-  TerminalBlockMode,
-  MarketCoin,
-  TerminalSavedPreset,
-} from '../types';
+import { ListChecks, ChevronDown, Send, Zap, Star, Search, PanelLeftClose, PanelLeftOpen, Trash2, RefreshCw, Loader2, Plus, SlidersHorizontal, Maximize2, Minimize2, X } from 'lucide-react';
+import { TerminalChartBlock, ScannedCoin, DetectedFormation, Timeframe, ExchangeId, MarketType, TerminalBlockMode, MarketCoin, TerminalSavedPreset } from '../types';
 import { TerminalChartWidget } from './terminal/TerminalChartWidget';
 import { ExchangeCandlestickChart } from './ExchangeCandlestickChart';
 import { getTradingViewSymbol } from '../utils/marketSymbols';
@@ -114,8 +84,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       }
     };
     void load();
-    const timer = setInterval(() => { void load(); }, 30_000);
-    return () => { controller.abort(); clearInterval(timer); };
+    const stopRefresh = subscribeMarketRefresh(load);
+    return () => { controller.abort(); stopRefresh(); };
   }, [marketRefresh]);
 
   const coinPresetSelection = useMemo(() => ({

@@ -2,22 +2,10 @@ import { accessService } from './accessService';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'node:crypto';
-import {
-  SurveillanceCoin,
-  SurveillanceConfig,
-  SurveillanceEvent,
-  SurveillanceState,
-  ExchangeId,
-  MarketType,
-  Timeframe,
-  TriggerModeType,
-  Kline,
-} from '../src/types';
+import { SurveillanceCoin, SurveillanceConfig, SurveillanceEvent, SurveillanceState, ExchangeId, MarketType, Kline } from '../src/types';
 import { normalizeKlineTimeMs } from '../src/utils/formationValidation';
 import { getTimeframeMs } from './surveillance/multiTimeframeEngine';
 import { fetchKlines } from './marketService';
-import { sendTelegramMessage } from './telegramService';
-import { getUserTelegram } from './alertService';
 import { surveillanceManager } from './surveillance/surveillanceManager';
 import { notificationRouter } from './notificationRouter';
 import { ensureMonitoringDataDirectory } from './monitoringStorage';
@@ -739,8 +727,6 @@ async function checkCoinSurveillanceInternal(
   return { coin: updatedCoin, newEvents };
 }
 
-let isLoopRunning = false;
-
 export async function checkAllUserCoins(userId: string): Promise<SurveillanceCoin[]> {
   const uid = userId && userId.trim() !== '' ? userId.trim() : 'guest';
   const list = [...(loadSurveillanceStore()[uid] || [])];
@@ -757,35 +743,3 @@ export async function checkAllUserCoins(userId: string): Promise<SurveillanceCoi
 
   return loadSurveillanceList(uid);
 }
-
-export function startSurveillanceMonitor(intervalMs = 25000) {
-  if (isLoopRunning) return;
-  isLoopRunning = true;
-  console.log(`[Surveillance] 24/7 Monitor started with interval ${intervalMs}ms`);
-
-  // Start 24/7 Realtime Surveillance Engine
-  try {
-    surveillanceManager.start();
-  } catch (e) {
-    console.error('[Surveillance] Error starting surveillanceManager:', e);
-  }
-
-  setInterval(async () => {
-    try {
-      const activeItems = getAllActiveSurveillanceCoins();
-      if (activeItems.length === 0) return;
-
-      for (const { userId, coin } of activeItems) {
-        try {
-          const { coin: updated } = await checkCoinSurveillance(coin);
-          commitSurveillanceCheck(updated);
-        } catch (e) {
-          console.error(`[Surveillance] Failed to check coin ${coin.symbol} for user ${userId}:`, e);
-        }
-      }
-    } catch (err) {
-      console.error('[Surveillance] Error in monitor loop:', err);
-    }
-  }, intervalMs);
-}
-

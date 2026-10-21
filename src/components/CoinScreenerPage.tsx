@@ -1,32 +1,6 @@
 import { getCoinVol5m, getCoinDistanceToHigh, getCoinDistanceToLow, matchesMarketPreset } from '../utils/marketPresets';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {
-  Search,
-  SlidersHorizontal,
-  ArrowUpDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  TrendingUp,
-  TrendingDown,
-  Flame,
-  Zap,
-  Send,
-  Bookmark,
-  ExternalLink,
-  RefreshCw,
-  LayoutGrid,
-  List,
-  ChevronDown,
-  ChevronUp,
-  AlertCircle,
-  Activity,
-  Layers,
-  BarChart2,
-  Maximize2,
-  Sparkles,
-  Radar,
-  Lock,
-} from 'lucide-react';
+import { Search, SlidersHorizontal, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Flame, Zap, Send, Bookmark, RefreshCw, LayoutGrid, List, ChevronDown, ChevronUp, AlertCircle, Radar, Lock } from 'lucide-react';
 import { useSurveillance } from '../context/SurveillanceContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -42,9 +16,6 @@ import { formatCryptoPrice, formatVolume, formatPercent } from '../utils/formatt
 import { getStoredPreferences, useAppPreferences } from '../utils/userPreferences';
 import { MarketSentimentWidget } from './MarketSentimentWidget';
 import { useLanguage } from '../context/LanguageContext';
-import {
-  TOP_POPULAR_PAIRS,
-} from '../utils/directExchangeClient';
 import { loadMarketCoins } from '../utils/marketCoinLoader';
 import { subscribeMarketRefresh } from '../utils/marketRefresh';
 

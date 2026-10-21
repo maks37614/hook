@@ -1,4 +1,3 @@
-import { SetupInstance } from './types';
 
 export interface SetupAlertsValidationResult {
   valid: boolean;

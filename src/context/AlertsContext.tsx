@@ -352,6 +352,7 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode; enabled?: boo
 
     let disposed = false;
     let inFlight = false;
+    let syncedPayload: string | undefined;
     const pollSync = async () => {
       if (inFlight || disposed) return;
       inFlight = true;
@@ -369,21 +370,24 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode; enabled?: boo
         currentAlertsList = syncGuard.current.filter(currentAlertsList);
         const ticket = syncGuard.current.request();
 
-        const res = await fetch('/api/alerts/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUser.uid,
-            language: normalizeLanguage(localStorage.getItem('crypto_screener_language')),
-            alerts: currentAlertsList,
-          }),
-        });
+        const language = normalizeLanguage(localStorage.getItem('crypto_screener_language'));
+        const payload = JSON.stringify({ userId: currentUser.uid, language, alerts: currentAlertsList });
+        // Keep checking for triggered alerts at the same frequency, but only
+        // upload the list when this tab has changes that have not been accepted.
+        const res = payload === syncedPayload
+          ? await fetch(`/api/alerts?userId=${encodeURIComponent(currentUser.uid)}`, { cache: 'no-store' })
+          : await fetch('/api/alerts/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+            });
 
         if (!res.ok) return;
         const data = await res.json();
         if (disposed || userRef.current?.uid !== currentUser.uid || !syncGuard.current.accept(ticket)) return;
         if (data.success && Array.isArray(data.alerts)) {
           data.alerts = syncGuard.current.filter(data.alerts);
+          syncedPayload = JSON.stringify({ userId: currentUser.uid, language, alerts: data.alerts });
           let hasNewlyTriggered = false;
 
           data.alerts.forEach((serverAlert: PriceAlert) => {

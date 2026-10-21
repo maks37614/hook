@@ -1,20 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  ShieldAlert,
-  Percent,
-  Layers,
-  Settings,
-  X,
-  Tag,
-  AlertTriangle,
-  RotateCcw,
-  CheckCircle2,
-  Sliders,
-  ChevronDown,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, TrendingDown, Settings, X, Tag, RotateCcw, Sliders } from 'lucide-react';
 import {
   ReplayPosition,
   ReplaySimulationSettings,

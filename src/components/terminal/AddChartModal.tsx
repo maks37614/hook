@@ -1,20 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import {
-  Search,
-  X,
-  Layers,
-  Star,
-  Plus,
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  SlidersHorizontal,
-  Flame,
-  ArrowUpDown,
-  Zap,
-  Globe,
-  Loader2,
-} from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, X, Layers, Star, Plus, TrendingUp, TrendingDown, Activity, SlidersHorizontal, Flame, Zap, Loader2 } from 'lucide-react';
 import { ScannedCoin, Timeframe, ExchangeId, MarketType, TerminalBlockMode, MarketCoin } from '../../types';
 import { formatCryptoPrice, formatVolume } from '../../utils/formatters';
 import { fetchDirectBinanceTickers, fetchDirectBybitTickers } from '../../utils/directExchangeClient';

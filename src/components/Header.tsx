@@ -1,26 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  RefreshCw,
-  Bell,
-  BellOff,
-  Bookmark,
-  BookOpen,
-  Zap,
-  Send,
-  User,
-  UserPlus,
-  Layers,
-  Activity,
-  BarChart2,
-  FolderArchive,
-  Monitor,
-  Radar,
-  Globe,
-  Lock,
-  History,
-  Maximize2,
-  ChevronRight,
-} from 'lucide-react';
+import { RefreshCw, Bell, BellOff, Bookmark, BookOpen, Zap, Send, UserPlus, Layers, Activity, FolderArchive, Monitor, Radar, Lock, History, Maximize2, ChevronRight } from 'lucide-react';
 import { MetaScalpSettings } from '../utils/metaScalpService';
 import { useAuth } from '../context/AuthContext';
 import { ActivePageType } from '../types';

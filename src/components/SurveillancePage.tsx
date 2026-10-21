@@ -1,59 +1,12 @@
+import { subscribeMarketRefresh } from '../utils/marketRefresh';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  Radar,
-  Eye,
-  Plus,
-  Trash2,
-  Play,
-  Pause,
-  Settings2,
-  ExternalLink,
-  Search,
-  RefreshCw,
-  Bell,
-  Clock,
-  Target,
-  Shield,
-  Zap,
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  Layers,
-  Check,
-  X,
-  Crosshair,
-  BarChart3,
-  Sliders,
-  AlertCircle,
-  HelpCircle,
-  Sparkles,
-  ArrowUpRight,
-  ArrowDownRight,
-  Send,
-  PieChart,
-  History,
-  CheckCircle2,
-  AlertTriangle,
-  PlayCircle,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-} from 'lucide-react';
+import { Radar, Plus, Trash2, Play, Pause, Settings2, Search, RefreshCw, Bell, Clock, Target, Shield, Zap, Activity, Layers, X, BarChart3, Sliders, AlertCircle, Send, History, CheckCircle2, PlayCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSurveillance } from '../context/SurveillanceContext';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
 import { ManualDensityThresholdField } from './ManualDensityThresholdField';
 import { getStoredPreferences, useAppPreferences } from '../utils/userPreferences';
-import {
-  SurveillanceCoin,
-  SurveillanceConfig,
-  SurveillanceEvent,
-  ScannedCoin,
-  ExchangeId,
-  MarketType,
-  Timeframe,
-  TriggerModeType,
-} from '../types';
+import { SurveillanceCoin, SurveillanceConfig, ScannedCoin, ExchangeId, MarketType, TriggerModeType } from '../types';
 
 interface SurveillancePageProps {
   availableCoins?: ScannedCoin[];
@@ -346,8 +299,8 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
       }
     };
     void refreshWorker();
-    const timer = setInterval(refreshWorker, 2000);
-    return () => { cancelled = true; clearInterval(timer); };
+    const stopRefresh = subscribeMarketRefresh(refreshWorker, undefined, 2000);
+    return () => { cancelled = true; stopRefresh(); };
   }, [detailedCoin?.id, getWorkerSnapshot]);
 
   const handleRunCausalBacktest = async (coin: SurveillanceCoin) => {

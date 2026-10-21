@@ -1,4 +1,4 @@
-import { ConfluenceBreakdown, ConfluenceComponent, DetectedFormation, Kline, PatternBias } from '../types';
+import { ConfluenceBreakdown, ConfluenceComponent, DetectedFormation, Kline } from '../types';
 
 export interface FormationValidation {
   passed: boolean;

@@ -1,30 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Send,
-  Bell,
-  CheckCircle2,
-  AlertCircle,
-  Trash2,
-  Plus,
-  RefreshCw,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  Play,
-  Pause,
-  Clock,
-  Target,
-  ArrowUpRight,
-  ArrowDownRight,
-  Check,
-  ShieldCheck,
-  Zap,
-  AlertTriangle,
-  Lock,
-  History,
-  RotateCcw,
-} from 'lucide-react';
+import { X, Send, Bell, CheckCircle2, AlertCircle, Trash2, Plus, RefreshCw, ExternalLink, Play, Pause, Clock, ArrowUpRight, ArrowDownRight, Check, ShieldCheck, AlertTriangle, Lock, History, RotateCcw } from 'lucide-react';
 import { PriceAlert, TelegramStatus, ExchangeId, MarketType, ScannedCoin, AlertHistoryItem } from '../types';
 import { formatCryptoPrice } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';

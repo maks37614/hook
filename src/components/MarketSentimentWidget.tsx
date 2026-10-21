@@ -1,21 +1,8 @@
+import { subscribeMarketRefresh } from '../utils/marketRefresh';
 import React, { useState, useEffect } from 'react';
-import {
-  Gauge,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Activity,
-  BarChart2,
-  PieChart,
-  RefreshCw,
-  Zap,
-  ChevronDown,
-  ChevronUp,
-  ShieldCheck,
-  AlertCircle,
-} from 'lucide-react';
+import { Gauge, TrendingUp, TrendingDown, DollarSign, Activity, BarChart2, PieChart, RefreshCw, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { MarketSentimentData, MarketCoin } from '../types';
-import { formatVolume, formatPercent } from '../utils/formatters';
+import { formatVolume } from '../utils/formatters';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
 
@@ -48,8 +35,7 @@ export const MarketSentimentWidget: React.FC<MarketSentimentWidgetProps> = ({ co
 
   useEffect(() => {
     fetchSentiment();
-    const interval = setInterval(fetchSentiment, 30000);
-    return () => clearInterval(interval);
+    return subscribeMarketRefresh(fetchSentiment);
   }, []);
 
   if (!data) return null;

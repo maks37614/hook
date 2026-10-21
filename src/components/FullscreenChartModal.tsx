@@ -1,26 +1,6 @@
 import { useChartProvider } from '../utils/useChartProvider';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  X,
-  Minimize2,
-  Layers,
-  BarChart2,
-  Send,
-  Zap,
-  TrendingUp,
-  TrendingDown,
-  Info,
-  RefreshCw,
-  Star,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-} from 'lucide-react';
+import { X, Minimize2, Layers, BarChart2, Send, Zap, RefreshCw, Star, Search, PanelLeftClose, PanelLeftOpen, Trash2 } from 'lucide-react';
 import { Kline, DetectedFormation, Timeframe, ExchangeId, MarketType, ChartMarkerInfo, ChartRestoreParams, ScannedCoin } from '../types';
 import { TradingViewChart } from './TradingViewChart';
 import { ExchangeCandlestickChart } from './ExchangeCandlestickChart';

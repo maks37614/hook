@@ -1,30 +1,9 @@
 import { MarketWebSocket as WebSocket } from '../../utils/marketTransport';
 import { normalizeExchangeSymbol } from '../../utils/marketSymbols';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {
-  Settings,
-  Volume2,
-  VolumeX,
-  Crosshair,
-  Layers,
-  ChevronDown,
-  Check,
-  Zap,
-  Info,
-  Sliders,
-  BellRing,
-  BarChart3,
-  LineChart,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  PanelRightClose,
-  PanelRightOpen,
-  CircleDot,
-  Filter,
-} from 'lucide-react';
+import { Settings, Volume2, VolumeX, Crosshair, ChevronDown, Check, Sliders, BellRing, BarChart3, ChevronLeft, ChevronRight, PanelRightClose, CircleDot } from 'lucide-react';
 import { ExchangeId, MarketType, Timeframe } from '../../types';
-import { formatCryptoPrice, formatVolume, formatWholeSum, formatCompactWholeBubble } from '../../utils/formatters';
+import { formatVolume, formatWholeSum, formatCompactWholeBubble } from '../../utils/formatters';
 import { playDensityChime } from '../../utils/domSound';
 import { useAuth } from '../../context/AuthContext';
 import { BinanceOrderBookSync, binanceStreamUrls } from '../../utils/binanceOrderBook';

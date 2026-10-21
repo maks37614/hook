@@ -13,19 +13,7 @@ import {
   IPriceLine,
   CrosshairMode,
 } from 'lightweight-charts';
-import {
-  Maximize2,
-  ZoomIn,
-  Activity,
-  Layers,
-  Clock,
-  Expand,
-  FolderArchive,
-  CheckCircle2,
-  BarChart3,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
+import { Maximize2, ZoomIn, Layers, Clock, Expand, FolderArchive, CheckCircle2, ChevronDown } from 'lucide-react';
 import { Kline, DetectedFormation, Timeframe, ExchangeId, MarketType, ChartMarkerInfo, ChartRestoreParams } from '../types';
 import { getChartPriceFormat, formatCryptoPrice } from '../utils/formatters';
 import { fetchDirectKlines } from '../utils/directExchangeClient';

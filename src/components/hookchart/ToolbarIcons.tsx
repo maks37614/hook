@@ -1,4 +1,3 @@
-import React from 'react';
 
 // Glyphs from the drawing and overlay toolbars in the supplied hookchart.
 const common = { width: 16, height: 16, viewBox: '0 0 18 18', fill: 'none', stroke: 'currentColor', strokeWidth: 1.45,

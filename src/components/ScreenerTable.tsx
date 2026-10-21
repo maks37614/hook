@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Star, BarChart2, TrendingUp, TrendingDown, Zap, Send } from 'lucide-react';
+import { Star, BarChart2, Zap, Send } from 'lucide-react';
 import { ScannedCoin, DetectedFormation } from '../types';
 import { formatCryptoPrice, formatVolume } from '../utils/formatters';
 import { useLanguage } from '../context/LanguageContext';

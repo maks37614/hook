@@ -16,7 +16,7 @@ import {
 } from 'lightweight-charts';
 import { Kline, Timeframe, ExchangeId, MarketType, ReplayPosition, ReplayPendingOrder } from '../../types';
 import { getChartPriceFormat, formatCryptoPrice } from '../../utils/formatters';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Camera, MoveVertical, GripHorizontal } from 'lucide-react';
+import { Maximize2, Minimize2, RotateCcw, Camera, MoveVertical } from 'lucide-react';
 
 export interface ReplayChartHandle {
   takeScreenshot: () => string | null;

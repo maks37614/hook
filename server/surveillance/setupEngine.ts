@@ -1,19 +1,5 @@
 import { ExchangeId, Kline, MarketType, Timeframe } from '../../src/types';
-import {
-  BTCContextSnapshot,
-  DensityItem,
-  DetectedPattern,
-  LevelZone,
-  OISnapshot,
-  SetupInstance,
-  SetupConfluenceBreakdown,
-  SetupConfluenceComponent,
-  SetupStage,
-  SetupType,
-  ThirdTouchTracker,
-  TimeframeStructure,
-  TradeFlowSnapshot,
-} from './types';
+import { BTCContextSnapshot, DensityItem, DetectedPattern, LevelZone, OISnapshot, SetupInstance, SetupConfluenceBreakdown, SetupConfluenceComponent, SetupStage, ThirdTouchTracker, TimeframeStructure, TradeFlowSnapshot } from './types';
 import { calculateATR } from './multiTimeframeEngine';
 
 /**
@@ -632,22 +618,6 @@ export class SetupEngine {
     if (args.btcScore >= 4) out.push('BTC context aligned');
     if (this.distancePct(args.currentPrice, args.zone.zoneCenter) <= 0.25) out.push('price at reaction zone');
     return out;
-  }
-
-  private independentConfirmationCount(confirmations: string[]): number {
-    const groups = new Set<string>();
-    for (const c of confirmations) {
-      const x = c.toLowerCase();
-      if (x.includes('formation')) groups.add('formation');
-      else if (x.includes('htf')) groups.add('htf');
-      else if (x.includes('bos') || x.includes('choch')) groups.add('structure');
-      else if (x.includes('density')) groups.add('orderbook');
-      else if (x.includes('flow')) groups.add('flow');
-      else if (x.includes('volume')) groups.add('volume');
-      else if (x.includes('oi')) groups.add('oi');
-      else if (x.includes('btc')) groups.add('btc');
-    }
-    return groups.size;
   }
 
   private confluenceGrade(total: number): SetupConfluenceBreakdown['grade'] {

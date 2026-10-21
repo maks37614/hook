@@ -225,29 +225,6 @@ export class LevelsAndFormationsEngine {
     return detectCanonicalFormations(candles1h, 'SURVEILLANCE').map(toSurveillancePattern);
   }
 
-  private findSwings(candles: Kline[], window=2): Array<{index:number;price:number;type:'HIGH'|'LOW'}> {
-    const out:Array<{index:number;price:number;type:'HIGH'|'LOW'}>=[];
-    for(let i=window;i<candles.length-window;i++) {
-      let hi=true,lo=true;
-      for(let j=1;j<=window;j++) { if(candles[i-j].high>=candles[i].high||candles[i+j].high>=candles[i].high)hi=false; if(candles[i-j].low<=candles[i].low||candles[i+j].low<=candles[i].low)lo=false; }
-      if(hi)out.push({index:i,price:candles[i].high,type:'HIGH'});
-      if(lo)out.push({index:i,price:candles[i].low,type:'LOW'});
-    }
-    return out.sort((a,b)=>a.index-b.index);
-  }
-
-  private patternScore(args:{symmetry:number;depth:number;trigger:number;volume:number}):number {
-    return Math.round(Math.max(50,Math.min(95,55+args.symmetry*15+args.depth*12+args.trigger*8+args.volume*5)));
-  }
-
-  private breakoutVolumeScore(candles:Kline[], index:number, boundary:number, direction:'LONG'|'SHORT'):number {
-    const sample=candles.slice(Math.max(0,index-20),index);
-    if(!sample.length)return 0;
-    const avg=sample.reduce((s,c)=>s+c.volume,0)/sample.length;
-    const c=candles[Math.min(candles.length-1,index)];
-    const directional=direction==='LONG'?c.close>boundary:c.close<boundary;
-    return directional && c.volume>avg*1.2 ? Math.min(1,c.volume/Math.max(avg*2,0.00000001)) : 0;
-  }
 }
 
 export function toSurveillancePattern(f: DetectedFormation): DetectedPattern {
@@ -282,6 +259,3 @@ export function toSurveillancePattern(f: DetectedFormation): DetectedPattern {
       status: f.validation?.passed ? 'BROKEN' : f.validation?.breakoutConfirmed || f.status === 'target_reached' ? 'INVALIDATED' : 'FORMING',
     };
 }
-
-function lowPairs(xs:Array<{index:number;price:number;type:'HIGH'|'LOW'}>) { const out:Array<[typeof xs[number],typeof xs[number]]>=[]; for(let i=1;i<xs.length;i++)out.push([xs[i-1],xs[i]]); return out; }
-function highPairs(xs:Array<{index:number;price:number;type:'HIGH'|'LOW'}>) { const out:Array<[typeof xs[number],typeof xs[number]]>=[]; for(let i=1;i<xs.length;i++)out.push([xs[i-1],xs[i]]); return out; }

@@ -1,26 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  X,
-  FolderArchive,
-  Search,
-  Trash2,
-  ExternalLink,
-  Clock,
-  TrendingUp,
-  TrendingDown,
-  Shield,
-  Target,
-  LogIn,
-  SlidersHorizontal,
-  CheckCircle2,
-  Sparkles,
-  MapPin,
-  Calendar,
-  Layers,
-  Download,
-  AlertTriangle,
-  Lock,
-} from 'lucide-react';
+import { X, FolderArchive, Search, Trash2, ExternalLink, TrendingUp, TrendingDown, LogIn, CheckCircle2, MapPin, Calendar, Download, AlertTriangle, Lock } from 'lucide-react';
 import { useArchive } from '../context/ArchiveContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';

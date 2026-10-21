@@ -1,18 +1,5 @@
 import React from 'react';
-import {
-  X,
-  Sliders,
-  Maximize2,
-  Grid,
-  Columns,
-  Clock,
-  Sparkles,
-  Layers,
-  RotateCcw,
-  Check,
-  Monitor,
-  LayoutGrid,
-} from 'lucide-react';
+import { X, Sliders, Maximize2, Columns, Clock, Sparkles, RotateCcw, Monitor, LayoutGrid } from 'lucide-react';
 import { Timeframe, TerminalWorkspaceConfig } from '../../types';
 import type { MarketSelection } from '../../utils/marketCoinLoader';
 import { useLanguage } from '../../context/LanguageContext';

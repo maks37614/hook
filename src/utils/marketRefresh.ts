@@ -6,17 +6,27 @@ interface MarketRefreshEnvironment {
 
 /** Resume immediately after reconnecting or returning from a suspended mobile tab. */
 export function subscribeMarketRefresh(
-  refresh: () => void,
+  refresh: () => void | Promise<unknown>,
   environment: MarketRefreshEnvironment = { window, document, navigator },
+  intervalMs = 30_000,
 ): () => void {
   const { window: browser, document: page, navigator: network } = environment;
+  let pending = false;
+  let disposed = false;
   const refreshIfActive = () => {
-    if (page.visibilityState !== 'hidden' && network.onLine !== false) refresh();
+    if (disposed || pending || page.visibilityState === 'hidden' || network.onLine === false) return;
+    const result = refresh();
+    if (result) {
+      pending = true;
+      void Promise.resolve(result).catch(error => console.warn('Market refresh failed:', error))
+        .finally(() => { pending = false; });
+    }
   };
   browser.addEventListener('online', refreshIfActive);
   page.addEventListener('visibilitychange', refreshIfActive);
-  const interval = browser.setInterval(refreshIfActive, 30_000);
+  const interval = browser.setInterval(refreshIfActive, intervalMs);
   return () => {
+    disposed = true;
     browser.clearInterval(interval);
     browser.removeEventListener('online', refreshIfActive);
     page.removeEventListener('visibilitychange', refreshIfActive);

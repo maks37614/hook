@@ -1,4 +1,4 @@
-import { EngineAlertEvent, SetupInstance, ThirdTouchTracker, DensityItem, OISnapshot, NewsItem } from './types';
+import { SetupInstance, ThirdTouchTracker, DensityItem, OISnapshot } from './types';
 import { notificationOutbox } from '../notificationOutbox';
 import { getUserTelegram } from '../alertService';
 import { notificationRouter, NotificationSource } from '../notificationRouter';

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'https://fixture.invalid' });
 Object.assign(globalThis, { window: dom.window, document: dom.window.document,
-  localStorage: dom.window.localStorage, IS_REACT_ACT_ENVIRONMENT: true });
+  localStorage: dom.window.localStorage, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true });
 const state = globalThis.__alertsFixture = {
   auth: { user: { uid: 'alice' }, profile: { uid: 'alice' } },
   listeners: new Map(), writes: [], deletes: [],
@@ -21,7 +21,10 @@ let rejectDelete = false;
 globalThis.fetch = async (input, options = {}) => {
   const url = String(input);
   if (url === '/api/alerts/sync') return new Promise(resolve => {
-    requests.push({ body: JSON.parse(options.body), resolve, settled: false });
+    requests.push({ method: 'POST', body: JSON.parse(options.body), resolve, settled: false });
+  });
+  if (url.startsWith('/api/alerts?')) return new Promise(resolve => {
+    requests.push({ method: 'GET', url, resolve, settled: false });
   });
   if (url.startsWith('/api/alerts/history?')) return Response.json({ success: true, history: [] });
   if (options.method === 'DELETE' && url.startsWith('/api/alerts/')) {
@@ -98,7 +101,22 @@ try {
   assert.equal(state.writes.length, 1, 'only the explicit create action writes a new alert');
   assert.ok(state.writes[0].ref.startsWith('users/bob/alerts/'));
   assert.notEqual(state.writes[0].value.id, legacy.id);
-  console.log('PASS: alert deletion, delayed sync, account changes, ownerless cache and manual creation remain isolated.');
+  await act(async () => { poll(); });
+  const changed = requests.at(-1);
+  assert.equal(changed.method, 'POST');
+  await act(async () => { answer(changed, api.alerts); });
+  await act(async () => { poll(); });
+  const unchanged = requests.at(-1);
+  assert.equal(unchanged.method, 'GET', 'unchanged alerts use the read-only endpoint');
+  assert.equal(unchanged.url, '/api/alerts?userId=bob');
+  await act(async () => { answer(unchanged, api.alerts.map(alert => ({ ...alert, isActive: false, triggered: true, triggeredAt: 123 }))); });
+  assert.ok(api.alerts.every(alert => alert.triggered), 'read-only polling still receives background triggers');
+  localStorage.setItem('crypto_screener_language', 'en');
+  await act(async () => { poll(); });
+  assert.equal(requests.at(-1).method, 'POST', 'a language change still synchronizes settings');
+  assert.equal(requests.at(-1).body.language, 'en');
+  await act(async () => { answer(requests.at(-1), api.alerts); });
+  console.log('PASS: alert deletion, delayed sync, account changes, ownerless cache, creation and read-only polling remain isolated.');
 } finally {
   await act(async () => { root.unmount(); });
   dom.window.close();

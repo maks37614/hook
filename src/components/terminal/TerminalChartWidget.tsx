@@ -1,36 +1,9 @@
+import { subscribeMarketRefresh } from '../../utils/marketRefresh';
 import { MarketWebSocket as WebSocket } from '../../utils/marketTransport';
 import { useChartProvider } from '../../utils/useChartProvider';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {
-  GripVertical,
-  Trash2,
-  Zap,
-  Send,
-  RefreshCw,
-  ExternalLink,
-  ChevronDown,
-  Search,
-  Sparkles,
-  ArrowLeftRight,
-  TrendingUp,
-  TrendingDown,
-  Columns,
-  Eye,
-  Activity,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Layers,
-  Split,
-  Plus,
-} from 'lucide-react';
-import {
-  TerminalChartBlock,
-  ScannedCoin,
-  DetectedFormation,
-  ExchangeId,
-  MarketType,
-  Kline,
-} from '../../types';
+import { GripVertical, Trash2, Zap, Send, ExternalLink, ChevronDown, Search, Columns, PanelLeftClose, PanelLeftOpen, Layers, Split, Plus } from 'lucide-react';
+import { TerminalChartBlock, ScannedCoin, DetectedFormation, Kline } from '../../types';
 import { formatCryptoPrice, formatVolume } from '../../utils/formatters';
 import { ScalperDOMWidget } from './ScalperDOMWidget';
 import { ExchangeCandlestickChart } from '../ExchangeCandlestickChart';
@@ -403,13 +376,11 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     };
 
     void loadTimeframeMetrics();
-    const refreshTimer = window.setInterval(() => {
-      void loadTimeframeMetrics();
-    }, 30_000);
+    const stopRefresh = subscribeMarketRefresh(loadTimeframeMetrics);
 
     return () => {
       disposed = true;
-      window.clearInterval(refreshTimer);
+      stopRefresh();
     };
   }, [block.symbol, block.exchange, block.marketType, block.timeframe]);
 

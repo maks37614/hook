@@ -15,7 +15,7 @@ export class VolumeAndOIEngine {
     }
   }
 
-  public getTradeFlowSnapshot(): TradeFlowSnapshot {
+  public getTradeFlowSnapshot(recordHistory = true): TradeFlowSnapshot {
     let buyVolUsd = 0;
     let sellVolUsd = 0;
     let largeTrades = 0;
@@ -38,9 +38,9 @@ export class VolumeAndOIEngine {
     const imbalanceRatio = sellVolUsd > 0 ? buyVolUsd / sellVolUsd : buyVolUsd > 0 ? 99 : 1.0;
     const deltaUsd = buyVolUsd - sellVolUsd;
     const now = Date.now();
-    this.flowHistory.push({ time: now, deltaUsd });
+    if (recordHistory) this.flowHistory.push({ time: now, deltaUsd });
     while (this.flowHistory.length && this.flowHistory[0].time < now - 5 * 60 * 1000) this.flowHistory.shift();
-    const history = this.flowHistory.slice(0, -1).slice(-30).map(x => x.deltaUsd);
+    const history = (recordHistory ? this.flowHistory.slice(0, -1) : this.flowHistory).slice(-30).map(x => x.deltaUsd);
     const mean = history.length ? history.reduce((a,b)=>a+b,0)/history.length : 0;
     const variance = history.length ? history.reduce((a,b)=>a+(b-mean)*(b-mean),0)/history.length : 0;
     const std = Math.sqrt(variance) || 1;

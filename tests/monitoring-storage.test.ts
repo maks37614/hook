@@ -60,3 +60,38 @@ test('atomic monitoring writes keep deletion records together with the current e
   assert.deepEqual(read(path.join(directory, 'deleted_alerts.json')), ['alice:deleted']);
   assert.equal(fs.readdirSync(directory).some(file => file.endsWith('.tmp')), false);
 });
+
+test('unchanged writes skip fsync, while edits, external replacements and deletion still persist', () => {
+  const file = path.join(root, 'deduplicated', 'state.json');
+  const original = fs.fsyncSync;
+  let flushes = 0;
+  fs.fsyncSync = fd => { flushes++; original(fd); };
+  try {
+    writeMonitoringJson(file, { enabled: true, alerts: [] });
+    const inode = fs.statSync(file).ino;
+    for (let i = 0; i < 100; i++) writeMonitoringJson(file, { enabled: true, alerts: [] });
+    assert.equal(flushes, 1);
+    assert.equal(fs.statSync(file).ino, inode);
+    writeMonitoringJson(file, { enabled: false, alerts: [] });
+    assert.equal(flushes, 2);
+    assert.deepEqual(read(file), { enabled: false, alerts: [] });
+    fs.writeFileSync(file, '{"external":true}');
+    writeMonitoringJson(file, { enabled: false, alerts: [] });
+    assert.equal(flushes, 3, 'an external edit cannot be hidden by the in-memory cache');
+    fs.unlinkSync(file);
+    writeMonitoringJson(file, { enabled: false, alerts: [] });
+    assert.equal(flushes, 4, 'a missing file must be written again');
+  } finally { fs.fsyncSync = original; }
+});
+
+test('a failed flush cannot mark new data as saved or replace the durable version', () => {
+  const file = path.join(root, 'retry-write', 'state.json');
+  writeMonitoringJson(file, { revision: 1 });
+  const original = fs.fsyncSync;
+  fs.fsyncSync = () => { throw new Error('fixture disk failure'); };
+  try { assert.throws(() => writeMonitoringJson(file, { revision: 2 }), /fixture disk failure/); }
+  finally { fs.fsyncSync = original; }
+  assert.deepEqual(read(file), { revision: 1 });
+  writeMonitoringJson(file, { revision: 2 });
+  assert.deepEqual(read(file), { revision: 2 });
+});

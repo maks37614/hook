@@ -21,6 +21,51 @@ const alert = (id: string, userId = 'test-user') => ({
   targetPrice: 110, condition: 'gte' as const,
 });
 
+test('unchanged polling from alternating accounts preserves file order and performs no durable writes', () => {
+  for (const uid of ['poll-alice', 'poll-bob']) {
+    service.createAlert(alert(`alert-${uid}`, uid));
+    service.syncUserAlerts(uid, service.getAllAlerts(uid), undefined, undefined, 'uk');
+  }
+  const before = JSON.stringify(service.loadAlerts());
+  const original = fs.fsyncSync;
+  let writes = 0;
+  fs.fsyncSync = fd => { writes++; original(fd); };
+  try {
+    for (let i = 0; i < 100; i++) {
+      for (const uid of ['poll-alice', 'poll-bob']) {
+        service.syncUserAlerts(uid, service.getAllAlerts(uid), undefined, undefined, 'uk');
+      }
+    }
+    assert.equal(writes, 0);
+    assert.equal(JSON.stringify(service.loadAlerts()), before);
+    service.syncUserAlerts('poll-alice', service.getAllAlerts('poll-alice'), undefined, undefined, 'en');
+    assert.ok(writes > 0, 'a real language change is still saved');
+    assert.equal(service.getUserLanguage('poll-alice'), 'en');
+    assert.equal(service.getUserLanguage('poll-bob'), 'uk');
+  } finally { fs.fsyncSync = original; }
+});
+
+test('a failed settings write is retried instead of being mistaken for unchanged saved settings', () => {
+  service.saveUserTelegram('retry-settings', { language: 'uk' });
+  const original = fs.fsyncSync;
+  fs.fsyncSync = () => { throw new Error('fixture disk failure'); };
+  try { assert.throws(() => service.saveUserTelegram('retry-settings', { language: 'en' }), /persist/); }
+  finally { fs.fsyncSync = original; }
+  assert.equal(service.getUserLanguage('retry-settings'), 'uk');
+  service.saveUserTelegram('retry-settings', { language: 'en' });
+  assert.equal(service.getUserLanguage('retry-settings'), 'en');
+});
+
+test('preserving global storage order still accepts a changed order within one account', () => {
+  service.createAlert(alert('order-first', 'order-user'));
+  service.createAlert(alert('order-second', 'order-user'));
+  const selected = service.getAllAlerts('order-user').reverse();
+  const otherAccounts = service.loadAlerts().filter(alert => alert.userId !== 'order-user');
+  service.syncUserAlerts('order-user', selected);
+  assert.deepEqual(service.getAllAlerts('order-user').map(alert => alert.id), selected.map(alert => alert.id));
+  assert.deepEqual(service.loadAlerts().filter(alert => alert.userId !== 'order-user'), otherAccounts);
+});
+
 test('stale client sync cannot delete server-created alerts', () => {
   service.createAlert(alert('new-on-server'));
   const merged = service.syncUserAlerts('test-user', []);

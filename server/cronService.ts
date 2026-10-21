@@ -1,7 +1,7 @@
 import { checkAlertsOnce, loadAlerts, getAllAlerts, getUserTelegram } from './alertService';
 import { checkCoinSurveillance, getAllActiveSurveillanceCoins, findSurveillanceCoinById, commitSurveillanceCheck } from './surveillanceService';
 import { runScreenerScan } from './marketService';
-import { sendTelegramMessage, getEffectiveTelegramConfig } from './telegramService';
+import { getEffectiveTelegramConfig } from './telegramService';
 import { surveillanceManager } from './surveillance/surveillanceManager';
 
 export interface CronJobStatus {

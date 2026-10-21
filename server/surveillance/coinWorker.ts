@@ -1,11 +1,9 @@
 import { ExchangeId, MarketType, SurveillanceCoin, Timeframe } from '../../src/types';
-import { fetchDualExchangeOI, fetchKlines } from '../marketService';
 import { notificationRouter } from '../notificationRouter';
 import { getUserLanguage } from '../alertService';
-import { ExchangeStreamClient, RawDepthDelta, RawTradeEvent } from './exchangeStream';
-import { LevelsAndFormationsEngine } from './levelsAndFormationsEngine';
+import type { RawDepthDelta } from './exchangeStream';
+import { sharedCoinMarkets, type SharedCoinMarket } from './sharedCoinMarket';
 import { MacroAndNewsEngine } from './macroAndNewsEngine';
-import { MultiTimeframeEngine } from './multiTimeframeEngine';
 import { OrderBookEngine } from './orderBookEngine';
 import { SetupEngine } from './setupEngine';
 import { StateMachineAndAlerts } from './stateMachineAndAlerts';
@@ -22,7 +20,6 @@ import {
   TimeframeStructure,
   TradeFlowSnapshot,
 } from './types';
-import { VolumeAndOIEngine } from './volumeAndOIEngine';
 
 export interface CoinWorkerSnapshot {
   id: string;
@@ -53,16 +50,14 @@ export interface CoinWorkerSnapshot {
 }
 
 export class CoinWorker {
-  private streamClient: ExchangeStreamClient;
+  private market: SharedCoinMarket;
+  private marketLease: ReturnType<typeof sharedCoinMarkets.acquire>;
+  private unsubscribeMarket: () => void = () => {};
+  private bookInitialized = false;
   private orderBookEngine: OrderBookEngine;
-  private mtfEngine: MultiTimeframeEngine;
-  private levelsEngine: LevelsAndFormationsEngine;
-  private volumeOIEngine: VolumeAndOIEngine;
   private setupEngine: SetupEngine;
 
   private isDestroyed = false;
-  private slowAnalysisInterval: NodeJS.Timeout | null = null;
-  private oiFetchInterval: NodeJS.Timeout | null = null;
 
   public currentPrice = 0;
   public high24h = 0;
@@ -70,7 +65,6 @@ export class CoinWorker {
   public change24h = 0;
   public volume24hUsd = 0;
   public lastAnalysisTimestamp = 0;
-  private lastMarketPriceAt = 0;
   private analysisInFlight = false;
 
   private structures: Record<Timeframe, TimeframeStructure> = {} as any;
@@ -83,13 +77,12 @@ export class CoinWorker {
   constructor(
     public coin: SurveillanceCoin,
     private macroEngine: MacroAndNewsEngine,
-    private alertManager: StateMachineAndAlerts
+    private alertManager: StateMachineAndAlerts,
+    marketPool = sharedCoinMarkets
   ) {
-    this.streamClient = new ExchangeStreamClient(coin.symbol, coin.exchange, coin.marketType);
     this.orderBookEngine = new OrderBookEngine(coin.symbol, coin.exchange, coin.marketType);
-    this.mtfEngine = new MultiTimeframeEngine();
-    this.levelsEngine = new LevelsAndFormationsEngine();
-    this.volumeOIEngine = new VolumeAndOIEngine();
+    this.marketLease = marketPool.acquire(coin);
+    this.market = this.marketLease.market;
     this.setupEngine = new SetupEngine();
 
     this.updateCoin(coin);
@@ -129,112 +122,65 @@ export class CoinWorker {
 
   private async init() {
     this.setupStreamListeners();
-    await this.loadInitialHistory();
+    await this.market.ready;
     if (this.isDestroyed) return;
-    this.startPeriodicTasks();
+    this.updateMarketPrice();
     void this.runDeepAnalysis().catch((err) => console.error(`[CoinWorker ${this.coin.symbol}] Analysis failed:`, err));
   }
 
+  private updateMarketPrice = () => {
+    const price = this.market.price;
+    this.currentPrice = price.price;
+    this.high24h = price.high24h;
+    this.low24h = price.low24h;
+    this.volume24hUsd = price.volume24hUsd;
+    this.orderBookEngine.setVolume24hUsd(price.volume24hUsd);
+    if (Number.isFinite(price.change24h)) this.change24h = price.change24h!;
+  };
+
   private setupStreamListeners() {
-    this.streamClient.on('error', (err) => {
-      console.warn(`[CoinWorker ${this.coin.symbol}] Stream error:`, err.message);
-    });
-
-    // 1. Live Ticker / Price Tick
-    this.streamClient.on('price', (data: { price: number; high24h: number; low24h: number; volume24hUsd: number; time: number; change24h?: number }) => {
-      if (!Number.isFinite(data.price) || data.price <= 0 || !Number.isFinite(data.time) || Math.abs(Date.now() - data.time) > 15_000) return;
-      this.lastMarketPriceAt = Date.now();
-      this.currentPrice = data.price;
-      this.high24h = data.high24h;
-      this.low24h = data.low24h;
-      this.volume24hUsd = data.volume24hUsd;
-      this.orderBookEngine.setVolume24hUsd(data.volume24hUsd);
-      if (Number.isFinite(data.change24h)) this.change24h = data.change24h!;
-    });
-
-    // 2. Real-time Trade Flow
-    this.streamClient.on('trade', (trade: RawTradeEvent) => {
-      if (!Number.isFinite(trade.price) || trade.price <= 0 || !Number.isFinite(trade.time) || Math.abs(Date.now() - trade.time) > 15_000) return;
-      this.lastMarketPriceAt = Date.now();
-      this.currentPrice = trade.price;
-      this.volumeOIEngine.addTrade(trade);
-      this.mtfEngine.updateWithTrade(trade);
-    });
-
-    // 3. Depth Updates for Local Order Book & Densities (Fast Path)
-    this.streamClient.on('depth', (delta: RawDepthDelta) => {
+    const depth = (delta: RawDepthDelta) => {
+      if (!this.bookInitialized && !delta.isSnapshot) {
+        const snapshot = this.market.bookSnapshot();
+        if (!snapshot) return;
+        delta = snapshot;
+      }
+      if (delta.isSnapshot) this.bookInitialized = true;
       this.orderBookEngine.applyDepth(delta);
-    });
-
-    // 4. Stream status
-    this.streamClient.on('status', (status) => {
-      this.orderBookEngine.setStatus(status);
-    });
-  }
-
-  private async loadInitialHistory() {
-    try {
-      const [k1d, k4h, k1h, k15m, k5m] = await Promise.all([
-        fetchKlines(this.coin.exchange, this.coin.marketType, this.coin.symbol, '1d', 80).catch(() => []),
-        fetchKlines(this.coin.exchange, this.coin.marketType, this.coin.symbol, '4h', 100).catch(() => []),
-        fetchKlines(this.coin.exchange, this.coin.marketType, this.coin.symbol, '1h', 100).catch(() => []),
-        fetchKlines(this.coin.exchange, this.coin.marketType, this.coin.symbol, '15m', 80).catch(() => []),
-        fetchKlines(this.coin.exchange, this.coin.marketType, this.coin.symbol, '5m', 80).catch(() => []),
-      ]);
-
-      if (k1d.length > 0) this.mtfEngine.setCandles('1d', k1d);
-      if (k4h.length > 0) this.mtfEngine.setCandles('4h', k4h);
-      if (k1h.length > 0) this.mtfEngine.setCandles('1h', k1h);
-      if (k15m.length > 0) this.mtfEngine.setCandles('15m', k15m);
-      if (k5m.length > 0) this.mtfEngine.setCandles('5m', k5m);
-
-      if (k15m.length > 0 && this.currentPrice === 0) {
-        this.currentPrice = k15m[k15m.length - 1].close;
-      }
-    } catch (e) {
-      console.warn(`[CoinWorker ${this.coin.symbol}] Error loading initial history:`, e);
-    }
-  }
-
-  private startPeriodicTasks() {
-    // 1. Slow Path Deep Analysis every 6 seconds
-    this.slowAnalysisInterval = setInterval(() => {
-      if (this.isDestroyed) return;
-      void this.runDeepAnalysis().catch((err) => console.error(`[CoinWorker ${this.coin.symbol}] Analysis failed:`, err));
-    }, 6000);
-
-    // 2. Fetch Open Interest every 15 seconds
-    this.oiFetchInterval = setInterval(() => {
-      if (this.isDestroyed) return;
-      this.fetchOpenInterest();
-    }, 15000);
-    this.fetchOpenInterest();
-  }
-
-  private async fetchOpenInterest() {
-    try {
-      const oi = await fetchDualExchangeOI(this.coin.symbol, this.coin.baseAsset, this.currentPrice || 1);
-      const exOI = this.coin.exchange === 'binance' ? oi.binance : oi.bybit;
-      if (exOI && exOI.valueUsd > 0) {
-        this.volumeOIEngine.recordOI(exOI.valueUsd, exOI.amountCoins, this.currentPrice);
-      }
-    } catch (e) {}
+    };
+    const status = (value: Parameters<OrderBookEngine['setStatus']>[0]) => {
+      if (value !== 'LIVE') this.bookInitialized = false;
+      this.orderBookEngine.setStatus(value);
+    };
+    const tick = () => { void this.runDeepAnalysis().catch(error =>
+      console.error(`[CoinWorker ${this.coin.symbol}] Analysis failed:`, error)); };
+    this.market.on('price', this.updateMarketPrice);
+    this.market.on('depth', depth);
+    this.market.on('status', status);
+    this.market.on('tick', tick);
+    this.updateMarketPrice();
+    const snapshot = this.market.bookSnapshot();
+    if (snapshot) depth(snapshot); else status(this.market.status);
+    this.unsubscribeMarket = () => {
+      this.market.off('price', this.updateMarketPrice);
+      this.market.off('depth', depth);
+      this.market.off('status', status);
+      this.market.off('tick', tick);
+    };
   }
 
   public async runDeepAnalysis() {
-    if (this.isDestroyed || this.currentPrice <= 0 || Date.now() - this.lastMarketPriceAt > 15_000 || this.analysisInFlight) return;
+    if (this.isDestroyed || this.analysisInFlight) return;
+    const analysis = this.market.getAnalysis();
+    if (!analysis) return;
     this.analysisInFlight = true;
-    this.lastAnalysisTimestamp = Date.now();
+    this.lastAnalysisTimestamp = analysis.at;
     try {
 
-    const price = this.currentPrice;
-    const candles1d = this.mtfEngine.getCandles('1d');
-    const candles4h = this.mtfEngine.getCandles('4h');
-    const candles1h = this.mtfEngine.getCandles('1h');
-    const candles15m = this.mtfEngine.getCandles('15m');
+    const { price, candles1h, candles15m } = analysis;
 
-    // 1. Multi-timeframe structure
-    this.structures = this.mtfEngine.getMultiTimeframeStructures(price);
+    // 1. Shared public market structure; personal settings and dispatch stay below.
+    this.structures = analysis.structures;
 
     // Check BOS / CHoCH structure change alerts
     for (const [tf, struct] of Object.entries(this.structures)) {
@@ -281,10 +227,10 @@ export class CoinWorker {
     }
 
     // 2. Strong S/R Zones
-    this.levelZones = this.levelsEngine.findSupportResistanceZones(candles1d, candles4h, candles1h);
+    this.levelZones = analysis.levelZones;
 
     // 3. Third Touch Tracking
-    this.thirdTouches = this.levelsEngine.trackThirdTouch(price, candles1h);
+    this.thirdTouches = analysis.thirdTouches;
     for (const tt of this.thirdTouches) {
       if (tt.state === 'APPROACHING' || tt.state === 'ACTIVE') {
         const ttIdentity = `${tt.levelId}_${tt.touchCount}`;
@@ -329,13 +275,11 @@ export class CoinWorker {
     }
 
     // 4. Formations
-    this.patterns = this.levelsEngine.detectFormations(candles1h, price)
+    this.patterns = analysis.patterns
       .filter(p => p.score >= (this.coin.config.formationThreshold ?? 0));
 
     // 5. Volume, RVOL, Trade Flow, OI
-    const { rvol } = this.volumeOIEngine.calculateRVOL(candles15m);
-    const tradeFlow = this.volumeOIEngine.getTradeFlowSnapshot();
-    const oiSnapshot = this.volumeOIEngine.getOISnapshot(price);
+    const { rvol, tradeFlow, oiSnapshot } = analysis;
 
     // Check OI Anomaly alert
     if (oiSnapshot.isAnomaly) {
@@ -455,7 +399,7 @@ export class CoinWorker {
       thirdTouches: this.thirdTouches,
       rvol,
       orderBookImbalance: this.orderBookEngine.getOrderBookImbalance(20),
-      candles1h, candles15m, candles5m: this.mtfEngine.getCandles('5m'),
+      candles1h, candles15m, candles5m: analysis.candles5m,
     });
 
     // Check Setups Telegram Alerts (#83, #87)
@@ -559,8 +503,8 @@ export class CoinWorker {
       levelZones: this.levelZones,
       thirdTouches: this.thirdTouches,
       patterns: this.patterns,
-      tradeFlow: this.volumeOIEngine.getTradeFlowSnapshot(),
-      oiSnapshot: this.volumeOIEngine.getOISnapshot(this.currentPrice),
+      tradeFlow: this.market.volume.getTradeFlowSnapshot(false),
+      oiSnapshot: this.market.volume.getOISnapshot(this.currentPrice),
       setups: this.setups,
       recentEvents: this.recentEvents,
       lastAnalysisTimestamp: this.lastAnalysisTimestamp,
@@ -569,15 +513,8 @@ export class CoinWorker {
 
   public destroy() {
     this.isDestroyed = true;
-    if (this.slowAnalysisInterval) {
-      clearInterval(this.slowAnalysisInterval);
-      this.slowAnalysisInterval = null;
-    }
-    if (this.oiFetchInterval) {
-      clearInterval(this.oiFetchInterval);
-      this.oiFetchInterval = null;
-    }
-    this.streamClient.destroy();
+    this.unsubscribeMarket();
+    this.marketLease.release();
     this.orderBookEngine.clear();
   }
 }

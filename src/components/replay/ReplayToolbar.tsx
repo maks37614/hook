@@ -1,22 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Play,
-  Pause,
-  SkipForward,
-  RotateCcw,
-  Calendar,
-  Shuffle,
-  Clock,
-  Sparkles,
-  ChevronDown,
-  Search,
-  Filter,
-  Activity,
-  CheckCircle2,
-  X,
-  Gauge,
-  Sliders,
-} from 'lucide-react';
+import { Play, Pause, SkipForward, RotateCcw, Calendar, Shuffle, Clock, ChevronDown, Search, Activity, X, Gauge } from 'lucide-react';
 import { Timeframe, ExchangeId, MarketType, ScannedCoin } from '../../types';
 import { formatCryptoPrice, formatLargeNumber } from '../../utils/formatters';
 
