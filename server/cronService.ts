@@ -1,6 +1,7 @@
 import { checkAlertsOnce, loadAlerts, getAllAlerts, getUserTelegram } from './alertService';
 import { checkCoinSurveillance, getAllActiveSurveillanceCoins, findSurveillanceCoinById, commitSurveillanceCheck } from './surveillanceService';
 import { runScreenerScan } from './marketService';
+import type { Timeframe } from '../src/types';
 import { getEffectiveTelegramConfig } from './telegramService';
 import { surveillanceManager } from './surveillance/surveillanceManager';
 
@@ -181,7 +182,8 @@ class CronManager {
         const results = await runScreenerScan({
           exchange: 'all',
           marketType: 'futures',
-          timeframe: '1h',
+          timeframe: (['1m', '5m', '15m', '1h', '4h', '1d'].includes(process.env.HOOK_SCREENER_TIMEFRAME || '')
+            ? process.env.HOOK_SCREENER_TIMEFRAME : '1h') as Timeframe,
           minVolumeUsd: 100_000,
         });
 
