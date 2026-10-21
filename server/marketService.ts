@@ -283,6 +283,7 @@ async function runScreenerScanInternal(params: {
     timestamp: Date.now(),
     data: scannedCoins,
   });
+  while (scanCache.size > 64) scanCache.delete(scanCache.keys().next().value!);
 
   return scannedCoins;
 }
@@ -941,6 +942,7 @@ export async function fetchDualExchangeOI(
 
   const result = { binance, bybit, totalOIUsd };
   oiResultCache.set(cacheKey, { timestamp: Date.now(), data: result });
+  while (oiResultCache.size > 500) oiResultCache.delete(oiResultCache.keys().next().value!);
   return result;
 }
 

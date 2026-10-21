@@ -149,11 +149,10 @@ export class SetupEngine {
       .slice(0, 12);
 
     const activeIds = new Set(ranked.map((s) => s.id));
-    for (const [id, setup] of this.activeSetups.entries()) {
-      if (!activeIds.has(id) && setup.stage !== 'CONFIRMED') {
-        setup.stage = 'INVALIDATED';
-        setup.updatedAt = Date.now();
-      }
+    // Historical events have their own archive. Keep only the current ranked
+    // candidates here so old anchors do not accumulate for a worker's lifetime.
+    for (const id of this.activeSetups.keys()) {
+      if (!activeIds.has(id)) this.activeSetups.delete(id);
     }
 
     return ranked;

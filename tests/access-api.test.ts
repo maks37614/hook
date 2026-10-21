@@ -46,6 +46,10 @@ test('registration grants permanent access, retired code routes are unavailable 
     assert.equal((await request('/api/access/admin/codes', bobToken, { targetUserId: bob.user.uid })).status, 404);
     assert.equal((await request('/api/alerts', bobToken)).status, 200);
     assert.equal((await request('/api/surveillance', bobToken)).status, 200);
+    for (const query of ['exchange=invalid', 'marketType=invalid', 'timeframe=invalid',
+      'minVolume=NaN', 'minVolume=Infinity', 'minVolume=-1', 'exchange=binance&exchange=bybit']) {
+      assert.equal((await request('/api/screener/scan?' + query, bobToken)).status, 400, query);
+    }
     assert.notEqual((await request('/api/screener/scan', bobToken)).status, 403);
     assert.equal((await request('/api/auth/local/register', undefined, { email: 'bad@example.test', password: 'test-password-123', isAdmin: true, inviteCode: 'invalid' })).status, 200);
     await stop();

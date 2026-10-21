@@ -32,7 +32,9 @@ export function installMarketStreams(server: Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16_384 });
   const counts = new Map<string, number>();
   server.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url || '/', 'http://localhost');
+    let url: URL;
+    try { url = new URL(req.url || '/', 'http://localhost'); }
+    catch { socket.destroy(); return; }
     if (url.pathname !== '/api/market/stream') { if (process.env.NODE_ENV === 'production') socket.destroy(); return; }
     const source = url.searchParams.get('source');
     if (!source || !publicStreamUrl(source) || wss.clients.size >= 1024) { socket.write('HTTP/1.1 400 Bad Request\r\n\r\n'); socket.destroy(); return; }

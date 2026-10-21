@@ -108,6 +108,10 @@ export class LevelsAndFormationsEngine {
     }
 
     this.levelZones = zones.sort((a, b) => b.strengthScore - a.strengthScore);
+    const currentZoneIds = new Set(zones.map(zone => zone.id));
+    for (const id of this.thirdTouchTrackers.keys()) {
+      if (!currentZoneIds.has(id)) this.thirdTouchTrackers.delete(id);
+    }
     return this.levelZones;
   }
 

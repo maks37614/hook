@@ -57,6 +57,15 @@ test('production HTTP and WebSocket relays authenticate accounts, reject private
     assert.equal(analysis.success, true); assert.equal(analysis.data.currentPrice, 100); assert.equal(analysis.data.derivatives.bybitFundingRate, 0);
     const rejected = new WebSocket(base.replace('http:', 'ws:') + '/api/market/stream?source=' + encodeURIComponent('wss://stream.bybit.com/v5/public/linear')); sockets.push(rejected);
     await once(rejected, 'open'); const closed = once(rejected, 'close'); rejected.send('{"type":"auth","token":"local.invalid"}'); assert.equal((await closed)[0], 4001);
+    for (const target of ['http://[invalid/', '//[invalid/']) {
+      const malformed = net.connect(port, '127.0.0.1');
+      malformed.on('error', () => {});
+      const disconnected = new Promise<void>(resolve => malformed.once('close', () => resolve()));
+      await once(malformed, 'connect');
+      malformed.write(`GET ${target} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`);
+      await disconnected;
+      assert.equal((await request('/api/health')).status, 200, 'a malformed upgrade must not stop the server');
+    }
   } finally {
     sockets.forEach(socket => socket.terminate());
     if (server.exitCode === null) { const exited = once(server, 'exit'); server.kill(); const timer = setTimeout(() => server.kill('SIGKILL'), 7000); await exited; clearTimeout(timer); }

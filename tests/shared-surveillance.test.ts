@@ -111,6 +111,44 @@ test('reading trade flow for UI polling never changes the history used by signal
   assert.deepEqual(control.getTradeFlowSnapshot(), observed.getTradeFlowSnapshot());
 });
 
+test('trade flow expires quiet and out-of-order trades from its sixty-second window', () => {
+  const nativeNow = Date.now;
+  let clock = nativeNow();
+  Date.now = () => clock;
+  try {
+    const volume = new VolumeAndOIEngine();
+    const trade = { price: 100, quantity: 3, side: 'BUY' as const, time: clock, isBuyerMaker: false };
+    volume.addTrade(trade);
+    // A later-arriving older trade must not be protected by the newer first trade.
+    volume.addTrade({ ...trade, time: clock - 10_000, side: 'SELL' });
+    clock += 50_001;
+    const active = volume.getTradeFlowSnapshot(false);
+    assert.equal(active.totalTradeCount, 1);
+    assert.equal(active.aggressiveBuyUsd, 300);
+    assert.equal(active.aggressiveSellUsd, 0);
+    clock += 10_000;
+    const quiet = volume.getTradeFlowSnapshot();
+    assert.equal(quiet.totalTradeCount, 0);
+    assert.equal(quiet.deltaUsd, 0);
+    assert.equal(quiet.imbalanceRatio, 1);
+  } finally { Date.now = nativeNow; }
+});
+
+test('third-touch tracking releases levels that have left the candle history', () => {
+  const engine = new LevelsAndFormationsEngine();
+  const candles = history('1h');
+  engine.findSupportResistanceZones([], [], candles);
+  const first = engine.trackThirdTouch(100, candles);
+  assert.ok(first.length > 0);
+  engine.findSupportResistanceZones([], [], []);
+  assert.deepEqual(engine.trackThirdTouch(100, []), []);
+  engine.findSupportResistanceZones([], [], candles);
+  const restored = engine.trackThirdTouch(100, candles);
+  const sameLevel = restored.find(tracker => tracker.levelId === first[0].levelId);
+  assert.ok(sameLevel);
+  assert.notEqual(sameLevel, first[0], 'an expired level must not retain obsolete tracking state');
+});
+
 test('a scheduled analysis never skips a cycle when its timer fires before the cache age boundary', async t => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   const nativeNow = Date.now;

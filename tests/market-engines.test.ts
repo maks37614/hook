@@ -139,6 +139,19 @@ test('surveillance confirms valid formations with their measured entry, stop and
   assert.equal(result[0].targetPrice, formation.levels.targetPrice);
 });
 
+test('setup tracking releases candidates after their market evidence disappears', () => {
+  const data = candles();
+  data[39] = { ...data[39], high: 102, close: 101, volume: 200 };
+  const context = { ...setupContext(), patterns: [toSurveillancePattern(validateFormation(data, pattern()))] };
+  const engine = new SetupEngine();
+  const active = engine.evaluateSetups(context);
+  assert.equal(active.length, 1);
+  assert.equal(active[0].stage, 'CONFIRMED');
+  assert.deepEqual(engine.getActiveSetups(), active);
+  assert.deepEqual(engine.evaluateSetups({ ...context, patterns: [], zones: [] }), []);
+  assert.deepEqual(engine.getActiveSetups(), [], 'confirmed candidates with expired evidence must also be released');
+});
+
 test('surveillance rejects failed formations despite confirmed breakouts and strong external evidence', () => {
   const data = candles();
   data[39] = { ...data[39], high: 102, close: 101, volume: 200 };

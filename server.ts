@@ -12,7 +12,6 @@ import { createTelegramLink, unlinkTelegram, startTelegramPolling, stopTelegramP
 import { initializeDataDirectory, DATA_DIR, readJson, writeJson } from './server/storage';
 import { notificationOutbox } from './server/notificationOutbox';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { runScreenerScan, fetchKlines, fetchMarketCoins, fetchOrderBook, fetchRecentTrades, fetchDomTickSize, fetchDualExchangeOI } from './server/marketService';
 import { getMarketSourceStatuses } from './server/marketTickerFeed';
 import { fetchHookChartOIHistory } from './server/hookchartOI';
@@ -249,6 +248,13 @@ async function startServer() {
       const marketType = (req.query.marketType as 'all' | MarketType) || 'all';
       const timeframe = (req.query.timeframe as Timeframe) || '1h';
       const minVolumeUsd = req.query.minVolume !== undefined ? parseFloat(req.query.minVolume as string) : 50_000;
+
+      if (!['all', 'binance', 'bybit'].includes(exchange) ||
+          !['all', 'spot', 'futures'].includes(marketType) ||
+          !['1m', '5m', '15m', '1h', '4h', '1d'].includes(timeframe) ||
+          !Number.isFinite(minVolumeUsd) || minVolumeUsd < 0) {
+        return void res.status(400).json({ success: false, error: 'Некоректні параметри скринера' });
+      }
 
       const results = await runScreenerScan({
         exchange,
@@ -1159,6 +1165,7 @@ async function startServer() {
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

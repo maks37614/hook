@@ -16,6 +16,10 @@ export class VolumeAndOIEngine {
   }
 
   public getTradeFlowSnapshot(recordHistory = true): TradeFlowSnapshot {
+    const now = Date.now();
+    // Expire trades even when the feed is quiet. Trades in one exchange batch
+    // can arrive out of order, so checking only the first item is insufficient.
+    this.recentTrades = this.recentTrades.filter(trade => trade.time >= now - 60000);
     let buyVolUsd = 0;
     let sellVolUsd = 0;
     let largeTrades = 0;
@@ -37,7 +41,6 @@ export class VolumeAndOIEngine {
     const avgTradeSize = totalTrades > 0 ? totalVol / totalTrades : 0;
     const imbalanceRatio = sellVolUsd > 0 ? buyVolUsd / sellVolUsd : buyVolUsd > 0 ? 99 : 1.0;
     const deltaUsd = buyVolUsd - sellVolUsd;
-    const now = Date.now();
     if (recordHistory) this.flowHistory.push({ time: now, deltaUsd });
     while (this.flowHistory.length && this.flowHistory[0].time < now - 5 * 60 * 1000) this.flowHistory.shift();
     const history = (recordHistory ? this.flowHistory.slice(0, -1) : this.flowHistory).slice(-30).map(x => x.deltaUsd);
