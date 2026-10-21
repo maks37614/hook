@@ -4,6 +4,7 @@ import { installMarketRoutes, installMarketStreams } from './server/marketRelay'
 import { fetchDomTradeHistoryPage } from './server/domTradeHistory';
 import { scanDensities, watchDensityWalls, type DensityScanOptions } from './server/densityService';
 import express from 'express';
+import { installPaperFeed } from './server/paperFeed';
 import { timingSafeEqual } from 'node:crypto';
 import { accessService, getAccessAdminKey } from './server/accessService';
 import { requireUser, authenticateLocal, revokeLocalToken, verifyUserToken, localEmailForUid, confirmLocalPasswordReset } from './server/authService';
@@ -154,6 +155,8 @@ async function startServer() {
       res.json({ success: true });
     } catch (error: any) { res.status(400).json({ success: false, error: error.message }); }
   });
+
+  installPaperFeed(app);
 
   // Operational metadata stays public; every application data API requires a session.
   app.use('/api', (req, res, next) => {

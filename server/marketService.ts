@@ -14,6 +14,16 @@ interface CacheEntry {
 const scanCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 45 * 1000; // 45 seconds
 
+/** Read-only export for the separate paper trader. Never starts exchange work. */
+export function getPaperFormationSnapshots(now = Date.now()) {
+  return Array.from(scanCache.entries())
+    .filter(([, entry]) => now - entry.timestamp <= 180_000)
+    .map(([key, entry]) => ({
+      key, generatedAt: entry.timestamp,
+      data: entry.data.map(({ exchangeUrl, ...coin }) => coin),
+    }));
+}
+
 // Helper to map timeframe to exchange interval
 function toBinanceInterval(tf: Timeframe): string {
   switch (tf) {

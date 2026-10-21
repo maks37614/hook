@@ -24,3 +24,5 @@ __pycache__/
 /.test-access-*/
 /.test-market-relay-*/
 /server/data/*.key
+/.hook-paper-private/
+/.test-paper-*/
