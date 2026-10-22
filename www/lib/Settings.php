@@ -19,7 +19,7 @@ function bot_settings(array $input, array $previous, bool $hasTrades): array
     $numbers = ['initialBalance' => [10, 10000000], 'riskPct' => [0.01, 5], 'maxOpenRiskPct' => [0.01, 20],
         'maxPositions' => [1, 10], 'leverage' => [1, 10], 'feePct' => [0, 2], 'slippagePct' => [0, 2],
         'maxEntryDeviationPct' => [0.01, 5], 'minVolumeUsd' => [0, 10000000000],
-        'minConfidence' => [0, 100], 'minConfluence' => [0, 100], 'minRR' => [2, 20]];
+        'minConfidence' => [0, 100], 'minConfluence' => [0, 100], 'minRR' => [2, 20], 'reverseMinRR' => [0.01, 10]];
     foreach ($numbers as $key => [$min, $max]) {
         $raw = $input[$key] ?? null;
         if (!is_scalar($raw) || !is_numeric($raw) || !is_finite((float)$raw) || (float)$raw < $min || (float)$raw > $max) throw new RuntimeException('Некоректний діапазон: ' . $key);
@@ -31,6 +31,7 @@ function bot_settings(array $input, array $previous, bool $hasTrades): array
     if ($next['riskPct'] > $next['maxOpenRiskPct']) throw new RuntimeException('Ризик угоди перевищує загальний ліміт');
     if (!is_string($input['searchQuery'] ?? null) || strlen($input['searchQuery']) > 64) throw new RuntimeException('Пошуковий запит завеликий');
     $next['searchQuery'] = trim($input['searchQuery']);
+    $next['reverse'] = isset($input['reverse']);
     $next['requireExtreme'] = isset($input['requireExtreme']);
     return $next;
 }

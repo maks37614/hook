@@ -14,18 +14,32 @@ final class Engine
             'minVolumeUsd' => 100000.0, 'searchQuery' => '',
             'sortBy' => 'confidence', 'sortOrder' => 'desc',
             'minConfidence' => 0.0, 'minRR' => 2.0, 'entryMode' => 'all',
-            'minConfluence' => 0.0, 'requireExtreme' => false,
+            'minConfluence' => 0.0, 'requireExtreme' => false, 'reverse' => false, 'reverseMinRR' => 0.1,
         ];
     }
 
     public static function fresh(array $settings = []): array
     {
         $settings = array_replace(self::defaults(), $settings);
-        return ['schema' => 1, 'settings' => $settings, 'balance' => $settings['initialBalance'],
+        $state = ['schema' => 1, 'settings' => $settings, 'balance' => $settings['initialBalance'],
             'peakEquity' => $settings['initialBalance'], 'maxDrawdownPct' => 0.0,
             'positions' => [], 'history' => [], 'seen' => [], 'events' => [],
             'equityCurve' => [], 'lastRun' => 0, 'lastSource' => 0, 'sourceError' => '', 'sourceWarnings' => [],
             'lastError' => '', 'coverage' => [], 'rejections' => [], 'marketCooldownUntil' => 0];
+        return self::upgrade($state);
+    }
+
+    public static function upgrade(array $state): array
+    {
+        $state['settings'] = array_replace(self::defaults(),$state['settings']);
+        $state['scalpSettings'] = array_replace(Scalping::defaults(),$state['scalpSettings'] ?? []);
+        $state += ['reportTimezone'=>'Europe/Warsaw','marketBars'=>[],'marketQuotes'=>[],'watchlist'=>[],
+            'scalpDiagnostics'=>[],'scalpStatus'=>'АвтоСкальпінг вимкнено','feedVersion'=>0,'lastEntry'=>[],
+            'sourceWarnings'=>[],'periodStats'=>[]];
+        foreach($state['positions'] as &$p) $p += ['strategy'=>'formations','reversed'=>false,'netRR'=>$p['rr']??0];
+        unset($p);
+        foreach($state['history'] as &$p) $p += ['strategy'=>'formations','reversed'=>false,'netRR'=>$p['rr']??0];
+        unset($p);return $state;
     }
 
     public static function key(array $coin): string
@@ -90,57 +104,78 @@ final class Engine
         $state['events'] = array_slice($state['events'], -150);
     }
 
-    public static function open(array &$state, array $coin, array $f, float $quote, int $now): ?string
+    public static function open(array &$state,array $coin,array $f,float $quote,int $now): ?string
     {
-        $s = $state['settings'];
-        $rejected = self::reject($coin, $f, $s, $now);
-        if ($rejected !== null) return $rejected;
-        if (!$s['enabled']) return 'Бот на паузі';
-        if (count($state['positions']) >= $s['maxPositions']) return 'Ліміт позицій';
-        if (count($state['history']) + count($state['positions']) >= 1000 || count($state['seen']) >= 5000) return 'Ліміт сховища: експортуйте історію та створіть нову інсталяцію';
-        $key = self::key($coin);
-        foreach ($state['positions'] as $p) if ($p['instrument'] === $key) return 'Інструмент уже відкритий';
-        // The site ID contains the timeframe and anchored candle timestamps.
-        // A later independent formation at the same prices is a different signal.
-        $identity = hash('sha256', $key . '|' . $coin['timeframe'] . '|' . $f['id']);
-        if (isset($state['seen'][$identity])) return 'Цей сигнал уже виконано';
-        if (!self::positive($quote)) return 'Немає свіжої ціни';
-        $planned = (float)$f['levels']['entryPrice'];
-        if (abs($quote - $planned) / $planned * 100 > $s['maxEntryDeviationPct']) return 'Ціна відійшла від входу';
-        $direction = $f['bias'] === 'bullish' ? 1 : -1;
-        $entry = $quote * (1 + $direction * $s['slippagePct'] / 100);
-        $stop = (float)$f['levels']['stopLossPrice'];
-        $target = (float)$f['levels']['targetPrice'];
-        $distance = ($entry - $stop) * $direction;
-        $reward = ($target - $entry) * $direction;
-        if ($distance <= 0 || $reward <= 0 || $reward / $distance < $s['minRR']) return 'Некоректний напрямок рівнів / фактичний R:R';
-        $equity = self::equity($state);
-        if ($equity <= 0) return 'Баланс вичерпаний';
-        $reserved = array_sum(array_column($state['positions'], 'margin'));
-        $openRisk = array_sum(array_column($state['positions'], 'risk'));
-        // Include both fees and adverse stop slippage in sizing.
-        $stopFill = $stop * (1 - $direction * $s['slippagePct'] / 100);
-        $riskPerUnit = abs($entry - $stopFill) + ($entry + $stopFill) * $s['feePct'] / 100;
-        $riskBudget = min($equity * $s['riskPct'] / 100, $equity * $s['maxOpenRiskPct'] / 100 - $openRisk);
-        $leverage = $coin['marketType'] === 'spot' ? 1 : $s['leverage'];
-        $available = max(0, $equity - $reserved);
-        $qty = min($riskBudget / $riskPerUnit, $available / ($entry / $leverage + $entry * $s['feePct'] / 100));
-        if (!is_finite($qty) || $qty * $entry < 1) return 'Недостатньо вільного балансу / ризику';
-        $fee = $qty * $entry * $s['feePct'] / 100;
-        $id = bin2hex(random_bytes(12));
-        $p = ['id' => $id, 'signalKey' => $identity, 'instrument' => $key,
-            'exchange' => $coin['exchange'], 'marketType' => $coin['marketType'], 'symbol' => $coin['symbol'],
-            'timeframe' => $coin['timeframe'], 'pattern' => $f['name'] ?? $f['patternKey'],
-            'direction' => $direction, 'plannedEntry' => $planned, 'entry' => $entry, 'stop' => $stop,
-            'target' => $target, 'qty' => $qty, 'margin' => $qty * $entry / $leverage, 'leverage' => $leverage,
-            'risk' => $qty * $riskPerUnit, 'entryFee' => $fee, 'feePct' => $s['feePct'], 'slippagePct' => $s['slippagePct'],
-            'openedAt' => $now, 'mark' => $quote, 'markAt' => $now,
-            'cursor' => (intdiv($now, 60) + 1) * 60, 'monitorError' => '',
-            'validation' => $f['validation'], 'confidence' => $f['confidence'], 'rr' => $reward / $distance];
-        $state['balance'] -= $fee;
-        $state['positions'][$id] = $p;
-        $state['seen'][$identity] = $now;
-        self::event($state, 'Відкрито ' . $p['symbol'] . ($direction === 1 ? ' LONG' : ' SHORT'), $now);
+        $s=$state['settings'];
+        $rejected=self::reject($coin,$f,$s,$now);
+        if($rejected!==null)return $rejected;
+        if(!$s['enabled'])return 'Бот формацій на паузі';
+        $direction=$f['bias']==='bullish'?1:-1;
+        $entry=$quote*(1+$direction*$s['slippagePct']/100);
+        $stop=(float)$f['levels']['stopLossPrice'];$target=(float)$f['levels']['targetPrice'];
+        $risk=($entry-$stop)*$direction;$reward=($target-$entry)*$direction;
+        if($risk<=0||$reward<=0||$reward/$risk<$s['minRR'])return 'Некоректний напрямок рівнів / вихідний R:R';
+        $original=['direction'=>$direction,'entry'=>$f['levels']['entryPrice'],'stop'=>$stop,'target'=>$target,'rr'=>$reward/$risk];
+        if($s['reverse']){$direction*=-1;[$stop,$target]=[$target,$stop];}
+        return self::execute($state,$coin,['id'=>$f['id'],'entry'=>$f['levels']['entryPrice'],'stop'=>$stop,'target'=>$target,'direction'=>$direction,
+            'pattern'=>$f['name']??$f['patternKey'],'validation'=>$f['validation'],'confidence'=>$f['confidence'],
+            'reversed'=>$s['reverse'],'original'=>$original],$quote,$now,$s,'formations',$s['reverse']?$s['reverseMinRR']:$s['minRR'],false);
+    }
+
+    public static function openScalp(array &$state,array $coin,array $signal,float $quote,int $now): ?string
+    {
+        $guard=Scalping::guard($state,$now);if($guard!==null)return $guard;
+        $s=$state['scalpSettings'];$open=0;
+        foreach($state['positions'] as $p)if(($p['strategy']??'formations')==='scalping')$open++;
+        if($open>=$s['maxPositions'])return 'Ліміт позицій скальпінгу';
+        $key=self::key($coin);$last=$state['lastEntry']['scalping:'.$key]??0;
+        foreach($state['history'] as $p)if(($p['strategy']??'formations')==='scalping'&&$p['instrument']===$key)$last=max($last,$p['closedAt']);
+        if($last+$s['cooldownMinutes']*60>$now)return 'Пауза між угодами монети';
+        if(($signal['signalAt']??0)>$now||$now-($signal['signalAt']??0)>$s['maxSignalAge'])return 'Сигнал скальпінгу застарів';
+        return self::execute($state,$coin,$signal+['pattern'=>'Відскок від лою / хаю','reversed'=>false,
+            'validation'=>['method'=>'closed_range_reversal','metrics'=>$signal['metrics']],'confidence'=>null],$quote,$now,$s,'scalping',$s['minRR'],true);
+    }
+
+    private static function execute(array &$state,array $coin,array $trade,float $quote,int $now,array $s,string $strategy,float $minimumRR,bool $netThreshold): ?string
+    {
+        if(count($state['positions'])>=$state['settings']['maxPositions'])return 'Загальний ліміт позицій';
+        if(count($state['history'])+count($state['positions'])>=1000||count($state['seen'])>=5000||!empty($state['dataBudgetExceeded']))return 'Ліміт сховища: потрібен експорт';
+        $key=self::key($coin);foreach($state['positions'] as $p)if($p['instrument']===$key)return 'Інструмент уже відкритий';
+        $identity=hash('sha256',($strategy==='formations'?'':$strategy.'|').$key.'|'.$coin['timeframe'].'|'.$trade['id']);
+        if(isset($state['seen'][$identity]))return 'Цей сигнал уже виконано';
+        if(!self::positive($quote)||!self::positive($trade['entry']??null))return 'Немає свіжої ціни';
+        if(abs($quote-$trade['entry'])/$trade['entry']*100>$s['maxEntryDeviationPct'])return 'Ціна відійшла від входу';
+        $direction=$trade['direction'];if(!in_array($direction,[1,-1],true))return 'Некоректний напрямок';
+        if($coin['marketType']==='spot'&&$direction===-1)return 'Реверс / short на spot неможливий';
+        $entry=$quote*(1+$direction*$s['slippagePct']/100);$stop=(float)$trade['stop'];$target=(float)$trade['target'];
+        if(!self::positive($stop)||!self::positive($target))return 'Некоректні ціни';
+        $distance=($entry-$stop)*$direction;$reward=($target-$entry)*$direction;
+        if($distance<=0||$reward<=0)return 'Некоректний порядок стопа і цілі';
+        $stopFill=$stop*(1-$direction*$s['slippagePct']/100);
+        $targetFill=$target*(1-$direction*$s['slippagePct']/100);
+        $riskPerUnit=abs($entry-$stopFill)+($entry+$stopFill)*$s['feePct']/100;
+        $rewardPerUnit=($targetFill-$entry)*$direction-($entry+$targetFill)*$s['feePct']/100;
+        $netRR=$rewardPerUnit/$riskPerUnit;
+        if($rewardPerUnit<=0||($netThreshold?$netRR:$reward/$distance)<$minimumRR)return 'R:R / ціль після комісій і прослизання';
+        if($strategy==='scalping'&&($distance/$entry*100<$s['minStopPct']||$distance/$entry*100>$s['maxStopPct']||$rewardPerUnit/$entry*100<$s['minNetProfitPct']))return 'Стоп / чистий потенціал поза межами';
+        $equity=self::equity($state);if($equity<=0)return 'Баланс вичерпаний';
+        $reserved=array_sum(array_column($state['positions'],'margin'));$openRisk=array_sum(array_column($state['positions'],'risk'));
+        $budget=min($equity*$s['riskPct']/100,$equity*$state['settings']['maxOpenRiskPct']/100-$openRisk);
+        $leverage=$coin['marketType']==='spot'?1:$s['leverage'];
+        $qty=min($budget/$riskPerUnit,max(0,$equity-$reserved)/($entry/$leverage+$entry*$s['feePct']/100));
+        if(!is_finite($qty)||$qty*$entry<1)return 'Недостатньо вільного балансу / ризику';
+        $fee=$qty*$entry*$s['feePct']/100;$id=bin2hex(random_bytes(12));
+        $p=['id'=>$id,'signalKey'=>$identity,'instrument'=>$key,'exchange'=>$coin['exchange'],'marketType'=>$coin['marketType'],'symbol'=>$coin['symbol'],
+            'timeframe'=>$coin['timeframe'],'pattern'=>$trade['pattern'],'strategy'=>$strategy,'reversed'=>$trade['reversed'],
+            'original'=>$trade['original']??null,'metrics'=>$trade['metrics']??null,'direction'=>$direction,'plannedEntry'=>$trade['entry'],
+            'entry'=>$entry,'stop'=>$stop,'target'=>$target,'qty'=>$qty,'margin'=>$qty*$entry/$leverage,'leverage'=>$leverage,
+            'risk'=>$qty*$riskPerUnit,'entryFee'=>$fee,'feePct'=>$s['feePct'],'slippagePct'=>$s['slippagePct'],
+            'openedAt'=>$now,'mark'=>$quote,'markAt'=>$now,'cursor'=>(intdiv($now,60)+1)*60,'monitorError'=>'',
+            'validation'=>$trade['validation'],'confidence'=>$trade['confidence'],'rr'=>$reward/$distance,'netRR'=>$netRR,
+            'maxHoldMinutes'=>$strategy==='scalping'?$s['maxHoldMinutes']:0];
+        $state['balance']-=$fee;$state['positions'][$id]=$p;$state['seen'][$identity]=$now;
+        $state['lastEntry'][$strategy.':'.$key]=$now;
+        self::event($state,'Відкрито '.$p['symbol'].($direction===1?' LONG':' SHORT').' · '.$strategy.($p['reversed']?' · РЕВЕРС':''),$now);
         return null;
     }
 
@@ -168,7 +203,7 @@ final class Engine
         foreach ($bars as $bar) {
             $time = (int)$bar['time'];
             if ($time < $p['cursor'] || $time + 60 > $now) continue;
-            if ($time !== $p['cursor']) { $p['monitorError'] = 'Прогалина в 1m-свічках; нові входи призупинено'; return; }
+            if ($time !== $p['cursor']) { $p['monitorError'] = 'Прогалина в 1m-свічках; нові входи призупинено'; self::manualGap($state,$id,$quote,$now); return; }
             foreach (['open', 'high', 'low', 'close'] as $field) {
                 if (!self::positive($bar[$field] ?? null)) throw new RuntimeException('Некоректна свічка');
             }
@@ -190,15 +225,24 @@ final class Engine
         }
         if ($p['cursor'] + 60 <= $now) {
             $p['monitorError'] = 'Очікування історії 1m; перевірка продовжиться наступним запуском';
-            return;
+            self::manualGap($state,$id,$quote,$now); return;
         }
         if ($quote !== null && self::positive($quote)) {
             $p['mark'] = $quote; $p['markAt'] = $now;
             $long = $p['direction'] === 1;
             if ($long ? $quote <= $p['stop'] : $quote >= $p['stop']) self::close($state, $id, $quote, $now, 'STOP_OBSERVED');
             elseif ($long ? $quote >= $p['target'] : $quote <= $p['target']) self::close($state, $id, $p['target'], $now, 'TARGET_OBSERVED');
+            elseif (!empty($p['maxHoldMinutes']) && $p['openedAt']+$p['maxHoldMinutes']*60 <= $now) self::close($state, $id, $quote, $now, 'TIME_EXIT');
             elseif (!empty($p['closeRequested'])) self::close($state, $id, $quote, $now, 'MANUAL');
         } else $p['monitorError'] = 'Немає свіжої ціни';
+    }
+
+    private static function manualGap(array &$state,string $id,?float $quote,int $now): void
+    {
+        if (($state['positions'][$id]['closeRequested'] ?? null)==='force' && $quote!==null && self::positive($quote)) {
+            $state['positions'][$id]['dataGapExit']=true;
+            self::close($state,$id,$quote,$now,'MANUAL_DATA_GAP');
+        }
     }
 
     public static function sample(array &$state, int $now): void

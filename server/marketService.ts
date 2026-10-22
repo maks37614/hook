@@ -15,9 +15,11 @@ const scanCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 45 * 1000; // 45 seconds
 
 /** Read-only export for the separate paper trader. Never starts exchange work. */
-export function getPaperFormationSnapshots(now = Date.now()) {
+export function getPaperFormationSnapshots(now = Date.now(), timeframe?: Timeframe) {
   return Array.from(scanCache.entries())
-    .filter(([, entry]) => now - entry.timestamp <= 180_000)
+    .filter(([key, entry]) => now - entry.timestamp <= 180_000 && (!timeframe || key.split('_')[2] === timeframe))
+    .sort((a, b) => b[1].timestamp - a[1].timestamp)
+    .slice(0, timeframe ? 4 : 64)
     .map(([key, entry]) => ({
       key, generatedAt: entry.timestamp,
       data: entry.data.map(({ exchangeUrl, ...coin }) => coin),
@@ -66,6 +68,25 @@ interface KlineCacheEntry {
 }
 const klinesMemoryCache = new Map<string, KlineCacheEntry>();
 const KLINES_CACHE_TTL_MS = 1500; // 1.5s TTL for ultra-fast repeated requests
+
+/** Bounded read-only export. Reuses market data already collected by the site. */
+export function getPaperMarketSnapshot(watch: string[], timeframes: string[], now = Date.now()) {
+  const wanted = new Set(watch);
+  const quotes = marketTickerFeed.cached().flatMap(source => source.data
+    .filter((ticker, index) => index < 25 || wanted.has(`${ticker.exchange}:${ticker.marketType}:${ticker.symbol}`))
+    .map(ticker => ({ ...ticker, updatedAt: source.updatedAt })));
+  const latest = new Map<string, { instrument: string; timeframe: string; updatedAt: number; candles: number[][] }>();
+  for (const [key, entry] of klinesMemoryCache) {
+    const [exchange, market, symbol, timeframe, , start, end] = key.split(':');
+    const instrument = `${exchange}:${market}:${symbol}`;
+    if (!wanted.has(instrument) || !timeframes.includes(timeframe) || start || end || now - entry.timestamp > 180_000) continue;
+    const id = `${instrument}:${timeframe}`;
+    if ((latest.get(id)?.updatedAt || 0) >= entry.timestamp) continue;
+    latest.set(id, { instrument, timeframe, updatedAt: entry.timestamp,
+      candles: entry.data.slice(-200).map(c => [c.time, c.open, c.high, c.low, c.close, c.volume]) });
+  }
+  return { quotes, series: Array.from(latest.values()).slice(0, 72) };
+}
 
 // Historical and live callers share the same guarded request/cache in exchangeGateway.
 export async function fetchKlines(exchange: ExchangeId, market: MarketType, symbol: string, timeframe: Timeframe,

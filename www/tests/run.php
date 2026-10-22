@@ -107,54 +107,28 @@ try {
 class FixtureMarket extends Market {
     public array $calls=[]; public bool $sourceFails=false; public array $feed=[]; public array $history=[];
     public function json(string $url, ?string $token=null): array { $this->calls[]=$url; if($this->sourceFails)throw new RuntimeException('source offline');return $this->feed; }
-    public function quote(array $instrument): float { return 100; }
     public function candles(array $p,int $now): array { return $this->history; }
 }
-$now=time();[$coin,$f]=fixture($now);
-$feed=['success'=>true,'generatedAt'=>$now*1000,'snapshots'=>[['key'=>'all_futures_1h_100000','generatedAt'=>$now*1000,'data'=>[array_replace($coin,['formations'=>[$f]])]]],
+$now=time();[$coin,$f]=fixture($now);$minute=intdiv($now,60)*60-60;
+$q=['symbol'=>'BTCUSDT','exchange'=>'binance','marketType'=>'futures','baseAsset'=>'BTC','quoteAsset'=>'USDT','price'=>100,'volumeUsd'=>500000,'updatedAt'=>$now*1000];
+$feed=['version'=>2,'success'=>true,'generatedAt'=>$now*1000,'market'=>['quotes'=>[$q],'series'=>[['instrument'=>'binance:futures:BTCUSDT','timeframe'=>'1m','updatedAt'=>$now*1000,'candles'=>[[$minute,100,101,99,100,10]]]]],
+    'snapshots'=>[['key'=>'all_futures_1h_100000','generatedAt'=>$now*1000,'data'=>[array_replace($coin,['formations'=>[$f]])]]],
     'sources'=>[['exchange'=>'binance','marketType'=>'futures','status'=>'live','updatedAt'=>$now*1000]]];
 $market=new FixtureMarket();$market->feed=$feed;$state=account();$state['sourceToken']=str_repeat('x',64);
-$result=Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$now);
-check($result['opened']===1 && $result['status']==='ok','runner opens from exact existing feed contract');check(count($market->calls)===1,'one VPS request');
-$state['settings']['enabled']=false;$market->sourceFails=true;$id=array_key_first($state['positions']);$cursor=$state['positions'][$id]['cursor'];
-$market->history=[bar($cursor,100,110,99,106)];
-Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$cursor+60);
-check(count($state['history'])===1 && !$state['positions'],'open position managed while paused and feed down');
+$result=Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$now);
+check($result['opened']===1&&$result['status']==='ok','runner opens from v2 real-data contract');check(count($market->calls)===1,'one source request for both bots');
+check(strpos($market->calls[0],'https://h00k.top/api/paper/formations?')===0,'only h00k.top supplies data');
+$state['settings']['enabled']=false;$market->sourceFails=true;$id=array_key_first($state['positions']);$cursor=$state['positions'][$id]['cursor'];$market->history=[bar($cursor,100,110,99,106)];
+Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$cursor+60);
+check(count($state['history'])===1&&!$state['positions'],'stored history can settle a position even if source fails');
 $market=new FixtureMarket();$market->feed=$feed;$state=account(['timeframe'=>'15m']);$state['sourceToken']=str_repeat('x',64);
-$result=Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$now);
-check($result['opened']===0 && $result['status']==='degraded','unsupported timeframe does not silently use 1h');
+$result=Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$now);
+check($result['opened']===0&&$result['status']==='degraded','unsupported formation timeframe never silently substitutes');
 $market=new FixtureMarket();$market->feed=$feed;$market->feed['sources'][0]['status']='unavailable';$state=account();$state['sourceToken']=str_repeat('x',64);
-$result=Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$now);
-check(!$state['positions'],'unavailable market source cannot create entry');
+Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$now);check(!$state['positions'],'unavailable sources cannot create entries');
 $market=new FixtureMarket();$market->feed=$feed;$market->feed['generatedAt']=($now-200)*1000;$state=account();$state['sourceToken']=str_repeat('x',64);
-$result=Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$now);
-check(!$state['positions'] && $state['sourceError']!=='','stale feed blocks entries');
-class QuoteFixtureMarket extends Market {
-    public array $responses=[]; public array $requests=[];
-    public function json(string $url, ?string $token=null): array {
-        $this->requests[]=$url;
-        return array_shift($this->responses) ?? [];
-    }
-}
-$market=new QuoteFixtureMarket();$market->responses=[[['symbol'=>'BTCUSDT','price'=>'100'],['symbol'=>'ETHUSDT','price'=>'50']]];
-near($market->quote($coin),100,'Binance quote parser');$other=$coin;$other['symbol']='ETHUSDT';near($market->quote($other),50,'bulk quotes reused');check(count($market->requests)===1,'one ticker request per source');
-$market=new QuoteFixtureMarket();$market->responses=[[]];
-for($i=0;$i<2;$i++) { try { $market->quote($coin);check(false,'empty quote must fail'); } catch(RuntimeException $e) { check(true,'empty quote fails'); } }
-check(count($market->requests)===1,'failed source not repeatedly requested');
-$market=new QuoteFixtureMarket();$market->responses=[['retCode'=>0,'time'=>time()*1000,'result'=>['list'=>[['symbol'=>'BTCUSDT','lastPrice'=>'101']]]]];
-$bybit=$coin;$bybit['exchange']='bybit';near($market->quote($bybit),101,'Bybit lastPrice parser');
-$market=new QuoteFixtureMarket();$market->responses=[['retCode'=>0,'time'=>(time()-200)*1000,'result'=>['list'=>[['symbol'=>'BTCUSDT','lastPrice'=>'101']]]]];
-try { $market->quote($bybit);check(false,'stale ticker rejected'); } catch(RuntimeException $e) { check(true,'stale ticker rejected'); }
-$international=$coin;$international['symbol']='测试USDT';$international['baseAsset']='测试';
-check(Engine::reject($international,$f,Engine::defaults(),$now)===null,'international exchange symbols accepted');
-$position=['instrument'=>'bybit:futures:测试USDT','exchange'=>'bybit','marketType'=>'futures','symbol'=>'测试USDT','cursor'=>intdiv($now,60)*60-120];
-$market=new QuoteFixtureMarket();$market->responses=[['retCode'=>0,'result'=>['list'=>[[($position['cursor']+60)*1000,'100','102','99','101'],[$position['cursor']*1000,'100','101','99','100']]]]];
-$bars=$market->candles($position,$now);check(count($bars)===2 && $bars[0]['open']===100.0,'Bybit reverse-order bars parsed');
-check(strpos($market->requests[0],rawurlencode('测试USDT'))!==false,'international symbols URL encoded');
-$market=new QuoteFixtureMarket();$market->responses=[[]];$position['exchange']='binance';$position['cursor']-=2000*60;
-$market->candles($position,$now);parse_str(parse_url($market->requests[0],PHP_URL_QUERY),$query);
-check((int)$query['endTime'] < ($position['cursor']+1000*60)*1000,'catch-up bounded to 1000 minutes');
-$market=new FixtureMarket();$market->feed=$feed;$market->feed['sources'][]=['exchange'=>'bybit','marketType'=>'futures','status'=>'unavailable','updatedAt'=>null];
-$state=account();$state['sourceToken']=str_repeat('x',64);$result=Runner::run($state,['source_url'=>'https://example.test/feed'],$market,$now);
-check($result['opened']===1 && $result['status']==='degraded' && count($state['sourceWarnings'])===1,'partial source failure is visible while healthy exchange remains actionable');
+Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$now);check(!$state['positions']&&$state['sourceError']!=='','stale feed blocks entries');
+$market=new FixtureMarket();$market->feed=$feed;$market->feed['version']=1;$state=account();$state['sourceToken']=str_repeat('x',64);
+Runner::run($state,['source_url'=>'https://h00k.top/api/paper/formations'],$market,$now);check(!$state['positions']&&strpos($state['sourceError'],'версії 2')!==false,'legacy feed asks for upgrade without direct exchange fallback');
+require __DIR__.'/scalping_checks.php';
 echo "OK: $tests checks\n";

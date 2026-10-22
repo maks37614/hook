@@ -38,7 +38,10 @@ final class Store
         if ($data === false || strpos($data, self::PREFIX) !== 0) throw new RuntimeException('Пошкоджене сховище; відновіть резервну копію');
         $state = json_decode(substr($data, strlen(self::PREFIX)), true, 64, JSON_THROW_ON_ERROR);
         if (!is_array($state) || ($state['schema'] ?? null) !== 1 || !isset($state['balance'], $state['settings'])) throw new RuntimeException('Невідомий формат сховища');
-        return $state;
+        if (!is_array($state['settings']) || !Engine::positive($state['settings']['initialBalance'] ?? null)
+            || !is_numeric($state['balance']) || !is_finite((float)$state['balance'])) throw new RuntimeException('Пошкоджений баланс або налаштування рахунку');
+        foreach (['positions','history','seen'] as $field) if (!is_array($state[$field] ?? null)) throw new RuntimeException('Пошкоджений журнал рахунку');
+        return Engine::upgrade($state);
     }
 
     public function write(array $state): void

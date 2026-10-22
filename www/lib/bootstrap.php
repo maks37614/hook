@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/Indicators.php';
+require_once __DIR__ . '/Scalping.php';
+require_once __DIR__ . '/Stats.php';
 require_once __DIR__ . '/Engine.php';
 require_once __DIR__ . '/Store.php';
 require_once __DIR__ . '/Market.php';

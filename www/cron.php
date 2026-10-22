@@ -18,6 +18,7 @@ try {
     }
     if (!$store->acquire()) { http_response_code(409); exit('{"status":"already_running"}'); }
     $state = $store->read();
+    if (PHP_SAPI !== 'cli' && !hash_equals('Bearer ' . $state['cronToken'], $received)) { http_response_code(401); exit('{"error":"Unauthorized"}'); }
     $now = time();
     if ($now - $state['lastRun'] < max(60, (int)$config['min_interval_seconds'])) { http_response_code(200); exit('{"status":"too_soon"}'); }
     $result = Runner::run($state, $config, new Market(), $now);
