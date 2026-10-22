@@ -30,6 +30,13 @@ const STALE_MS = 120_000;
 export class MarketTickerFeed {
   private entries = new Map<string, FeedEntry>();
 
+  /** Existing memory only: this method cannot initiate an exchange request. */
+  cached() {
+    return Array.from(this.entries.entries()).map(([key, entry]) => ({
+      key, data: entry.data, updatedAt: entry.updatedAt,
+    }));
+  }
+
   constructor(
     private request: typeof fetch = (input, init) => fetch(input, init),
     private now: () => number = Date.now,

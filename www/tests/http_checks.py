@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='.test-paper-http-', dir=source.parent) 
     client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
     def request(path='/', data=None, headers=None, anonymous=False):
-        body = urllib.parse.urlencode(data).encode() if data is not None else None
+        body = urllib.parse.urlencode(data, doseq=True).encode() if data is not None else None
         req = urllib.request.Request(base + path, data=body, headers=headers or {})
         opener = urllib.request.build_opener() if anonymous else client
         try:
@@ -100,6 +100,24 @@ with tempfile.TemporaryDirectory(prefix='.test-paper-http-', dir=source.parent) 
         check('Неправильний пароль' in html, 'old password revoked')
         _, _, html = request(data={'csrf': token(html), 'password': 'A-new-password-456'})
         check('Ринок. Рішення. Результат.' in html, 'new password logs in')
+        _, _, scalp_html = request('/?tab=scalping')
+        check('Детальні налаштування АвтоСкальпінгу' in scalp_html and 'timeframes[]' in scalp_html, 'scalping tab and detailed fields render')
+        _, _, stats_html = request('/?tab=statistics')
+        check('Автоматична статистика' in stats_html and 'Погодинно' in stats_html, 'statistics tab renders all periods')
+        check(request('/?tab=statistics&export=stats&period=month')[1].get_content_type() == 'text/csv', 'period statistics CSV export')
+        check(request('/views/scalping.php')[0] == 404 and request('/views/statistics.php')[0] == 404, 'view partials cannot bypass login')
+        _, _, html = request(data={'csrf': token(html), 'action': 'reverse_toggle'})
+        check('Реверс: увімкнено' in html, 'reverse toggles on formations page')
+        _, _, html = request(data={'csrf': token(html), 'action': 'reverse_toggle'})
+        check('Реверс: вимкнено' in html, 'reverse can be disabled')
+        defaults = json.loads(subprocess.check_output([php, '-n', '-r', "require '" + str(public / 'lib/bootstrap.php') + "'; echo json_encode(Scalping::defaults());"]))
+        frames = defaults.pop('timeframes')
+        defaults.update({'timeframes[]': frames, 'action': 'scalp_settings', 'tab': 'scalping', 'csrf': token(html)})
+        _, _, html = request(data=defaults)
+        check('Налаштування АвтоСкальпінгу збережено' in html and 'АвтоСкальпінг' in html, 'all scalping settings save over real HTTP')
+        _, _, html = request(data={'csrf': token(html), 'action': 'report_settings', 'tab': 'statistics', 'reportTimezone': 'Europe/Warsaw'})
+        check('Часовий пояс статистики збережено' in html, 'report timezone persists')
+        _, _, html = request('/?tab=formations')
         code, headers, csv = request('/?export=csv')
         check(code == 200 and headers.get_content_type() == 'text/csv' and 'net_pnl' in csv, 'authenticated CSV export')
         check(request('/tests/run.php')[0] == 404, 'test runner inaccessible via web')

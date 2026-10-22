@@ -1,114 +1,102 @@
 <?php
 declare(strict_types=1);
-
 final class Runner
 {
-    public static function run(array &$state, array $config, Market $market, int $now): array
+    public static function run(array &$state,array $config,Market $market,int $now): array
     {
-        $state['lastRun'] = $now; $state['lastError'] = ''; $state['rejections'] = [];
-        if (($state['marketCooldownUntil'] ?? 0) > $now) {
-            $state['lastError'] = 'Пауза після обмеження API до ' . gmdate('H:i:s', $state['marketCooldownUntil']) . ' UTC';
-            return ['status' => 'cooldown'];
+        $state=Engine::upgrade($state);$state['lastRun']=$now;$state['lastError']='';$state['sourceError']='';
+        $state['sourceWarnings']=[];$state['rejections']=[];$state['scalpDiagnostics']=[];$state['formationError']='';
+        if(($state['marketCooldownUntil']??0)>$now){$state['lastError']='Пауза джерела після обмеження запитів';return ['status'=>'cooldown'];}
+        $before=count($state['history']);$opened=0;$feed=null;
+        try{$feed=$market->prepare($state,$config,$now);$state['lastSource']=$now;}
+        catch(Throwable $e){$state['sourceError']=$e->getMessage();}
+        // Both strategies share the same account and immutable, independently monitored positions.
+        foreach(array_keys($state['positions']) as $id){
+            $p=$state['positions'][$id];$quote=null;$quoteAt=0;
+            try{$q=$market->quoteInfo($p,$now,90);$quote=(float)$q['price'];$quoteAt=(int)floor($q['updatedAt']/1000);if($quoteAt<$p['openedAt'])throw new RuntimeException('Ще немає котирування після входу');}
+            catch(Throwable $e){$quote=null;$quoteAt=0;$state['lastError']=$e->getMessage();}
+            try{
+                Engine::monitor($state,$id,$market->candles($p,$now),$quote,$now);
+                if(isset($state['positions'][$id])&&$quoteAt&&$state['positions'][$id]['monitorError']==='')$state['positions'][$id]['markAt']=$quoteAt;
+            }catch(Throwable $e){$state['positions'][$id]['monitorError']=$e->getMessage();$state['lastError']=$e->getMessage();}
         }
-        $before = count($state['history']); $opened = 0;
-        // Always manage existing positions, even with entry pause or unavailable formation source.
-        foreach (array_keys($state['positions']) as $id) {
-            try {
-                $p = $state['positions'][$id];
-                $bars = $market->candles($p, $now);
-                $quote = null;
-                try { $quote = $market->quote($p); } catch (Throwable $error) { $state['lastError'] = $error->getMessage(); }
-                Engine::monitor($state, $id, $bars, $quote, max($now, time()));
-            } catch (Throwable $error) {
-                $state['positions'][$id]['monitorError'] = $error->getMessage();
-                $state['lastError'] = $error->getMessage();
+        $blocked=false;foreach($state['positions'] as $p)if($p['monitorError']!==''||$p['markAt']<$now-90)$blocked=true;
+        $state['dataBudgetExceeded']=strlen(json_encode($state,JSON_INVALID_UTF8_SUBSTITUTE))>7*1024*1024;
+        $candidates=[];
+        if($feed){try{$candidates=self::formations($state,$feed,$now);}catch(Throwable $e){$state['formationError']=$e->getMessage();}}
+        $nextWatch=[];foreach($candidates as $candidate)$nextWatch[Engine::key($candidate['coin'])]=true;
+        $state['watchlist']=array_slice(array_keys($nextWatch),0,12);
+        if($state['settings']['enabled']&&!$blocked&&$state['sourceError']===''&&$state['formationError']===''){
+            foreach($candidates as $candidate){
+                if(count($state['positions'])>=$state['settings']['maxPositions'])break;
+                try{
+                    $q=$market->quoteInfo($candidate['coin'],$now,90);
+                    self::requireMinute($market,$candidate['coin'],$now);
+                    $reason=Engine::open($state,$candidate['coin'],$candidate['formation'],(float)$q['price'],$now);
+                    if($reason!==null)self::reject($state,$reason);else {$opened++;$id=array_key_last($state['positions']);$state['positions'][$id]['quoteAt']=(int)floor($q['updatedAt']/1000);$state['positions'][$id]['markAt']=$state['positions'][$id]['quoteAt'];}
+                }catch(Throwable $e){self::reject($state,$e->getMessage());}
             }
         }
-        $candidates = []; $state['coverage'] = []; $state['sourceWarnings'] = [];
-        try {
-            if (empty($state['sourceToken'])) throw new RuntimeException('Задайте токен каналу формацій у налаштуваннях');
-            $feed = $market->json($config['source_url'], $state['sourceToken']);
-            if (($feed['success'] ?? false) !== true || !is_array($feed['snapshots'] ?? null)) throw new RuntimeException('Канал формацій не готовий');
-            $generated = (float)($feed['generatedAt'] ?? 0) / 1000;
-            if ($generated < $now - 180 || $generated > $now + 30) throw new RuntimeException('Застаріла відповідь каналу формацій');
-            $freshSources = 0;
-            foreach ($feed['sources'] ?? [] as $source) {
-                $s = $state['settings'];
-                if (($s['exchange'] !== 'all' && $s['exchange'] !== ($source['exchange'] ?? ''))
-                    || ($s['marketType'] !== 'all' && $s['marketType'] !== ($source['marketType'] ?? ''))) continue;
-                if (in_array($source['status'] ?? '', ['live', 'stale'], true)
-                    && (float)($source['updatedAt'] ?? 0) / 1000 >= $now - 120
-                    && (float)($source['updatedAt'] ?? 0) / 1000 <= $now + 30) $freshSources++;
-                else $state['sourceWarnings'][] = ($source['exchange'] ?? '?') . ' / ' . ($source['marketType'] ?? '?') . ': немає свіжого джерела VPS';
-            }
-            if ($freshSources === 0) throw new RuntimeException('Біржові джерела вибраного ринку на VPS недоступні або застаріли');
-            $covered = false;
-            foreach ($feed['snapshots'] as $snapshot) {
-                $timestamp = (float)($snapshot['generatedAt'] ?? 0) / 1000;
-                if ($timestamp < $now - 180 || $timestamp > $now + 30) continue;
-                $parts = explode('_', $snapshot['key'] ?? '');
-                if (count($parts) !== 4) continue;
-                [$exchange, $marketType, $timeframe, $minVolume] = $parts;
-                $state['coverage'][] = [$exchange, $marketType, $timeframe, $minVolume];
-                $s = $state['settings'];
-                $matches = $s['timeframe'] === $timeframe && (float)$minVolume <= $s['minVolumeUsd']
-                    && ($exchange === 'all' || $exchange === $s['exchange'])
-                    && ($marketType === 'all' || $marketType === $s['marketType']);
-                if ($matches) $covered = true;
-                // Only use complete selected universe; never pretend a narrower top-75 scan is the all-exchange universe.
-                if (!$matches) continue;
-                foreach ($snapshot['data'] ?? [] as $coin) {
-                    if (($coin['timeframe'] ?? '') !== $timeframe) continue;
-                    $live = false;
-                    foreach ($feed['sources'] ?? [] as $source) {
-                        if (($source['exchange'] ?? '') === ($coin['exchange'] ?? '') && ($source['marketType'] ?? '') === ($coin['marketType'] ?? '')
-                            && in_array($source['status'] ?? '', ['live', 'stale'], true)
-                            && (float)($source['updatedAt'] ?? 0) / 1000 >= $now - 120 && (float)($source['updatedAt'] ?? 0) / 1000 <= $now + 30) $live = true;
+        $scalpGuard=Scalping::guard($state,$now);$state['scalpStatus']=$scalpGuard??'Аналіз реального ринку';
+        $scalpDataReady=false;
+        foreach(Scalping::watch($state) as $instrument){
+            [$exchange,$type,$symbol]=explode(':',$instrument);$coin=['exchange'=>$exchange,'marketType'=>$type,'symbol'=>$symbol];
+            foreach($state['scalpSettings']['timeframes'] as $tf){
+                $coin['timeframe']=$tf;$result=['reason'=>'Немає даних','metrics'=>[]];
+                try{
+                    $q=$market->quoteInfo($coin,$now,$state['scalpSettings']['maxQuoteAge']);
+                    $coin+=['baseAsset'=>$q['baseAsset'],'quoteAsset'=>$q['quoteAsset'],'volume24hUsd'=>(float)$q['volumeUsd']];
+                    self::requireMinute($market,$coin,$now);
+                    $result=Scalping::signal($coin,$market->bars($coin,$tf,$now),$market->bars($coin,$state['scalpSettings']['contextTimeframe'],$now),$state['scalpSettings'],$now);
+                    if(!empty($result['dataReady']))$scalpDataReady=true;
+                    if($result['signal']){
+                        $guard=Scalping::guard($state,$now);
+                        if($blocked)$result['reason']='Є позиція з прогалиною даних; нові входи заблоковані';
+                        elseif($guard!==null)$result['reason']=$guard;
+                        elseif($state['sourceError']===''){
+                            $reason=Engine::openScalp($state,$coin,$result['signal'],(float)$q['price'],$now);
+                            if($reason===null){$opened++;$id=array_key_last($state['positions']);$state['positions'][$id]['quoteAt']=(int)floor($q['updatedAt']/1000);$state['positions'][$id]['markAt']=$state['positions'][$id]['quoteAt'];$result['reason']='Позицію відкрито';}else $result['reason']=$reason;
+                        }
                     }
-                    if (!$live) continue;
-                    foreach ($coin['formations'] ?? [] as $f) {
-                        $reason = Engine::reject($coin, $f, $s, $now);
-                        if ($reason !== null) { self::rejection($state, $reason); continue; }
-                        $key = Engine::key($coin) . ':' . ($f['id'] ?? '') . ':' . $timeframe;
-                        if (!isset($candidates[$key]) || $timestamp > $candidates[$key]['timestamp']) $candidates[$key] = ['coin' => $coin, 'formation' => $f, 'timestamp' => $timestamp];
-                    }
-                }
-            }
-            if (!$covered) throw new RuntimeException('Немає свіжого кешу для вибраного ринку/таймфрейму/мінімального обсягу. Типовий фоновий кеш: all / futures / 1h / 100000.');
-            $state['lastSource'] = $now; $state['sourceError'] = '';
-        } catch (Throwable $error) { $state['sourceError'] = $error->getMessage(); }
-        $monitorBlocked = false;
-        foreach ($state['positions'] as $p) if ($p['monitorError'] !== '' || $p['markAt'] < $now - 90) $monitorBlocked = true;
-        $s = $state['settings'];
-        usort($candidates, static function ($a, $b) use ($s) {
-            $score = static function ($item) use ($s) {
-                switch ($s['sortBy']) {
-                    case 'volume': return $item['coin']['volume24hUsd'];
-                    case 'priceChange': return abs($item['coin']['priceChange24h']);
-                    case 'profitPotential': return $item['formation']['riskRewardRatio'];
-                    default: return $item['formation']['confidence'];
-                }
-            };
-            return ($s['sortOrder'] === 'asc' ? 1 : -1) * ($score($a) <=> $score($b));
-        });
-        if ($s['enabled'] && !$monitorBlocked && $state['sourceError'] === '' && $state['lastError'] === '') {
-            foreach ($candidates as $candidate) {
-                if (count($state['positions']) >= $s['maxPositions']) break;
-                try {
-                    $quote = $market->quote($candidate['coin']);
-                    $reason = Engine::open($state, $candidate['coin'], $candidate['formation'], $quote, max($now, time()));
-                    if ($reason !== null) self::rejection($state, $reason); else $opened++;
-                } catch (Throwable $error) { $state['lastError'] = $error->getMessage(); break; }
+                }catch(Throwable $e){$result['reason']=$e->getMessage();}
+                $state['scalpDiagnostics'][]=['instrument'=>$instrument,'timeframe'=>$tf,'time'=>$now,'reason'=>$result['reason'],'metrics'=>$result['metrics']??[]];
             }
         }
-        if ($market->rateLimited) $state['marketCooldownUntil'] = $now + $market->retryAfter;
-        Engine::sample($state, $now);
-        return ['status' => $state['sourceError'] || $state['lastError'] || $monitorBlocked || $state['sourceWarnings'] ? 'degraded' : 'ok',
-            'opened' => $opened, 'closed' => count($state['history']) - $before,
-            'positions' => count($state['positions']), 'balance' => $state['balance']];
+        if($state['scalpSettings']['enabled']&&!$scalpDataReady)$state['scalpStatus']='Очікування достатніх свіжих даних h00k.top';
+        if($market->rateLimited)$state['marketCooldownUntil']=$now+$market->retryAfter;
+        Engine::sample($state,$now);
+        // Derived reports are refreshed by cron and can always be rebuilt from the durable ledger.
+        foreach(['hour','day','week','month'] as $period)$state['periodStats'][$period]=array_slice(Stats::periods($state,$period),0,200);
+        $degraded=$state['sourceError']!==''||$state['lastError']!==''||$blocked||($state['settings']['enabled']&&$state['formationError']!=='')||($state['scalpSettings']['enabled']&&!$scalpDataReady);
+        return ['status'=>$degraded?'degraded':'ok','opened'=>$opened,'closed'=>count($state['history'])-$before,'positions'=>count($state['positions']),'balance'=>$state['balance']];
     }
-    private static function rejection(array &$state, string $reason): void
+    private static function requireMinute(Market $market,array $coin,int $now): void
     {
-        $state['rejections'][$reason] = ($state['rejections'][$reason] ?? 0) + 1;
+        $bars=$market->bars($coin,'1m',$now);$last=$bars?end($bars):null;
+        if(!$last||$last['time']+60<$now-90)throw new RuntimeException('Немає свіжих 1m-свічок h00k.top. Очікування кешу; входи заборонені');
+    }
+    private static function reject(array &$state,string $reason): void{$state['rejections'][$reason]=($state['rejections'][$reason]??0)+1;}
+    private static function formations(array &$state,array $feed,int $now): array
+    {
+        $state['coverage']=[];$candidates=[];$covered=false;$s=$state['settings'];
+        foreach($feed['snapshots']??[] as $snapshot){
+            $stamp=(float)($snapshot['generatedAt']??0)/1000;
+            if($stamp<$now-180||$stamp>$now+30)continue;
+            $parts=explode('_',$snapshot['key']??'');if(count($parts)!==4)continue;
+            [$exchange,$type,$tf,$min]=$parts;$state['coverage'][]=$parts;
+            if($s['timeframe']!==$tf||(float)$min>$s['minVolumeUsd']||($exchange!=='all'&&$exchange!==$s['exchange'])||($type!=='all'&&$type!==$s['marketType']))continue;
+            $covered=true;
+            foreach($snapshot['data']??[] as $coin)foreach($coin['formations']??[] as $f){
+                $reason=Engine::reject($coin,$f,$s,$now);if($reason!==null){self::reject($state,$reason);continue;}
+                $key=Engine::key($coin).':'.$tf.':'.$f['id'];
+                if(!isset($candidates[$key])||$stamp>$candidates[$key]['time'])$candidates[$key]=['coin'=>$coin,'formation'=>$f,'time'=>$stamp];
+            }
+        }
+        if(!$covered)throw new RuntimeException('Немає свіжого кешу формацій для вибраних фільтрів');
+        usort($candidates,static function($a,$b)use($s){
+            $score=static function($c)use($s){switch($s['sortBy']){case 'volume':return $c['coin']['volume24hUsd'];case 'priceChange':return abs($c['coin']['priceChange24h']);case 'profitPotential':return $c['formation']['riskRewardRatio'];default:return $c['formation']['confidence'];}};
+            return ($s['sortOrder']==='asc'?1:-1)*($score($a)<=>$score($b));
+        });
+        return $candidates;
     }
 }
