@@ -77,6 +77,17 @@ try {
   assert.equal(await aliceProfile.getByText('Доступ', { exact: true }).count(), 0, 'Profile access block removed');
   await aliceProfile.getByRole('button', { name: 'Закрити профіль' }).click();
 
+  // Loading the production bundle installs auth after imported market modules.
+  // A captured native fetch used to send this screener request without a token.
+  const quoteResponse = alice.waitForResponse(response => new URL(response.url()).pathname === '/api/market/quotes');
+  await alice.goto(base + '/?fixture=screener#screener');
+  const quotes = await quoteResponse;
+  assert.match(quotes.request().headers().authorization || '', /^Bearer local\./);
+  assert.equal(quotes.status(), 200, 'a registered account must load the screener without an anonymous request');
+  assert.ok((await quotes.json()).data.length > 0);
+  await alice.locator('table tbody tr').first().waitFor();
+  assert.equal(await alice.getByText('Увійдіть у свій обліковий запис', { exact: true }).count(), 0);
+
   const bob = await newPage(390); await bob.goto(base + '/#replay');
   await bob.getByRole('heading', { name: 'Створити акаунт' }).waitFor();
   await register(bob, 'bob');

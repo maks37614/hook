@@ -13,7 +13,10 @@ export interface MarketCoinSnapshot {
   warning: string | null;
 }
 
-const defaultDependencies = { request: fetch, binance: fetchDirectBinanceTickers, bybit: fetchDirectBybitTickers };
+// Resolve fetch at request time: main.tsx installs auth/market transport after
+// imported modules initialize. Capturing the native fetch here drops the session.
+const defaultDependencies = { request: (...args: Parameters<typeof fetch>) => fetch(...args),
+  binance: fetchDirectBinanceTickers, bybit: fetchDirectBybitTickers };
 
 interface MarketSourceStatus {
   exchange: ExchangeId;
@@ -56,6 +59,9 @@ export async function loadMarketCoins(
     return { coins: result.data, timestamp: result.timestamp ?? null, warning };
   } catch (error) {
     if (error instanceof MarketRequestError && typeof error.payload?.error === 'string') backendError = error.payload.error;
+    if (error instanceof MarketRequestError && [401, 403].includes(error.status || 0)) {
+      throw new Error(backendError);
+    }
     // Browser networking may still allow a direct public market request.
   }
   signal.throwIfAborted();

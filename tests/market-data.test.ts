@@ -136,6 +136,32 @@ test('browser fetch receives no dependency object as its receiver', async () => 
   assert.deepEqual(snapshot, { coins: [], timestamp: 10, warning: null });
 });
 
+test('default market loading uses fetch installed after module initialization', async t => {
+  const calls: string[] = [];
+  const coin = { symbol: 'BTCUSDT', exchange: 'binance', marketType: 'futures' } as MarketCoin;
+  t.mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0]) => {
+    calls.push(String(input));
+    return json({ success: true, data: [coin], timestamp: 100 });
+  });
+  const snapshot = await loadMarketCoins({ exchange: 'binance', marketType: 'futures' }, new AbortController().signal);
+  assert.deepEqual(snapshot.coins, [coin]);
+  assert.equal(calls.length, 1, 'the current authentication/market transport must handle the first request');
+  assert.match(calls[0], /^\/api\/market\/quotes\?/);
+});
+
+test('account denials do not start a second market scan through the same protected relay', async () => {
+  for (const status of [401, 403]) {
+    let backendCalls = 0, fallbackCalls = 0;
+    await assert.rejects(loadMarketCoins({ exchange: 'all', marketType: 'all' }, new AbortController().signal, {
+      request: async () => { backendCalls++; return json({ success: false, error: 'Увійдіть у свій обліковий запис' }, status); },
+      binance: async () => { fallbackCalls++; return []; },
+      bybit: async () => { fallbackCalls++; return []; },
+    }), /Увійдіть/);
+    assert.equal(backendCalls, 1);
+    assert.equal(fallbackCalls, 0, 'retrying public-data URLs cannot repair an expired account session');
+  }
+});
+
 test('a transient backend failure recovers before attempting direct browser APIs', async () => {
   for (const failure of ['network', 'html', 'gateway']) {
     let calls = 0;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DEFAULT_CHART_PROVIDER, chartProviderStorageKey, normalizeChartProvider, resolveChartProvider } from '../src/utils/chartPreferences';
-import { hookChartHorizontalRange, formationChartMarkers, mergeLiveCandle, mergeProfileUpdate, replayChartMarkers, restoredHookViewport, toHookCandles } from '../src/utils/hookchartData';
+import { hookChartHorizontalRange, formationChartMarkers, mergeChartHistory, mergeLiveCandle, mergeProfileUpdate, replayChartMarkers, restoredHookViewport, toHookCandles } from '../src/utils/hookchartData';
 import { INDICATOR_META, indicatorData, rsiSeries } from '../src/components/hookchart/indicatorEngine';
 import { Chart, IndicatorDock, aggregateLiquidationsByCandle, calcCascadeRisk, isRoundPrice, roundPriceIncrement, type Liquidation, type Viewport } from '../src/components/hookchart/engine';
 import { normalizeOriginalHookChartPreferences } from '../src/components/hookchart/OriginalHookChartSettings';
@@ -13,6 +13,16 @@ import type { DetectedFormation, Kline, ReplayPendingOrder, ReplayPosition, User
 const candle = (time: number, close = 10): Kline => ({ time, open: 10, high: Math.max(12, close), low: 8, close, volume: 100 });
 const account: UserProfile = { uid: 'user-a', email: 'test@example.test', displayName: 'Test' };
 const viewport: Viewport = { barWidth: 9, rightOffset: 0, autoY: true, manualCenter: null, manualRange: null };
+
+test('REST history preserves its open, full range and volume while retaining in-flight live prices and new bars', () => {
+  const history = [candle(60), { ...candle(120), open: 9, high: 14, low: 7, volume: 1000 }];
+  const live = [candle(60, 11), { ...candle(120, 13), low: 8, volume: 20 }, candle(180, 11)];
+  const savedHistory = structuredClone(history), savedLive = structuredClone(live);
+  const combined = mergeChartHistory(history, live);
+  assert.deepEqual(combined, [history[0], { ...history[1], close: 13 }, live[2]]);
+  assert.deepEqual(history, savedHistory);
+  assert.deepEqual(live, savedLive);
+});
 
 test('large liquidation sums are bucketed under their real candle', () => {
   const candles = [

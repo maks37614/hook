@@ -40,6 +40,20 @@ export function mergeLiveCandle(candles: Kline[], tick: Kline, limit = 40_000): 
   return [...candles, tick].slice(-limit);
 }
 
+/** Keep full REST history and any live candles received while it was loading. */
+export function mergeChartHistory(history: Kline[], live: Kline[]): Kline[] {
+  const byTime = new Map(history.filter(validCandle).map(candle => [candle.time, candle]));
+  const lastHistoryTime = Math.max(0, ...byTime.keys());
+  for (const tick of live) {
+    if (!validCandle(tick) || tick.time < lastHistoryTime) continue;
+    const original = byTime.get(tick.time);
+    byTime.set(tick.time, original ? { ...original, close: tick.close,
+      high: Math.max(original.high, tick.high), low: Math.min(original.low, tick.low),
+      volume: Math.max(original.volume, tick.volume) } : tick);
+  }
+  return [...byTime.values()].sort((a, b) => a.time - b.time);
+}
+
 export function restoredHookViewport(candleCount: number, plotWidth: number, range?: { from: number; to: number }) {
   if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to) || range.to <= range.from) return null;
   return { barWidth: Math.max(.12, Math.min(34, plotWidth / (range.to - range.from))), rightOffset: candleCount - range.to,

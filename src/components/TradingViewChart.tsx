@@ -17,10 +17,11 @@ import { Maximize2, ZoomIn, Layers, Clock, Expand, FolderArchive, CheckCircle2, 
 import { Kline, DetectedFormation, Timeframe, ExchangeId, MarketType, ChartMarkerInfo, ChartRestoreParams } from '../types';
 import { getChartPriceFormat, formatCryptoPrice } from '../utils/formatters';
 import { fetchDirectKlines } from '../utils/directExchangeClient';
+import { MarketRequestError, requestMarketJson } from '../utils/marketRequests';
 import { useAuth } from '../context/AuthContext';
 import { ScalperDOMWidget } from './terminal/ScalperDOMWidget';
 import { useChartProvider } from '../utils/useChartProvider';
-import { formationChartMarkers, mergeLiveCandle } from '../utils/hookchartData';
+import { formationChartMarkers, mergeChartHistory, mergeLiveCandle } from '../utils/hookchartData';
 import { HookChart } from './HookChart';
 import type { HookChartHandle } from './hookchart/engine';
 
@@ -296,6 +297,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   }, [timeframe]);
 
   const [effectiveKlines, setEffectiveKlines] = useState<Kline[]>(klines);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  const historyScope = `${exchange}:${marketType}:${symbol}:${timeframe}`;
+  const historyScopeRef = useRef(historyScope);
+  const hasProvidedHistory = klines.length > 1;
 
   useEffect(() => {
     if (klines && klines.length > 1) {
@@ -303,43 +309,59 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     }
   }, [klines]);
 
-  // Self-healing: if parent passed <= 1 candle, fetch 1000 candles immediately
+  // Live candles must not restart the request or masquerade as full REST history.
   useEffect(() => {
-    if (effectiveKlines.length > 1) return;
+    setHistoryError(null);
+    if (historyScopeRef.current !== historyScope) {
+      historyScopeRef.current = historyScope;
+      setEffectiveKlines(klines);
+      currentCandleRef.current = klines.at(-1) || null;
+      latestPriceRef.current = klines.at(-1)?.close ?? null;
+      setCurrentPrice(klines.at(-1)?.close ?? null);
+    }
+    if (hasProvidedHistory) return;
     let isCancelled = false;
+    const controller = new AbortController();
+    const acceptHistory = (rows: Kline[]) => {
+      if (isCancelled || rows.length <= 1) return false;
+      setEffectiveKlines(previous => mergeChartHistory(rows, previous));
+      return true;
+    };
 
     async function loadFullHistory() {
       const cleanSym = normalizeExchangeSymbol(symbol);
+      const message = 'Не вдалося завантажити історію свічок. Повторіть спробу.';
       try {
-        const res = await fetch(
-          `/api/klines?exchange=${exchange}&market=${marketType}&symbol=${encodeURIComponent(cleanSym)}&timeframe=${timeframe}&limit=${historyLimit || 1000}`
-        );
-        const json = await res.json();
-        if (!isCancelled && json.success && Array.isArray(json.data) && json.data.length > 1) {
-          setEffectiveKlines(json.data);
+        const json = await requestMarketJson([`/api/klines?exchange=${exchange}&market=${marketType}&symbol=${encodeURIComponent(cleanSym)}&timeframe=${timeframe}&limit=${historyLimit || 1000}`], {
+          signal: controller.signal, timeoutMs: 15_000, attempts: 1,
+          validate(data) {
+            if (!data?.success || !Array.isArray(data.data) || data.data.length <= 1)
+              throw new MarketRequestError(message, false);
+          }
+        });
+        if (acceptHistory(json.data)) return;
+      } catch (error) {
+        if (isCancelled) return;
+        if (error instanceof MarketRequestError && [401, 403].includes(error.status || 0)) {
+          setHistoryError(error.payload?.error || 'Сесія завершилася. Увійдіть повторно.');
           return;
         }
-
-        const direct = await fetchDirectKlines(exchange, marketType, cleanSym, timeframe as Timeframe, historyLimit || 1000);
-        if (!isCancelled && direct.length > 1) {
-          setEffectiveKlines(direct);
-        }
-      } catch {
-        try {
-          const direct = await fetchDirectKlines(exchange, marketType, cleanSym, timeframe as Timeframe, historyLimit || 1000);
-          if (!isCancelled && direct.length > 1) {
-            setEffectiveKlines(direct);
-          }
-        } catch {}
       }
+      if (isCancelled) return;
+      try {
+        const direct = await fetchDirectKlines(exchange, marketType, cleanSym, timeframe as Timeframe, historyLimit || 1000);
+        if (acceptHistory(direct)) return;
+      } catch { /* Surface an actionable error after both real data sources fail. */ }
+      if (!isCancelled) setHistoryError(message);
     }
 
-    loadFullHistory();
+    void loadFullHistory();
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
-  }, [symbol, timeframe, exchange, marketType, historyLimit, effectiveKlines.length]);
+  }, [historyScope, symbol, timeframe, exchange, marketType, historyLimit, hasProvidedHistory, historyAttempt, user?.uid]);
 
   // Update latest price ref and initialize active candle
   useEffect(() => {
@@ -1276,6 +1298,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           data-chart-provider="tradingview"
           style={{ willChange: 'transform', transform: 'translateZ(0)' }}
         />}
+
+        {historyError && <div role="alert" className="absolute bottom-12 left-2 right-2 z-40 flex items-center justify-between gap-2 rounded-lg border border-rose-500/40 bg-slate-950/95 p-3 text-xs text-rose-200">
+          <span>{historyError}</span>
+          <button type="button" onClick={() => setHistoryAttempt(value => value + 1)} className="shrink-0 rounded bg-rose-500/20 px-3 py-2">Повторити</button>
+        </div>}
 
         {/* Right-Bottom: Time to Bar Close Countdown + Button "Стакан" */}
         {chartProvider !== 'hookchart' && <div className="absolute right-2.5 sm:right-3 bottom-2.5 sm:bottom-3 z-30 flex items-center gap-1.5 sm:gap-2 select-none pointer-events-auto">

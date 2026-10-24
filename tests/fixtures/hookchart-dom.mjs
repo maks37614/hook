@@ -533,6 +533,76 @@ assertChartLanguage('uk');
 assert.ok(auth.profile.hookChartPreferences.drawings['live:binance:futures:龙虾USDT'].length, 'language sync preserves drawings');
 await act(async () => { root.unmount(); });
 
+// Live ticks can arrive before REST history, including across a bar boundary.
+// Neither tick may cancel/restart the request or make two bars count as loaded history.
+const historyHost = document.createElement('div');
+document.body.append(historyHost);
+const historyRoot = createRoot(historyHost);
+const originalHistoryFetch = globalThis.fetch;
+const pendingHistory = [];
+globalThis.fetch = (input, options) => {
+    const url = new URL(String(input), location.href);
+    if (url.pathname === '/api/klines' && url.searchParams.get('symbol') === 'DELAYUSDT' && url.searchParams.get('limit') === '1000') {
+        return new Promise(resolve => pendingHistory.push({ resolve, signal: options?.signal }));
+    }
+    return originalHistoryFetch(input, options);
+};
+function HistoryHarness({ symbol = 'DELAYUSDT' }) {
+    const { user } = useAuth();
+    return user && React.createElement(TradingViewChart, {
+        klines: [], symbol, exchange: 'binance', marketType: 'futures', timeframe: '1m', fullHeight: true,
+    });
+}
+await act(async () => { historyRoot.render(React.createElement(AuthProvider, {}, React.createElement(HistoryHarness))); });
+await act(async () => { await new Promise(resolve => setTimeout(resolve, 120)); });
+assert.equal(pendingHistory.length, 1);
+const historyStream = Socket.instances.filter(socket => socket.url.includes('delayusdt') && socket.url.includes('kline_')).at(-1);
+assert.ok(historyStream);
+const lastHistoryTime = candles.at(-1).time;
+const sendHistoryTick = async (time, close) => {
+    await act(async () => {
+        historyStream.onmessage({ data: JSON.stringify({ data: { e: 'kline', k: {
+            t: time * 1000, o: '10', h: '14', l: '8', c: String(close), v: '105',
+        } } }) });
+        await new Promise(resolve => setTimeout(resolve, 120));
+    });
+};
+await sendHistoryTick(lastHistoryTime, 11.5);
+await sendHistoryTick(lastHistoryTime + 60, 13);
+assert.equal(pendingHistory.length, 1, 'live updates must not restart full-history loading');
+assert.notEqual(pendingHistory[0].signal?.aborted, true);
+await act(async () => {
+    pendingHistory[0].resolve(new Response(JSON.stringify({ success: true, data: candles })));
+    await new Promise(resolve => setTimeout(resolve, 150));
+});
+const historyCanvas = historyHost.querySelector('.chartWrap > canvas');
+assert.ok(historyCanvas);
+const restoredBars = canvasFrames.get(historyCanvas).filter(fill => ['#0ECB81', '#F6465D'].includes(fill.color) && fill.args[2] <= 9);
+assert.ok(restoredBars.length > 20, 'delayed history must replace the one/two-bar chart');
+assert.ok(canvasTexts.get(historyCanvas).some(row => row.text === '13.00'), 'history must preserve the latest live price');
+let historyRecovered = false;
+globalThis.fetch = (input, options) => {
+    const url = new URL(String(input), location.href);
+    if (url.searchParams.get('symbol') === 'RETRYUSDT' && url.searchParams.get('limit') === '1000') {
+        return Promise.resolve(url.pathname === '/api/klines'
+            ? new Response(JSON.stringify({ success: historyRecovered, data: historyRecovered ? candles : [] }), { status: historyRecovered ? 200 : 503 })
+            : new Response('[]'));
+    }
+    return originalHistoryFetch(input, options);
+};
+await act(async () => { historyRoot.render(React.createElement(AuthProvider, {}, React.createElement(HistoryHarness, { symbol: 'RETRYUSDT' }))); });
+await act(async () => { await new Promise(resolve => setTimeout(resolve, 150)); });
+const historyFailure = historyHost.querySelector('[role="alert"]');
+assert.ok(historyFailure?.textContent.includes('Не вдалося завантажити історію свічок'), 'an unavailable source must not leave an endless loading indicator');
+historyRecovered = true;
+await act(async () => { historyFailure.querySelector('button').click(); await new Promise(resolve => setTimeout(resolve, 150)); });
+await act(async () => { await new Promise(resolve => setTimeout(resolve, 100)); });
+assert.equal(historyHost.querySelector('[role="alert"]'), null, 'retry clears the error after receiving real history');
+assert.ok(canvasFrames.get(historyHost.querySelector('.chartWrap > canvas')).filter(fill => ['#0ECB81', '#F6465D'].includes(fill.color) && fill.args[2] <= 9).length > 20);
+await act(async () => { historyRoot.unmount(); });
+historyHost.remove();
+globalThis.fetch = originalHistoryFetch;
+
 // Model desktop grid dimensions, then notify the real renderers as a browser's
 // ResizeObserver would. Canvas sizes must follow layout without remounting.
 window.HTMLElement.prototype.getBoundingClientRect = function () {
