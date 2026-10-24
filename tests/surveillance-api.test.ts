@@ -61,10 +61,11 @@ test('HTTP tracking is explicit; deleting the last coin stays empty after refres
     await t.test('chart API preserves international symbols instead of truncating to the quote asset', async () => {
       for (const symbol of ['龙虾', '币安人生', '我踏马来了']) {
         const response = await privateRead(`/api/klines?symbol=${encodeURIComponent(`${symbol}/USDT`)}&limit=10`);
-        assert.equal(response.status, 200);
+        assert.equal(response.status, 503);
         const history = await response.json();
         assert.equal(history.symbol, `${symbol}USDT`);
-        assert.equal(history.success, true);
+        assert.equal(history.success, false);
+        assert.equal(history.sourceUnavailable, true);
       }
     });
     const marketResponse = await privateRead('/api/market/quotes?minVolume=0');

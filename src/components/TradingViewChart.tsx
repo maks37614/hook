@@ -346,6 +346,10 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           setHistoryError(error.payload?.error || 'Сесія завершилася. Увійдіть повторно.');
           return;
         }
+        if (error instanceof MarketRequestError && error.payload?.sourceUnavailable) {
+          setHistoryError(error.payload.error || message);
+          return;
+        }
       }
       if (isCancelled) return;
       try {

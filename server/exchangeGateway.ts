@@ -3,13 +3,15 @@ import { exchangeProvider, publicMarketUrl } from '../src/utils/exchangeEndpoint
 import { waitForMarketRetry } from '../src/utils/marketRequests';
 
 interface Hold { until: number; reason: string }
-interface State { active: number; queued: number; slots: Array<{ at: number; weight: number; signed: boolean }>; nextAt: number; requests: number; cacheHits: number; shared: number; hold: Hold }
+type Traffic = 'market' | 'analysis' | 'history';
+interface State { active: number; queued: number; waiting: Record<Traffic, number>; slots: Array<{ at: number; weight: number; signed: boolean; traffic: Traffic }>; nextAt: number; requests: number; cacheHits: number; shared: number; queueTimeouts: number; upstreamTimeouts: number; lastError?: string; hold: Hold }
 interface Saved { body: Uint8Array; status: number; headers: [string, string][]; expires: number }
 export interface GatewayOptions {
   request?: typeof fetch; now?: () => number; wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
   holds?: Partial<Record<ExchangeProvider, Hold>>;
   saveHolds?: (holds: Record<ExchangeProvider, Hold>) => void;
   weightPerMinute?: number; requestsPerFiveSeconds?: number; spacingMs?: number;
+  publicTimeoutMs?: number;
   disabled?: ExchangeProvider[];
 }
 const reply = (value: Saved) => new Response(value.body.slice(), { status: value.status, headers: value.headers });
@@ -35,6 +37,14 @@ function weight(url: URL) {
   if (/\/aggTrades$|\/trades$/.test(url.pathname)) return 25;
   return 5;
 }
+function trafficFor(url: URL | null): Traffic {
+  if (!url) return 'market'; // Signed operations retain the full budget and are never retried.
+  const candles = /\/(klines|kline)$/.test(url.pathname);
+  // Both server and older browser fallback queues request this daily badge history.
+  if (candles && ['1d', 'D'].includes(url.searchParams.get('interval') || '') && url.searchParams.get('limit') === '731') return 'history';
+  if (candles || (/\/(exchangeInfo|instruments-info|tickers|ticker\/24hr)$/.test(url.pathname) && !url.searchParams.has('symbol'))) return 'market';
+  return 'analysis';
+}
 function ttl(url: URL) {
   if (/exchangeInfo|instruments-info/.test(url.pathname)) return 3600_000;
   if (/klines$|\/kline$/.test(url.pathname)) {
@@ -55,7 +65,7 @@ export class ExchangeGateway {
   private now: () => number;
   constructor(private options: GatewayOptions = {}) { this.now = options.now || Date.now; }
   private state(provider: ExchangeProvider): State {
-    if (!this.states.has(provider)) this.states.set(provider, { active: 0, queued: 0, slots: [], nextAt: 0, requests: 0, cacheHits: 0, shared: 0, hold: this.options.holds?.[provider] || { until: 0, reason: '' } });
+    if (!this.states.has(provider)) this.states.set(provider, { active: 0, queued: 0, waiting: { market: 0, analysis: 0, history: 0 }, slots: [], nextAt: 0, requests: 0, cacheHits: 0, shared: 0, queueTimeouts: 0, upstreamTimeouts: 0, hold: this.options.holds?.[provider] || { until: 0, reason: '' } });
     return this.states.get(provider)!;
   }
   hold(provider: ExchangeProvider, status: number, delay = 0, reason = `HTTP ${status}`) {
@@ -68,15 +78,19 @@ export class ExchangeGateway {
   stats() {
     return (['binance', 'bybit'] as const).map(exchange => {
       const s = this.state(exchange);
+      const recent = s.slots.filter(slot => this.now() - slot.at < 60_000);
       return { exchange, active: s.active, queued: s.queued, requests: s.requests, cacheHits: s.cacheHits, shared: s.shared,
+        weightUsed: recent.reduce((sum, slot) => sum + slot.weight, 0), weightLimit: exchange === 'binance' ? this.options.weightPerMinute || 900 : null,
+        backgroundWeightUsed: recent.filter(slot => slot.traffic === 'history').reduce((sum, slot) => sum + slot.weight, 0),
+        queueTimeouts: s.queueTimeouts, upstreamTimeouts: s.upstreamTimeouts, lastError: s.lastError,
         disabled: this.options.disabled?.includes(exchange) || false,
         pausedUntil: s.hold.until > this.now() ? s.hold.until : null, reason: s.hold.until > this.now() ? s.hold.reason : undefined };
     });
   }
-  private async acquire(provider: ExchangeProvider, cost: number, signal: AbortSignal, signed: boolean, scope?: { key: string; cap: number }, catalog = false) {
+  private async acquire(provider: ExchangeProvider, cost: number, signal: AbortSignal, signed: boolean, scope?: { key: string; cap: number }, traffic: Traffic = 'analysis') {
     const state = this.state(provider);
-    if (state.queued >= (catalog ? 210 : 200)) throw new Error('Черга біржових даних заповнена. Повторіть пізніше.');
-    state.queued++;
+    if (state.queued >= (traffic === 'market' ? 210 : 200)) throw new Error('Черга біржових даних заповнена. Повторіть пізніше.');
+    state.queued++; state.waiting[traffic]++;
     try {
       while (true) {
         abort(signal);
@@ -89,25 +103,34 @@ export class ExchangeGateway {
         if (scope) this.scopedSlots.set(scope.key, scoped);
         const minute = state.slots.reduce((sum, slot) => sum + slot.weight, 0);
         const minuteCap = this.options.weightPerMinute || 900;
-        // Reserve part of the existing budget for the shared tradable catalog.
-        // Per-symbol metadata, charts and signed requests use the normal budget.
-        const requestCap = catalog ? minuteCap : minuteCap - Math.min(50, Math.floor(minuteCap * .05));
+        // Separate sub-budgets within the SAME total cap. Background badge history
+        // cannot spend the capacity reserved for quotes and visible candle history.
+        const analysis = state.slots.filter(slot => slot.traffic !== 'market');
+        const history = analysis.filter(slot => slot.traffic === 'history');
         const fiveCap = this.options.requestsPerFiveSeconds || (provider === 'bybit' ? 80 : 100);
         let delay = Math.max(0, state.nextAt - now);
-        if (provider === 'binance' && minute + cost > requestCap) delay = Math.max(delay, state.slots[0].at + 60_001 - now);
+        if (provider === 'binance') {
+          if (minute + cost > minuteCap) delay = Math.max(delay, state.slots[0].at + 60_001 - now);
+          if (traffic !== 'market' && analysis.reduce((sum, slot) => sum + slot.weight, 0) + cost > Math.max(cost, Math.floor(minuteCap * .45)))
+            delay = Math.max(delay, analysis[0].at + 60_001 - now);
+          if (traffic === 'history' && history.reduce((sum, slot) => sum + slot.weight, 0) + cost > Math.max(cost, Math.floor(minuteCap * .18)))
+            delay = Math.max(delay, history[0].at + 60_001 - now);
+        }
         if (recent.length >= fiveCap) delay = Math.max(delay, recent[0].at + 5001 - now);
         if (signed && privateSecond.length >= (provider === 'bybit' ? 1 : 4)) delay = Math.max(delay, privateSecond[0].at + 1001 - now);
         if (scope && scoped.length >= scope.cap) delay = Math.max(delay, scoped[0] + 300_001 - now);
         if (state.active >= 4) delay = Math.max(delay, 25);
+        // A newly opened chart or quote request gets the next free connection.
+        if ((traffic !== 'market' && state.waiting.market > 0) || (traffic === 'history' && state.waiting.analysis > 0)) delay = Math.max(delay, 25);
         if (delay <= 0) {
-          state.slots.push({ at: now, weight: cost, signed }); state.active++; state.requests++;
+          state.slots.push({ at: now, weight: cost, signed, traffic }); state.active++; state.requests++;
           if (scope) scoped.push(now);
           state.nextAt = now + (this.options.spacingMs ?? 65);
           return true;
         }
         await (this.options.wait || waitForMarketRetry)(Math.min(delay, 1000), signal);
       }
-    } finally { state.queued--; }
+    } finally { state.queued--; state.waiting[traffic]--; }
   }
   async fetch(input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
     const original = new URL(input instanceof Request ? input.url : String(input));
@@ -145,13 +168,13 @@ export class ExchangeGateway {
   }
   private async load(provider: ExchangeProvider, url: URL, publicUrl: URL | null, headers: Headers, method: string, input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Saved> {
     // Signed timestamps cannot sit in a queue; give them a short deadline and never resend.
-    const controller = new AbortController(), timer = setTimeout(() => controller.abort(new Error('Біржа перевантажена або не відповідає')), publicUrl ? 12_000 : 3500);
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(new Error('Біржа перевантажена або не відповідає')), publicUrl ? this.options.publicTimeoutMs ?? 12_000 : 3500);
     const state = this.state(provider);
     let acquired = false;
     try {
       const scope = provider === 'binance' && /\/fapi\/v1\/funding(Rate|Info)$/.test(url.pathname) ? { key: 'binance:funding', cap: 400 }
         : provider === 'binance' && url.pathname.startsWith('/futures/data/') ? { key: 'binance:statistics', cap: 800 } : undefined;
-      acquired = await this.acquire(provider, weight(url), controller.signal, !publicUrl, scope, !!publicUrl && !url.searchParams.has('symbol') && /\/(exchangeInfo|instruments-info)$/.test(url.pathname));
+      acquired = await this.acquire(provider, weight(url), controller.signal, !publicUrl, scope, trafficFor(publicUrl));
       if (!acquired) {
         const response = unavailable(state.hold.until, this.now());
         return { body: new Uint8Array(await response.arrayBuffer()), headers: [...response.headers], status: response.status, expires: 0 };
@@ -184,6 +207,15 @@ export class ExchangeGateway {
         }
       }
       return saved;
+    } catch (error) {
+      if (!publicUrl) throw error;
+      if (controller.signal.aborted) {
+        if (acquired) state.upstreamTimeouts++; else state.queueTimeouts++;
+      }
+      state.lastError = !acquired ? 'Черга ринкових запитів перевантажена. Повторіть спробу.'
+        : controller.signal.aborted ? 'Біржа не відповіла вчасно' : 'Помилка підключення до біржі';
+      return { body: new TextEncoder().encode(JSON.stringify({ error: state.lastError })), status: 503,
+        headers: [['content-type', 'application/json'], ['retry-after', '1']], expires: 0 };
     } finally { clearTimeout(timer); if (acquired) state.active--; }
   }
 }

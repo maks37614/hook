@@ -81,7 +81,7 @@ export async function fetchKlines(exchange: ExchangeId, market: MarketType, symb
   if (startTime) url.searchParams.set(exchange === 'bybit' ? 'start' : 'startTime', String(startTime));
   if (endTime) url.searchParams.set(exchange === 'bybit' ? 'end' : 'endTime', String(endTime));
   try {
-    const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(13_000) });
     if (!response.ok) return [];
     const body = await response.json();
     if (exchange === 'bybit' && body?.retCode !== 0) return [];

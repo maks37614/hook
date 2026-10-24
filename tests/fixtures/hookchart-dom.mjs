@@ -581,11 +581,14 @@ const restoredBars = canvasFrames.get(historyCanvas).filter(fill => ['#0ECB81', 
 assert.ok(restoredBars.length > 20, 'delayed history must replace the one/two-bar chart');
 assert.ok(canvasTexts.get(historyCanvas).some(row => row.text === '13.00'), 'history must preserve the latest live price');
 let historyRecovered = false;
+let historyFallbackCalls = 0;
 globalThis.fetch = (input, options) => {
     const url = new URL(String(input), location.href);
     if (url.searchParams.get('symbol') === 'RETRYUSDT' && url.searchParams.get('limit') === '1000') {
+        if (url.pathname !== '/api/klines' && url.searchParams.get('interval') === '1m') historyFallbackCalls++;
         return Promise.resolve(url.pathname === '/api/klines'
-            ? new Response(JSON.stringify({ success: historyRecovered, data: historyRecovered ? candles : [] }), { status: historyRecovered ? 200 : 503 })
+            ? new Response(JSON.stringify({ success: historyRecovered, sourceUnavailable: !historyRecovered,
+                error: 'Не вдалося завантажити історію свічок. Повторіть спробу.', data: historyRecovered ? candles : [] }), { status: historyRecovered ? 200 : 503 })
             : new Response('[]'));
     }
     return originalHistoryFetch(input, options);
@@ -594,6 +597,7 @@ await act(async () => { historyRoot.render(React.createElement(AuthProvider, {},
 await act(async () => { await new Promise(resolve => setTimeout(resolve, 150)); });
 const historyFailure = historyHost.querySelector('[role="alert"]');
 assert.ok(historyFailure?.textContent.includes('Не вдалося завантажити історію свічок'), 'an unavailable source must not leave an endless loading indicator');
+assert.equal(historyFallbackCalls, 0, 'a structured server failure must not fan out through the same overloaded relay');
 historyRecovered = true;
 await act(async () => { historyFailure.querySelector('button').click(); await new Promise(resolve => setTimeout(resolve, 150)); });
 await act(async () => { await new Promise(resolve => setTimeout(resolve, 100)); });

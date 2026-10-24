@@ -183,7 +183,7 @@ test('a transient backend failure recovers before attempting direct browser APIs
   }
 });
 
-test('structured provider failures go straight to fallback without repeating backend cooldown requests', async () => {
+test('structured provider failures do not fan out through the same server relay', async () => {
   let calls = 0;
   let fallbackCalls = 0;
   await assert.rejects(loadMarketCoins({ exchange: 'binance', marketType: 'futures' }, new AbortController().signal, {
@@ -197,7 +197,23 @@ test('structured provider failures go straight to fallback without repeating bac
     bybit: async () => { throw new Error('wrong exchange'); },
   }), /Binance: HTTP 429/);
   assert.equal(calls, 1);
-  assert.equal(fallbackCalls, 1);
+  assert.equal(fallbackCalls, 0);
+});
+
+test('the quote page allows the server queue to finish instead of starting a parallel fallback', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finish!: (response: Response) => void;
+  let signal: AbortSignal | undefined;
+  let fallbackCalls = 0;
+  const pending = loadMarketCoins({ exchange: 'all', marketType: 'all' }, new AbortController().signal, {
+    request: async (_input, init) => { signal = init?.signal ?? undefined; return new Promise<Response>(resolve => { finish = resolve; }); },
+    binance: async () => { fallbackCalls++; return []; }, bybit: async () => { fallbackCalls++; return []; },
+  });
+  t.mock.timers.tick(11_000);
+  assert.equal(signal?.aborted, false);
+  finish(json({ success: true, data: [], timestamp: 123 }));
+  assert.equal((await pending).timestamp, 123);
+  assert.equal(fallbackCalls, 0);
 });
 
 test('all four successful direct sources load concurrently without a fallback warning', async () => {

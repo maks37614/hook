@@ -150,6 +150,24 @@ test('concurrent consumers share the retry and only a successful fetch updates f
   });
 });
 
+test('a valid shared quote is not discarded while waiting longer than the former four-second deadline', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let finish!: (response: Response) => void;
+  let signal: AbortSignal | undefined;
+  let calls = 0;
+  const feed = new MarketTickerFeed(async (_input, init) => {
+    calls++; signal = init?.signal ?? undefined;
+    return new Promise<Response>(resolve => { finish = resolve; });
+  });
+  const pending = feed.get('binance', 'futures');
+  t.mock.timers.tick(5000);
+  assert.equal(signal?.aborted, false, 'The outer feed must allow the gateway to finish its bounded queue');
+  finish(json([ticker]));
+  assert.equal((await pending)[0].price, 100);
+  assert.equal(calls, 1);
+  assert.equal(feed.status('binance', 'futures').status, 'live');
+});
+
 test('the shared feed observes cooldowns before requesting again', async () => {
   for (const source of ['http', 'bybit'] as const) {
     let calls = 0;

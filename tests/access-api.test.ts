@@ -64,7 +64,10 @@ test('registration grants permanent access, retired code routes are unavailable 
     assert.equal(migrated.hasFullAccess, true);
     assert.equal((await request('/api/alerts', bobToken)).status, 200);
     assert.equal((await request('/api/market/quotes?minVolume=0', bobToken)).status, 503, 'Market API reaches offline exchange fixture');
-    assert.equal((await request('/api/klines?symbol=BTCUSDT&limit=10', bobToken)).status, 200);
+    const unavailableHistory = await request('/api/klines?symbol=BTCUSDT&limit=10', bobToken);
+    assert.equal(unavailableHistory.status, 503);
+    assert.equal(unavailableHistory.body.success, false, 'Unavailable history must not be reported as a successful empty chart');
+    assert.equal(unavailableHistory.body.sourceUnavailable, true);
     assert.equal((await request('/api/auth/local/login', undefined, { email: 'bob@example.test', password: 'test-password-123' })).status, 200);
   } finally { await stop(); fs.rmSync(directory, { recursive: true, force: true }); }
 });

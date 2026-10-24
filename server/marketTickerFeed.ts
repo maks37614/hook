@@ -72,6 +72,9 @@ export class MarketTickerFeed {
     try {
       const data = await requestMarketTickers(exchange, market, {
         request: this.request, now: this.now,
+        // The guarded gateway owns a 12s queue + network deadline. Do not abort
+        // its shared result after 4s and then join the same unfinished work again.
+        timeoutMs: 13_000,
         headers: { Accept: 'application/json', 'User-Agent': 'SignalHook/1.0' },
       });
       entry.data = data;
@@ -83,7 +86,8 @@ export class MarketTickerFeed {
     } catch (error) {
       const failure = error instanceof MarketRequestError ? error : undefined;
       entry.httpStatus = failure?.status;
-      entry.error = failure?.message || 'Біржа не відповідає або повернула некоректні дані';
+      entry.error = typeof failure?.payload?.error === 'string' ? failure.payload.error
+        : failure?.message || 'Біржа не відповідає або повернула некоректні дані';
       // A denial or rate limit must not be retried through another hostname.
       const denied = [403, 451, 418, 429].includes(failure?.status || 0);
       const cooldown = failure?.status === 403 && exchange === 'bybit' ? 600_000

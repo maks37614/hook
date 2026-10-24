@@ -45,7 +45,7 @@ export async function loadMarketCoins(
     const result = await requestMarketJson([`/api/market/quotes?${params}`], {
       request: dependencies.request, signal,
       // Allow both bounded server-side attempts to finish before client fallback.
-      timeoutMs: 10_000,
+      timeoutMs: 30_000,
       // Structured source failures have already used the server's retry policy.
       shouldRetry: error => !Array.isArray(error.payload?.sources),
       validate(data) {
@@ -59,10 +59,11 @@ export async function loadMarketCoins(
     return { coins: result.data, timestamp: result.timestamp ?? null, warning };
   } catch (error) {
     if (error instanceof MarketRequestError && typeof error.payload?.error === 'string') backendError = error.payload.error;
-    if (error instanceof MarketRequestError && [401, 403].includes(error.status || 0)) {
+    if (error instanceof MarketRequestError && ([401, 403].includes(error.status || 0) || Array.isArray(error.payload?.sources))) {
       throw new Error(backendError);
     }
-    // Browser networking may still allow a direct public market request.
+    // Only a transport/proxy failure uses the compatibility fallback. A structured
+    // source failure has already used the gateway; relaying it again adds load.
   }
   signal.throwIfAborted();
   const exchanges: ExchangeId[] = selection.exchange === 'all' ? ['binance', 'bybit'] : [selection.exchange];

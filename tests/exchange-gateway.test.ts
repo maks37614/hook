@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ExchangeGateway } from '../server/exchangeGateway';
 import { publicMarketUrl, publicStreamUrl } from '../src/utils/exchangeEndpoints';
+import { MarketTickerFeed } from '../server/marketTickerFeed';
 
 const json = (value: unknown, status = 200, headers: HeadersInit = {}) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json', ...headers } });
 const price = 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT';
@@ -107,8 +108,7 @@ test('the shared catalog can load under chart pressure without increasing the ve
   let now = 1000; const sent: { path: string; at: number }[] = [];
   const gateway = new ExchangeGateway({ now: () => now, wait: async ms => { now += ms; }, spacingMs: 0, requestsPerFiveSeconds: 1000,
     request: async input => { sent.push({ path: new URL(String(input)).pathname, at: now }); return json({}); } });
-  for (let n = 0; n < 34; n++) await gateway.fetch(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=COIN${n}USDT`);
-  await gateway.fetch(price); // Ordinary traffic has consumed 855 of the existing 900 budget.
+  for (let n = 0; n < 81; n++) await gateway.fetch(price.replace('BTCUSDT', `COIN${n}USDT`));
   assert.equal(now, 1000);
   await gateway.fetch('https://api.binance.com/api/v3/exchangeInfo');
   await gateway.fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
@@ -116,4 +116,82 @@ test('the shared catalog can load under chart pressure without increasing the ve
   await gateway.fetch(price.replace('BTCUSDT', 'ETHUSDT'));
   assert.ok(now >= 61000, 'Ordinary traffic still waits for the rolling budget');
   assert.deepEqual(sent.slice(-3).map(row => row.path), ['/api/v3/exchangeInfo', '/fapi/v1/exchangeInfo', '/api/v3/ticker/price']);
+});
+
+test('diagnostics distinguish waiting for the local quota from an upstream timeout', async () => {
+  const wait = (_ms: number, signal?: AbortSignal) => new Promise<void>((_resolve, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  let calls = 0;
+  const queued = new ExchangeGateway({ spacingMs: 0, publicTimeoutMs: 100, wait,
+    request: async () => { calls++; return json({}); } });
+  for (let n = 0; n < 81; n++) await queued.fetch(price.replace('BTCUSDT', `COIN${n}USDT`));
+  const response = await queued.fetch(price);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /Черга/);
+  assert.equal(response.headers.get('retry-after'), '1');
+  assert.equal(calls, 81, 'A quota timeout must not send another upstream request');
+  assert.equal(queued.stats()[0].queueTimeouts, 1);
+  assert.equal(queued.stats()[0].upstreamTimeouts, 0);
+  assert.equal(queued.stats()[0].active, 0);
+  assert.equal(queued.stats()[0].queued, 0);
+  const upstream = new ExchangeGateway({ publicTimeoutMs: 100, request: async (_input, init) => {
+    await wait(0, init!.signal!); return json({});
+  } });
+  assert.equal((await upstream.fetch(price)).status, 503);
+  assert.equal(upstream.stats()[0].upstreamTimeouts, 1);
+  assert.equal(upstream.stats()[0].queueTimeouts, 0);
+  assert.equal(upstream.stats()[0].active, 0);
+});
+
+test('queued quotes get the next connection before optional daily history', async () => {
+  const entered: string[] = [], releases: Array<() => void> = [];
+  let block = true;
+  const gateway = new ExchangeGateway({ spacingMs: 0, wait: () => new Promise(resolve => setTimeout(resolve, 1)), request: async input => {
+    const path = new URL(String(input)).pathname; entered.push(path);
+    if (block) await new Promise<void>(resolve => releases.push(resolve));
+    return json([]);
+  } });
+  const work = Array.from({ length: 5 }, (_, n) => gateway.fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=COIN${n}USDT&interval=1d&limit=731`));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(entered.length, 4);
+  work.push(gateway.fetch('https://fapi.binance.com/fapi/v1/ticker/24hr'));
+  block = false; releases.forEach(resolve => resolve());
+  await Promise.all(work);
+  assert.equal(entered[4], '/fapi/v1/ticker/24hr');
+});
+
+test('chart analytics cannot make the shared quote feed wait beyond its request deadline', async () => {
+  let now = 1000;
+  const sent: { url: URL; at: number }[] = [];
+  const gateway = new ExchangeGateway({ now: () => now, wait: async ms => { now += ms; }, spacingMs: 0, requestsPerFiveSeconds: 1000,
+    request: async input => {
+      const url = new URL(String(input)); sent.push({ url, at: now });
+      return json([{ symbol: 'BTCUSDT', lastPrice: '100', priceChangePercent: '2', quoteVolume: '1000', highPrice: '102', lowPrice: '98' }]);
+    } });
+  for (let n = 0; n < 171; n++) await gateway.fetch(price.replace('BTCUSDT', `COIN${n}USDT`));
+  const started = now;
+  const feed = new MarketTickerFeed((input, init) => gateway.fetch(input, init), () => now);
+  for (const market of ['futures', 'spot'] as const) {
+    assert.equal((await feed.get('binance', market))[0]?.price, 100);
+    assert.equal(feed.status('binance', market).status, 'live');
+  }
+  await gateway.fetch('https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=5m&limit=1000');
+  assert.equal(now, started, 'Quotes and chart candles must use their reserved capacity immediately');
+  for (const row of sent) {
+    const window = sent.filter(item => item.at <= row.at && item.at > row.at - 60_000);
+    const total = window.reduce((sum, item) => sum + (item.url.pathname.endsWith('/24hr') ? item.url.pathname.startsWith('/fapi/') ? 40 : 80 : 5), 0);
+    assert.ok(total <= 900, 'The original total weighted budget remains enforced');
+  }
+});
+
+test('daily badge warmup cannot consume the capacity needed by chart history', async () => {
+  let now = 1000;
+  const sent: { at: number; background: boolean }[] = [];
+  const gateway = new ExchangeGateway({ now: () => now, wait: async ms => { now += ms; }, spacingMs: 0, requestsPerFiveSeconds: 1000,
+    request: async input => { sent.push({ at: now, background: new URL(String(input)).searchParams.get('limit') === '731' }); return json([]); } });
+  for (let n = 0; n < 171; n++) await gateway.fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=COIN${n}USDT&interval=1d&limit=731`);
+  const started = now;
+  await gateway.fetch('https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=5m&limit=1000');
+  assert.equal(now, started);
+  for (const row of sent) assert.ok(sent.filter(item => item.background && item.at <= row.at && item.at > row.at - 60_000).length * 5 <= 162,
+    'Background enrichment must leave capacity for active users throughout the minute');
 });

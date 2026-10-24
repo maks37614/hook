@@ -43,6 +43,11 @@ test('production HTTP and WebSocket relays authenticate accounts, reject private
     assert.ok(quotes.every(price => price === '100'));
     let status = await (await request('/api/market/connection-status', alice)).json();
     assert.ok(status.sources.find((entry: any) => entry.exchange === 'binance').cacheHits + status.sources.find((entry: any) => entry.exchange === 'binance').shared >= 59);
+    const publicStatus = await (await request('/api/dom/status')).json();
+    assert.equal(publicStatus.marketGateway.length, 2);
+    assert.equal(publicStatus.marketGateway[0].weightLimit, 900);
+    assert.equal(typeof publicStatus.marketGateway[0].queueTimeouts, 'number');
+    assert.equal(JSON.stringify(publicStatus).includes(alice), false, 'Public diagnostics never contain account sessions');
     for (const target of ['https://127.0.0.1/api/v3/depth', 'https://api.binance.com/api/v3/account', 'https://api.bybit.com/v5/order/create']) assert.equal((await request('/api/market/source?url=' + encodeURIComponent(target), alice)).status, 400);
     const one = await connect(alice, 'orderbook.50.BTCUSDT'), two = await connect(bob, 'publicTrade.ETHUSDT');
     const seenOne: string[] = [], seenTwo: string[] = [];

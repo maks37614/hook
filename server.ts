@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { configureExchangeGateway } from './server/exchangeGateway';
+import { configureExchangeGateway, exchangeGatewayStatus } from './server/exchangeGateway';
 import { installMarketRoutes, installMarketStreams } from './server/marketRelay';
 import { fetchDomTradeHistoryPage } from './server/domTradeHistory';
 import { scanDensities, watchDensityWalls, type DensityScanOptions } from './server/densityService';
@@ -370,6 +370,8 @@ async function startServer() {
       const endTime = req.query.endTime ? parseInt(req.query.endTime as string, 10) : undefined;
 
       const klines = await fetchKlines(exchange, market, symbol, timeframe, limit, startTime, endTime);
+      if (!klines.length) return void res.status(503).json({ success: false, sourceUnavailable: true,
+        error: 'Історія свічок тимчасово недоступна. Повторіть спробу.', symbol, exchange, timeframe, data: [] });
       res.json({ success: true, symbol, exchange, timeframe, data: klines });
     } catch (err: any) {
       console.error('Error fetching klines:', err);
@@ -399,7 +401,8 @@ async function startServer() {
   app.get('/api/dom/status', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const revision = /^[a-f0-9]{40}$/.test(process.env.APP_COMMIT || '') ? process.env.APP_COMMIT : null;
-    res.json({ success: true, revision, marketSources: getMarketSourceStatuses({ exchange: 'all', marketType: 'all' }) });
+    res.json({ success: true, revision, marketSources: getMarketSourceStatuses({ exchange: 'all', marketType: 'all' }),
+      marketGateway: exchangeGatewayStatus() });
   });
 
   // Cursor-paginated real execution history used by footprint candles.
