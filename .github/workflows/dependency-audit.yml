@@ -1,0 +1,33 @@
+name: Dependency audit (informational)
+
+# Report concrete advisory packages and distinguish deployment dependencies
+# from developer tooling without silently upgrading anything.
+on:
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/dependency-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies (audit-only, no lifecycle scripts)
+        run: npm ci --ignore-scripts --no-progress
+      - name: Audit production dependencies (informational)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high --no-progress
+      - name: Audit all dependencies including development tools (informational)
+        continue-on-error: true
+        run: npm audit --audit-level=high --no-progress
