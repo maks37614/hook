@@ -36,7 +36,10 @@ test('Terminal single and multi-chart layouts route to their proper saved profil
   const terminal = source('../src/components/TerminalPage.tsx');
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
   const canvas = source('../src/components/hookchart/HookChartCanvas.tsx');
-  assert.match(terminal, /visualContext="terminalLarge"/);
+  // One coin and many coins now share the same grid widget. HookChart derives
+  // its saved Terminal visual context from the actual rendered tile width.
+  assert.match(terminal, /<TerminalGridItem/);
+  assert.doesNotMatch(terminal, /visualContext="terminalLarge"/);
   assert.match(terminal, /terminalAutoScale=\{autoScaleCharts && chartProvider === 'hookchart'\}/);
   assert.match(widget, /terminalAutoScale=\{terminalAutoScale && useIntegratedHookChartToolbar\}/);
   assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
