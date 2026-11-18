@@ -90,7 +90,6 @@ test('empty Terminal moves the existing plus and live coin count into the worksp
     'one shared element is reused, not duplicated');
   assert.match(source, /\{blocks.length !== 0 && <>\{terminalBelowCharts\}<\/>\}/);
   assert.match(source, /\{blocks.length === 0 && <SiteFooter \/>\}/);
-  assert.doesNotMatch(source, /^\s*\/\* Multi-chart Grid Layout \*\//m,
-    'a source-code comment must not be rendered in the Terminal');
-  assert.match(source, /\{\/\* Multi-chart Grid Layout \*\/\}/);
+  assert.doesNotMatch(source, /Multi-chart Grid Layout/,
+    'the old debug label must not appear in Terminal source or page');
 });
