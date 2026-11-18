@@ -1811,10 +1811,13 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         isOpen={isAddModalOpen}
         onClose={handleCloseChartPicker}
         mode={replaceBlockId !== null ? 'replace' : 'add'}
+        // With timeframe controls removed from this picker, inherit the
+        // active chart's timeframe when replacing, or Terminal's saved TF on add.
         initialTimeframe={replaceBlockId !== null
           ? blocks.find(block => block.id === replaceBlockId)?.timeframe
-          : undefined}
+          : config.globalTimeframe || timeframe}
         coins={coins}
+        formationCoins={formationCoins}
         terminalMarketCoins={marketCoins}
         atChartLimit={replaceBlockId === null && blocks.length >= MAX_TERMINAL_CHARTS}
         watchlist={localWatchlist}
