@@ -7,8 +7,9 @@ const page = readFileSync(new URL('../src/components/PcLandingPage.tsx', import.
 const header = readFileSync(new URL('../src/components/Header.tsx', import.meta.url), 'utf8');
 
 test('PC landing is independently reachable for guests and lazy-loaded', () => {
-  assert.match(app, /hash === '#replay' \|\| hash === '#pc'/);
-  assert.match(app, /page !== 'screener' && page !== 'replay' && page !== 'pc'/);
+  assert.match(app, /if \(hash === '#pc'\) \{/);
+  assert.match(app, /page !== 'screener' && page !== 'pc'/);
+  assert.doesNotMatch(app, /hash === '#replay' \|\| hash === '#pc'/);
   assert.match(app, /React\.lazy\(\(\) => import\('\.\/components\/PcLandingPage'\)\)/);
   assert.match(app, /activePage === 'pc' \? \(/);
   assert.match(header, /nav-category-pc-btn/);
