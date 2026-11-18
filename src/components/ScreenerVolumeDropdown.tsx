@@ -11,9 +11,11 @@ interface Props {
   value: number;
   mode?: ScreenerVolumeMode;
   onChange: (value: number) => void;
+  /** Allow the dropdown to sit above a portaled modal without altering screener stacking. */
+  portalZIndex?: number;
 }
 
-export const ScreenerVolumeDropdown: React.FC<Props> = ({ id, labelId, value, mode = 'to', onChange }) => {
+export const ScreenerVolumeDropdown: React.FC<Props> = ({ id, labelId, value, mode = 'to', onChange, portalZIndex = 100 }) => {
   const { t } = useLanguage();
   const unlimited = t('screenerVolumeUnlimited');
   const options = useMemo(() => {
@@ -215,7 +217,7 @@ export const ScreenerVolumeDropdown: React.FC<Props> = ({ id, labelId, value, mo
           aria-labelledby={labelId}
           aria-activedescendant={optionId(activeIndex)}
           onKeyDown={handleListKeyDown}
-          style={position}
+          style={{ ...position, zIndex: portalZIndex }}
           className="fixed z-[100] m-0 list-none overflow-y-auto overscroll-contain touch-pan-y rounded-lg border border-slate-700 bg-slate-950 p-1 text-xs shadow-xl outline-none"
         >
           {options.map((option, index) => (
