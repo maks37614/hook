@@ -26,7 +26,7 @@ test('every Basic HookChart control has its own contextual explanation', () => {
     const explanation = mainSettingHelpText(section, item[2]) || line.match(/desc="([^"]+)"/)?.[1];
     assert.ok(explanation && explanation.length >= 35, `Missing explanation: ${section} / ${item[2]}`);
   }
-  assert.equal(controls, 88, 'all Basic and Levels settings, including Optimization, must have explanatory help');
+  assert.equal(controls, 87, 'all Basic and Levels settings, including Optimization, must have explanatory help');
   assert.notEqual(mainSettingHelpText('Відносний об’єм (колонка VR)', 'Кількість свічок'),
     mainSettingHelpText('Кількість угод (лише Binance)', 'Кількість свічок'),
     'the same label must explain a different function depending on its section');
@@ -39,8 +39,8 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
   }));
   // Every visible Basic control, including the three independent large-trade
   // arrow/text controls, has exactly one contextual help trigger.
-  assert.equal((html.match(/aria-label="Пояснення: /g) || []).length, 74);
-  assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, 74);
+  assert.equal((html.match(/aria-label="Пояснення: /g) || []).length, 73);
+  assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, 73);
   assert.match(html, /Пояснення: Максимальний DPR полотна/);
   assert.match(html, /Пояснення: Прогнозні зони Liq · модель за історією/);
   assert.match(html, /Пояснення: Товщина горизонтальної лінії/);
@@ -132,4 +132,27 @@ test('deprecated HookChart Data and Sorting controls are absent from the editor'
   const source = code('../src/components/hookchart/OriginalHookChartSettings.tsx');
   assert.doesNotMatch(source, /Дані та сортування|Типи та порядок сортування|Інтервали аналізу/);
   assert.doesNotMatch(source, /sortEnabled|sortDisabled|analyzedIntervals/);
+});
+
+test('chart settings hide redundant explanations but retain accessible help and live status', () => {
+  const markup = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
+    open: true, embedded: false, prefs: normalizeOriginalHookChartPreferences(),
+    onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
+    loadedCandles: 1001,
+  }));
+  assert.doesNotMatch(markup, /Часовий пояс|Europe\/Warsaw|America\/New_York/,
+    'the chart must not offer a second timezone choice');
+  assert.doesNotMatch(markup, /<div class="settingText"><b>[^<]*<\/b><small>/,
+    'settings must not repeat explanations under the label');
+  assert.doesNotMatch(markup, /Підказки в інтерфейсі під час наведення миші/,
+    'tooltips rather than inline descriptions should explain controls');
+  assert.match(markup, /Пояснення: Підказки/);
+  assert.match(markup, /Пояснення: Максимальна історія свічок/);
+  assert.match(markup, /Завантажено:/, 'live history status is useful and must stay visible');
+
+  const source = code('../src/components/hookchart/OriginalHookChartSettings.tsx');
+  assert.doesNotMatch(source, /<Choice label="Часовий пояс"/);
+  assert.doesNotMatch(source, /<small>\{translateHookChartPhrase\(language, desc\)\}<\/small>/);
+  assert.match(source, /mainSettingHelpText\(section, label\) \|\| help \|\| desc/,
+    'the same explanations must remain available through the question mark');
 });
