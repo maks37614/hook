@@ -82,3 +82,22 @@ test('smaller screens keep the original positions and all actions remain connect
   assert.match(secondRow, /setIsAddModalOpen\(true\)/);
   assert.match(header, /onClick=\{onReturnToPatterns\}/);
 });
+
+test('narrow mobile chart-alert action stays clear of the clock without hiding controls', () => {
+  // Below 520px the top toolbar gets fixed-size action columns on either side
+  // of the centered clock instead of letting the two button strips overflow it.
+  assert.match(header, /max-\[519px\]:grid-cols-\[auto_minmax\(0,1fr\)_auto\]/);
+  assert.match(header, /justify-self-start min-\[720px\]:hidden max-\[519px\]:grid max-\[519px\]:grid-cols-2/);
+  assert.match(header, /col-start-3 row-start-1 flex shrink-0 items-center justify-self-end[^"]*max-\[519px\]:grid max-\[519px\]:grid-cols-3/);
+  assert.match(header, /max-\[519px\]:\[&>button\]:h-7 max-\[519px\]:\[&>button\]:w-7/);
+  assert.match(header, /<TerminalClock timeZone=\{profile\?\.timeZone\}/);
+  for (const button of [
+    'ChartNoAxesCombined', 'BellRing', 'Send', 'Zap',
+    'SlidersHorizontal', 'Maximize2', 'Minimize2',
+  ]) {
+    assert.ok(header.includes('<' + button), 'mobile control is missing: ' + button);
+  }
+  assert.match(header, /onClick=\{\(\) => setConfig\(current => \(\{ \.\.\.current, terminalMarketAlerts:/);
+  assert.match(header, /onClick=\{\(\) => setIsSettingsOpen\(true\)\}/);
+  assert.match(header, /onClick=\{toggleBrowserFullscreen\}/);
+});
