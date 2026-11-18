@@ -55,7 +55,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
-import { terminalResponsiveAutoHeights } from '../utils/terminalResponsiveGrid';
+import { terminalGridColumnClasses, terminalResponsiveAutoHeights } from '../utils/terminalResponsiveGrid';
 import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
@@ -747,7 +747,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         };
       });
       setBlocks(newBlocks);
-      setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 2, autoFitScreen: true }));
+      setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 2, freeLayoutAutoColumns: false, autoFitScreen: true }));
     } else if (presetKey === 'grid_4') {
       const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'SUIUSDT'];
       const newBlocks = symbols.map((sym, i) => {
@@ -802,8 +802,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     updateBlocks(current => blocksForMarketPreset(current, pageCoins, timeframe));
     setConfig(current => {
       const columns = pageCoins.length === 1 ? 1 : pageCoins.length <= 4 ? 2 : pageCoins.length <= 9 ? 3 : 4;
-      return current.columns === columns && current.layoutPreset === 'custom' ? current
-        : { ...current, columns, layoutPreset: 'custom' };
+      return current.columns === columns && current.layoutPreset === 'custom'
+        && current.freeLayoutAutoColumns === true ? current
+        : { ...current, columns, layoutPreset: 'custom', freeLayoutAutoColumns: true };
     });
   }, [updateBlocks, setConfig, timeframe, coinPresetLimit]);
 
@@ -916,7 +917,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     // so its next quote refresh cannot overwrite the user's saved selection.
     requestImmediateWorkspaceSync();
     setBlocks(restored);
-    setConfig(current => ({ ...current, columns: preset.columns, blockHeight: preset.blockHeight, layoutPreset: 'custom' }));
+    setConfig(current => ({ ...current, columns: preset.columns, blockHeight: preset.blockHeight, layoutPreset: 'custom', freeLayoutAutoColumns: false }));
     setTimeframe(restored[0].timeframe);
     // A previously scrolled/paged workspace must start at the first preset coin.
     setWorkspacePage(0);
@@ -1006,25 +1007,19 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     }
   };
 
-  const gridColsClass = useMemo(() => {
-    // A single coin occupies a normal grid column, not the full chart width.
-    // Its normal width and controls now match all multi-coin tiles.
-    switch (config.columns) {
-      case 1: return 'grid-cols-1';
-      case 2: return 'grid-cols-1 md:grid-cols-2';
-      case 3: return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
-      case 4: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
-      case 5: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
-      case 6: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6';
-      default: return 'grid-cols-1 md:grid-cols-2';
-    }
-  }, [config.columns, visibleWorkspaceBlocks.length]);
+  const gridColsClass = useMemo(() => terminalGridColumnClasses(
+    config.layoutPreset, config.columns, visibleWorkspaceBlocks.length,
+    config.freeLayoutAutoColumns !== false,
+  ), [config.layoutPreset, config.columns, config.freeLayoutAutoColumns, visibleWorkspaceBlocks.length]);
 
   // CSS owns the four breakpoint switches; chart/market data never rerenders
   // when the viewport changes. Account for full-width tiles when counting rows.
   const terminalAutoHeights = useMemo(
-    () => terminalResponsiveAutoHeights(visibleWorkspaceBlocks, config.columns),
-    [visibleWorkspaceBlocks, config.columns],
+    () => terminalResponsiveAutoHeights(
+      visibleWorkspaceBlocks, config.columns, config.layoutPreset,
+      config.freeLayoutAutoColumns !== false,
+    ),
+    [visibleWorkspaceBlocks, config.columns, config.layoutPreset, config.freeLayoutAutoColumns],
   );
   const terminalHeightVariables = useMemo(() => ({
     '--terminal-height-mobile': terminalAutoHeights.mobile,
@@ -1034,10 +1029,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   } as React.CSSProperties), [terminalAutoHeights]);
 
   const computedHeightStyle = useMemo(() => {
-    // A single coin remains a compact tile, not a fullscreen chart. Explicit
-    // per-block heightPx still overrides this default in TerminalChartWidget.
-    if (visibleWorkspaceBlocks.length === 1 && config.autoFitScreen)
-      return 'clamp(300px, calc((100dvh - 120px) / 2), 500px)';
+    // First chart is large, with the normal draggable/resizable grid controls.
+    // User-selected block.heightPx still has priority in TerminalChartWidget.
+    if (visibleWorkspaceBlocks.length === 1) return 'var(--terminal-chart-height)';
     if (config.autoFitScreen) return 'var(--terminal-chart-height)';
     switch (config.blockHeight) {
       case 'compact': return '280px';
@@ -1439,10 +1433,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             <button
               onClick={() => {
                 // Column selectors are layout-only: never remove existing charts.
-                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 1, autoFitScreen: true }));
+                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 1, freeLayoutAutoColumns: false, autoFitScreen: true }));
               }}
               className={`px-2 py-1 rounded-lg transition-colors ${
-                config.columns === 1
+                config.columns === 1 && config.layoutPreset === 'custom' && config.freeLayoutAutoColumns === false
                   ? 'bg-emerald-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
               }`}
@@ -1452,10 +1446,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             </button>
             <button
               onClick={() => {
-                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 2, autoFitScreen: true }));
+                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 2, freeLayoutAutoColumns: false, autoFitScreen: true }));
               }}
               className={`px-2 py-1 rounded-lg transition-colors ${
-                config.columns === 2
+                config.columns === 2 && config.layoutPreset === 'custom' && config.freeLayoutAutoColumns === false
                   ? 'bg-emerald-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
               }`}
@@ -1465,10 +1459,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             </button>
             <button
               onClick={() => {
-                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 3, autoFitScreen: true }));
+                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 3, freeLayoutAutoColumns: false, autoFitScreen: true }));
               }}
               className={`px-2 py-1 rounded-lg transition-colors ${
-                config.columns === 3
+                config.columns === 3 && config.layoutPreset === 'custom' && config.freeLayoutAutoColumns === false
                   ? 'bg-emerald-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
               }`}
@@ -1478,10 +1472,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             </button>
             <button
               onClick={() => {
-                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 4, autoFitScreen: true }));
+                setConfig((prev) => ({ ...prev, layoutPreset: 'custom', columns: 4, freeLayoutAutoColumns: false, autoFitScreen: true }));
               }}
               className={`px-2 py-1 rounded-lg transition-colors ${
-                config.columns === 4
+                config.columns === 4 && config.layoutPreset === 'custom' && config.freeLayoutAutoColumns === false
                   ? 'bg-emerald-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
               }`}

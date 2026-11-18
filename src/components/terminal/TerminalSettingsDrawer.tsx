@@ -318,10 +318,13 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
                     else if (item.id === '4x4') cols = 4;
                     else if (item.id === '5x5') cols = 5;
                     else if (item.id === '6x6') cols = 6;
-                    onUpdateConfig({ layoutPreset: item.id as any, columns: cols as any });
+                    onUpdateConfig({
+                      layoutPreset: item.id as any, columns: cols as any,
+                      freeLayoutAutoColumns: item.id === 'custom',
+                    });
                   }}
                   className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    config.layoutPreset === item.id
+                    config.layoutPreset === item.id && (item.id !== 'custom' || config.freeLayoutAutoColumns !== false)
                       ? 'bg-cyan-950/60 border-cyan-500/60 text-white shadow-sm'
                       : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
                   }`}
@@ -344,7 +347,7 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
                   key={col}
                   aria-label={t(col === 1 ? 'terminal.column.one' : col < 5 ? 'terminal.column.few' : 'terminal.column.many', { count: col })}
                   title={t(col === 1 ? 'terminal.column.one' : col < 5 ? 'terminal.column.few' : 'terminal.column.many', { count: col })}
-                  onClick={() => onUpdateConfig({ columns: col, layoutPreset: 'custom' })}
+                  onClick={() => onUpdateConfig({ columns: col, layoutPreset: 'custom', freeLayoutAutoColumns: false })}
                   className={`py-2 px-3 rounded-xl border font-mono font-bold text-center transition-all ${
                     config.columns === col
                       ? 'bg-cyan-600 border-cyan-500 text-white'

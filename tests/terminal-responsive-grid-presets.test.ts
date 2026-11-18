@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { terminalResponsiveColumns, terminalResponsiveRows, terminalResponsiveAutoHeights } from '../src/utils/terminalResponsiveGrid';
+import { terminalResponsiveColumns, terminalResponsiveRows, terminalResponsiveAutoHeights, terminalResponsiveLayoutColumns, terminalGridColumnClasses } from '../src/utils/terminalResponsiveGrid';
 import type { TerminalChartBlock } from '../src/types';
 
 const blocks = (spans: TerminalChartBlock['colSpan'][]): Pick<TerminalChartBlock, 'colSpan'>[] =>
@@ -31,15 +31,47 @@ test('full-width blocks add rows; wide saved charts do not conceal other coins',
   assert.equal(terminalResponsiveRows([], 3, 'mobile'), 0);
 });
 
+
+test('free grid auto-adapts 1, 2, 3, 4, 5 and 10 coins to the viewport', () => {
+  const specs = [
+    [1, 1, 1, 'grid-cols-1'],
+    [2, 2, 2, 'grid-cols-1 md:grid-cols-2'],
+    [3, 2, 3, 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'],
+    [4, 2, 2, 'grid-cols-1 md:grid-cols-2'],
+    [5, 2, 3, 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'],
+    [10, 3, 4, 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'],
+  ] as const;
+  for (const [count, desktop, wide, css] of specs) {
+    assert.equal(terminalGridColumnClasses('custom', 2, count), css);
+    assert.equal(terminalResponsiveLayoutColumns(2, count, 'mobile'), 1);
+    assert.equal(terminalResponsiveLayoutColumns(2, count, 'desktop'), desktop);
+    assert.equal(terminalResponsiveLayoutColumns(2, count, 'wide'), wide);
+    const charts = blocks(Array(count).fill(1));
+    assert.equal(terminalResponsiveRows(charts, 2, 'wide', 'custom', true), Math.ceil(count / wide));
+    assert.ok(terminalResponsiveAutoHeights(charts, 2, 'custom', true).wide.includes('100dvh'));
+  }
+});
+
+test('fixed presets and manually selected columns override auto-layout', () => {
+  assert.equal(terminalGridColumnClasses('4x4', 4, 4), 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
+  assert.equal(terminalGridColumnClasses('2x2', 2, 4), 'grid-cols-1 md:grid-cols-2');
+  assert.equal(terminalGridColumnClasses('1x1', 1, 5), 'grid-cols-1');
+  assert.equal(terminalGridColumnClasses('custom', 1, 4, false), 'grid-cols-1');
+  assert.equal(terminalResponsiveLayoutColumns(1, 4, 'wide', 'custom', false), 1);
+  assert.equal(terminalResponsiveLayoutColumns(4, 4, 'wide', '4x4'), 4);
+  assert.equal(terminalGridColumnClasses('4x4', 4, 1), 'grid-cols-1');
+  assert.equal(terminalResponsiveAutoHeights(blocks([1]), 4, '4x4').wide, 'calc(100dvh - 110px)');
+});
+
 test('Terminal grid keeps regular tile heights for one or many coins without additional polling', () => {
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-  assert.match(page, /terminalResponsiveAutoHeights\(visibleWorkspaceBlocks, config\.columns\)/);
+  assert.match(page, /terminalResponsiveAutoHeights\(/);
+  assert.match(page, /visibleWorkspaceBlocks, config\.columns, config\.layoutPreset/);
   assert.match(page, /style=\{terminalHeightVariables\}/);
   assert.match(page, /return 'var\(--terminal-chart-height\)'/);
-  assert.match(page, /visibleWorkspaceBlocks\.length === 1 && config\.autoFitScreen/);
-  assert.match(page, /clamp\(300px, calc\(\(100dvh - 120px\) \/ 2\), 500px\)/);
-  assert.doesNotMatch(page, /if \(visibleWorkspaceBlocks\.length === 1\) return 'grid-cols-1'/);
+  assert.match(page, /if \(visibleWorkspaceBlocks\.length === 1\) return 'var\(--terminal-chart-height\)'/);
+  assert.match(page, /terminalGridColumnClasses\(/);
   assert.doesNotMatch(page, /Math\.ceil\(visibleWorkspaceBlocks\.length \/ cols\)/);
   for (const size of ['mobile', 'tablet', 'desktop', 'wide']) {
     assert.ok(css.includes(`--terminal-height-${size}`), size);

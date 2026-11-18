@@ -30,12 +30,12 @@ test('one Terminal coin uses the exact same normal resizable and removable grid 
   assert.doesNotMatch(page, /Sub-header: 24h Coin Market Stats Bar/);
 });
 
-test('single tile stays compact unless a trader resizes or explicitly maximizes it', () => {
+test('first chart remains large with standard block resize and maximize controls', () => {
   const page = file('../src/components/TerminalPage.tsx');
   const widget = file('../src/components/terminal/TerminalChartWidget.tsx');
-  assert.match(page, /visibleWorkspaceBlocks\.length === 1 && config\.autoFitScreen/);
-  assert.match(page, /clamp\(300px, calc\(\(100dvh - 120px\) \/ 2\), 500px\)/);
-  assert.match(page, /switch \(config\.columns\)/);
+  assert.match(page, /if \(visibleWorkspaceBlocks\.length === 1\) return 'var\(--terminal-chart-height\)'/);
+  assert.match(page, /terminalGridColumnClasses\(/);
+  assert.doesNotMatch(page, /clamp\(300px, calc\(\(100dvh - 120px\) \/ 2\), 500px\)/);
   assert.match(widget, /block\.heightPx\s*\? `\$\{block\.heightPx\}px`/);
   assert.match(widget, /isMaximized\s*\? 'calc\(100vh - 2rem\)'/);
   assert.match(page, /\{terminalBelowCharts\}/);

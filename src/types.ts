@@ -25,6 +25,8 @@ export interface TerminalChartBlock {
 export interface TerminalWorkspaceConfig {
   layoutPreset: '1x1' | '1x2' | '2x1' | '2x2' | '2x3' | '3x3' | '4x4' | '5x5' | '6x6' | 'custom';
   columns: 1 | 2 | 3 | 4 | 5 | 6;
+  /** Free grid adapts automatically; false preserves an explicit column choice. */
+  freeLayoutAutoColumns?: boolean;
   autoFitScreen: boolean;
   /** Hide the Terminal header clock and its trading sessions popover. Defaults to visible. */
   showClock?: boolean;

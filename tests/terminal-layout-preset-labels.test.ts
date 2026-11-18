@@ -9,5 +9,7 @@ test('Terminal layout presets display only their main labels', () => {
   assert.match(section, /<span className="font-mono font-bold text-xs text-cyan-300">\{translatePhrase\(language, item.label\)\}<\/span>/);
   assert.doesNotMatch(section, new RegExp(String.raw`>\{item\.sub\}</`));
   assert.match(section, /aria-label=\{\`\$\{translatePhrase\(language, item.label\)\} — \$\{translatePhrase\(language, item.sub\)\}\`\}/);
-  assert.match(section, /onUpdateConfig\(\{ layoutPreset: item.id as any, columns: cols as any \}\)/);
+  assert.match(section, /layoutPreset: item\.id as any/);
+  assert.match(section, /columns: cols as any/);
+  assert.match(section, /freeLayoutAutoColumns: item\.id === 'custom'/);
 });

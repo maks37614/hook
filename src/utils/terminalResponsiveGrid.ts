@@ -1,4 +1,4 @@
-import type { TerminalChartBlock } from '../types';
+import type { TerminalChartBlock, TerminalWorkspaceConfig } from '../types';
 
 type Breakpoint = 'mobile' | 'tablet' | 'desktop' | 'wide';
 
@@ -9,6 +9,47 @@ export function terminalResponsiveColumns(columns: number, breakpoint: Breakpoin
   if (breakpoint === 'tablet') return 2;
   if (breakpoint === 'desktop') return configured >= 4 ? 3 : 2;
   return configured;
+}
+
+
+/** Compute responsive columns with no chart polling or resize listeners. */
+export function terminalResponsiveLayoutColumns(
+  columns: number, count: number, breakpoint: Breakpoint,
+  layoutPreset: TerminalWorkspaceConfig['layoutPreset'] = 'custom',
+  freeLayoutAutoColumns = true,
+): number {
+  if (count <= 1) return 1;
+  if (layoutPreset !== 'custom' || !freeLayoutAutoColumns)
+    return terminalResponsiveColumns(columns, breakpoint);
+  if (breakpoint === 'mobile') return 1;
+  if (breakpoint === 'tablet') return 2;
+  if (breakpoint === 'desktop') return count >= 10 ? 3 : 2;
+  if (count === 3) return 3;
+  if (count <= 4) return 2;
+  return count <= 9 ? 3 : 4;
+}
+
+/** Tailwind class list mirrors the breakpoint decisions above. */
+export function terminalGridColumnClasses(
+  layoutPreset: TerminalWorkspaceConfig['layoutPreset'],
+  columns: number, count: number, freeLayoutAutoColumns = true,
+): string {
+  if (count <= 1) return 'grid-cols-1';
+  if (layoutPreset === 'custom' && freeLayoutAutoColumns) {
+    if (count === 3) return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
+    if (count <= 4) return 'grid-cols-1 md:grid-cols-2';
+    if (count <= 9) return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+  }
+  switch (columns) {
+    case 1: return 'grid-cols-1';
+    case 2: return 'grid-cols-1 md:grid-cols-2';
+    case 3: return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
+    case 4: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+    case 5: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
+    case 6: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6';
+    default: return 'grid-cols-1 md:grid-cols-2';
+  }
 }
 
 /** Match the span of each TerminalChartWidget at each Tailwind breakpoint. */
@@ -30,8 +71,12 @@ export function terminalResponsiveRows(
   blocks: readonly Pick<TerminalChartBlock, 'colSpan'>[],
   configuredColumns: number,
   breakpoint: Breakpoint,
+  layoutPreset: TerminalWorkspaceConfig['layoutPreset'] = 'custom',
+  freeLayoutAutoColumns = false,
 ): number {
-  const columns = terminalResponsiveColumns(configuredColumns, breakpoint);
+  const columns = terminalResponsiveLayoutColumns(
+    configuredColumns, blocks.length, breakpoint, layoutPreset, freeLayoutAutoColumns,
+  );
   let rows = 0;
   let used = 0;
   for (const block of blocks) {
@@ -52,11 +97,13 @@ function heightForRows(rows: number): string {
 export function terminalResponsiveAutoHeights(
   blocks: readonly Pick<TerminalChartBlock, 'colSpan'>[],
   columns: number,
+  layoutPreset: TerminalWorkspaceConfig['layoutPreset'] = 'custom',
+  freeLayoutAutoColumns = false,
 ): Record<Breakpoint, string> {
   return {
-    mobile: heightForRows(terminalResponsiveRows(blocks, columns, 'mobile')),
-    tablet: heightForRows(terminalResponsiveRows(blocks, columns, 'tablet')),
-    desktop: heightForRows(terminalResponsiveRows(blocks, columns, 'desktop')),
-    wide: heightForRows(terminalResponsiveRows(blocks, columns, 'wide')),
+    mobile: heightForRows(terminalResponsiveRows(blocks, columns, 'mobile', layoutPreset, freeLayoutAutoColumns)),
+    tablet: heightForRows(terminalResponsiveRows(blocks, columns, 'tablet', layoutPreset, freeLayoutAutoColumns)),
+    desktop: heightForRows(terminalResponsiveRows(blocks, columns, 'desktop', layoutPreset, freeLayoutAutoColumns)),
+    wide: heightForRows(terminalResponsiveRows(blocks, columns, 'wide', layoutPreset, freeLayoutAutoColumns)),
   };
 }

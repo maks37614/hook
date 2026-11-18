@@ -27,6 +27,18 @@ test('all Terminal settings controls write to the same per-profile workspace and
   assert.match(hook, /terminalStorageKey\(BLOCKS_KEY, uid\)/);
 });
 
+
+test('free grid mode and manual column overrides are profile and JSON backup settings', () => {
+  const page = read('../src/components/TerminalPage.tsx');
+  const drawer = read('../src/components/terminal/TerminalSettingsDrawer.tsx');
+  const hook = read('../src/utils/useTerminalWorkspace.ts');
+  assert.match(drawer, /freeLayoutAutoColumns: item\.id === 'custom'/);
+  assert.match(drawer, /layoutPreset: 'custom', freeLayoutAutoColumns: false/);
+  assert.match(page, /config\.freeLayoutAutoColumns !== false/);
+  assert.match(hook, /config\.freeLayoutAutoColumns = config\.freeLayoutAutoColumns !== false/);
+  assert.match(hook, /config\.freeLayoutAutoColumns = source\.freeLayoutAutoColumns/);
+});
+
 test('Terminal settings and 30 chart identities reload from the correct account profile', () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const items = new Map<string, string>();

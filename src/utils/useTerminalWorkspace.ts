@@ -31,7 +31,7 @@ function saveConflictBackup(uid: string, value: WorkspaceSnapshot): boolean {
   } catch { return false; }
 }
 const DEFAULT_CONFIG: TerminalWorkspaceConfig = {
-  layoutPreset: 'custom', columns: 2, autoFitScreen: true, showClock: true, blocks: [], showFormations: true, blockHeight: 'medium',
+  layoutPreset: 'custom', columns: 2, freeLayoutAutoColumns: true, autoFitScreen: true, showClock: true, blocks: [], showFormations: true, blockHeight: 'medium',
   terminalMarketAlerts: false,
 };
 /** Validate imported files before replacing any chart or saving to a profile. */
@@ -86,6 +86,8 @@ export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
     config.layoutPreset = source.layoutPreset as TerminalWorkspaceConfig['layoutPreset'];
   if ([1, 2, 3, 4, 5, 6].includes(source.columns as number))
     config.columns = source.columns as TerminalWorkspaceConfig['columns'];
+  if (typeof source.freeLayoutAutoColumns === 'boolean')
+    config.freeLayoutAutoColumns = source.freeLayoutAutoColumns;
   if (typeof source.autoFitScreen === 'boolean') config.autoFitScreen = source.autoFitScreen;
   if (typeof source.showClock === 'boolean') config.showClock = source.showClock;
   if (typeof source.autoScaleCharts === 'boolean') config.autoScaleCharts = source.autoScaleCharts;
@@ -130,6 +132,7 @@ export function loadTerminalWorkspace(uid?: string, settings?: TerminalWorkspace
     : storedConfig && typeof storedConfig === 'object' ? storedConfig : {};
   const config = { ...DEFAULT_CONFIG, ...sourceConfig } as TerminalWorkspaceConfig;
   if (![1, 2, 3, 4, 5, 6].includes(config.columns)) config.columns = 2;
+  config.freeLayoutAutoColumns = config.freeLayoutAutoColumns !== false;
   if ((config.blockHeight as string) === 'tall') config.blockHeight = 'large';
   if (!['compact', 'medium', 'large'].includes(config.blockHeight)) config.blockHeight = 'medium';
   if (config.initialChartView != null) {
