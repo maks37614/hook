@@ -252,6 +252,13 @@ export async function registerAccount(emailInput: unknown, passwordInput: unknow
       [id, email, passwordHash, displayName, JSON.stringify({
         defaultExchange: 'all', defaultMarketType: 'all', defaultTimeframe: '1h',
         soundAlertsEnabled: true, marketSentimentExpanded: true,
+        // Chart decoration is opt-in for new accounts; keep existing profiles
+        // and the global HookChart defaults unchanged.
+        hookChartPreferences: {
+          showMarketPrintArrows: false,
+          showLiquidationArrows: false,
+          showLiquidationCandleSums: false,
+        },
         // Only new accounts start with compact chart detail panels.
         // Per-user choices subsequently remain controlled by profile settings.
         telegramPriceAlertCollapsed: true,
