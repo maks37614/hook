@@ -42,7 +42,10 @@ test('header timeframe controls update chart blocks, not only the highlighted pi
   assert.match(terminal,/updateBlocks\(previous => applyTerminalTimeframe\(previous, tf\)\)/);
   assert.match(terminal,/onClick=\{\(\) => handleApplyGlobalTimeframe\(tf\)\}/);
   assert.match(terminal,/aria-pressed=\{activeTimeframe === tf\}/);
-  assert.match(terminal,/timeframe=\{blocks\[0\]\.timeframe\}/);
+  // Both one-coin and multi-coin layouts now use the same grid widget.
+  const widget=readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx',import.meta.url),'utf8');
+  assert.match(terminal,/<TerminalGridItem/);
+  assert.match(widget,/timeframe=\{block\.timeframe\}/);
 });
 
 test('workspace conflict no longer covers charts but recovery remains inside settings', () => {
