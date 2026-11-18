@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { terminalResponsiveColumns, terminalResponsiveRows, terminalResponsiveAutoHeights, terminalResponsiveLayoutColumns, terminalGridColumnClasses } from '../src/utils/terminalResponsiveGrid';
+import { terminalResponsiveColumns, terminalResponsiveRows, terminalResponsiveAutoHeights, terminalResponsiveLayoutColumns, terminalGridColumnClasses, terminalResponsiveSpanClasses } from '../src/utils/terminalResponsiveGrid';
 import type { TerminalChartBlock } from '../src/types';
 
 const blocks = (spans: TerminalChartBlock['colSpan'][]): Pick<TerminalChartBlock, 'colSpan'>[] =>
@@ -85,4 +85,21 @@ test('manual and fixed grid choices survive automatic market preset refresh', ()
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   assert.match(page, /current\.layoutPreset !== 'custom' \|\| current\.freeLayoutAutoColumns === false/);
   assert.match(page, /terminalGridColumnClasses\(/);
+});
+
+test('widened chart never creates implicit tracks beyond the responsive grid', () => {
+  assert.equal(terminalResponsiveSpanClasses(3, 1, 3, 'custom', false),
+    'col-span-1 md:col-span-1 lg:col-span-1 xl:col-span-1');
+  assert.equal(terminalResponsiveSpanClasses(3, 2, 3, 'custom', true),
+    'col-span-1 md:col-span-2 lg:col-span-2 xl:col-span-3');
+  assert.equal(terminalResponsiveSpanClasses(3, 2, 4, '2x2', false),
+    'col-span-1 md:col-span-2 lg:col-span-2 xl:col-span-2');
+  assert.equal(terminalResponsiveSpanClasses(3, 4, 4, '4x4', false),
+    'col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-3');
+  assert.equal(terminalResponsiveSpanClasses('full', 1, 4), 'col-span-full');
+  assert.equal(terminalResponsiveSpanClasses(1, 2, 1), 'col-span-full');
+  const widget = readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  assert.match(widget, /if \(responsiveSpanClass\) return responsiveSpanClass/);
+  assert.match(page, /responsiveSpanClass=\{terminalResponsiveSpanClasses\(/);
 });

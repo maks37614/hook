@@ -43,6 +43,8 @@ interface TerminalChartWidgetProps {
   isSingleBlock: boolean;
   /** The only visible Terminal tile loads immediately, without losing grid controls. */
   isOnlyChart?: boolean;
+  /** CSS grid span clamped to actual responsive column count. */
+  responsiveSpanClass?: string;
   isMaximized: boolean;
   /** Pause charts obscured by a maximized Terminal chart. */
   isSuspended?: boolean;
@@ -84,6 +86,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   subscribeAllCoins,
   isSingleBlock,
   isOnlyChart = false,
+  responsiveSpanClass,
   isMaximized,
   isSuspended = false,
   onToggleMaximize,
@@ -321,6 +324,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   // Compute CSS column span class
   const colSpanClass = useMemo(() => {
     if (isSingleBlock || isMaximized) return 'col-span-full';
+    if (responsiveSpanClass) return responsiveSpanClass;
     const effectiveSpan = block.colSpan || 1;
     switch (effectiveSpan) {
       case 2: return 'col-span-1 md:col-span-2';
@@ -329,7 +333,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       case 'full': return 'col-span-full';
       default: return 'col-span-1';
     }
-  }, [block.colSpan, isSingleBlock, isMaximized]);
+  }, [block.colSpan, isSingleBlock, isMaximized, responsiveSpanClass]);
 
   const terminalToolbarControls = (
     <>

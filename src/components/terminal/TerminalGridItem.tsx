@@ -11,6 +11,7 @@ export interface TerminalGridItemProps {
   subscribeAllCoins: (listener: () => void) => () => void;
   index: number;
   isOnlyChart?: boolean;
+  responsiveSpanClass?: string;
   isMaximized: boolean;
   isSuspended: boolean;
   terminalAutoScale: boolean;
@@ -39,7 +40,7 @@ export interface TerminalGridItemProps {
  * Parent UI updates never recreate its callbacks or cause remounts.
  */
 export const TerminalGridItem = memo(function TerminalGridItem({
-  block, coin, getAllCoins, subscribeAllCoins, index, isOnlyChart = false, isMaximized, isSuspended,
+  block, coin, getAllCoins, subscribeAllCoins, index, isOnlyChart = false, responsiveSpanClass, isMaximized, isSuspended,
   terminalAutoScale, terminalEcoMode, terminalRefreshMs, terminalActiveCharts,
   terminalInitialView, terminalFitAllRequest, heightStyle, metaScalpBinding,
   onToggleMaximize, onRemove, onUpdateBlock, onOpenCoinSelector,
@@ -64,6 +65,7 @@ export const TerminalGridItem = memo(function TerminalGridItem({
       subscribeAllCoins={subscribeAllCoins}
       isSingleBlock={false}
       isOnlyChart={isOnlyChart}
+      responsiveSpanClass={responsiveSpanClass}
       isMaximized={isMaximized}
       isSuspended={isSuspended}
       terminalAutoScale={terminalAutoScale}

@@ -52,6 +52,32 @@ export function terminalGridColumnClasses(
   }
 }
 
+
+/** Clamp a manually widened chart to real responsive grid columns.
+ * Prevents implicit CSS columns that would overflow a narrow phone/tablet.
+ * All class variants are literal so Tailwind's build can find them.
+ */
+export function terminalResponsiveSpanClasses(
+  span: TerminalChartBlock['colSpan'], columns: number, count: number,
+  layoutPreset: TerminalWorkspaceConfig['layoutPreset'] = 'custom',
+  freeLayoutAutoColumns = true,
+): string {
+  if (count <= 1 || span === 'full' || span === 4) return 'col-span-full';
+  const requested = typeof span === 'number' ? Math.max(1, Math.min(3, span)) : 1;
+  const tablet = Math.min(requested, terminalResponsiveLayoutColumns(
+    columns, count, 'tablet', layoutPreset, freeLayoutAutoColumns));
+  const desktop = Math.min(requested, terminalResponsiveLayoutColumns(
+    columns, count, 'desktop', layoutPreset, freeLayoutAutoColumns));
+  const wide = Math.min(requested, terminalResponsiveLayoutColumns(
+    columns, count, 'wide', layoutPreset, freeLayoutAutoColumns));
+  return [
+    'col-span-1',
+    tablet >= 2 ? 'md:col-span-2' : 'md:col-span-1',
+    desktop >= 3 ? 'lg:col-span-3' : desktop === 2 ? 'lg:col-span-2' : 'lg:col-span-1',
+    wide >= 3 ? 'xl:col-span-3' : wide === 2 ? 'xl:col-span-2' : 'xl:col-span-1',
+  ].join(' ');
+}
+
 /** Match the span of each TerminalChartWidget at each Tailwind breakpoint. */
 function terminalSpan(span: TerminalChartBlock['colSpan'], columns: number, breakpoint: Breakpoint): number {
   if (span === 'full' || span === 4) return columns;

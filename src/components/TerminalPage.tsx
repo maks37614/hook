@@ -54,7 +54,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
-import { terminalGridColumnClasses, terminalResponsiveAutoHeights } from '../utils/terminalResponsiveGrid';
+import { terminalGridColumnClasses, terminalResponsiveAutoHeights, terminalResponsiveSpanClasses } from '../utils/terminalResponsiveGrid';
 import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
@@ -1759,6 +1759,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                       subscribeAllCoins={subscribeCoinsForPicker}
                       index={visibleWorkspaceStart + index}
                       isOnlyChart={visibleWorkspaceBlocks.length === 1}
+                      responsiveSpanClass={terminalResponsiveSpanClasses(
+                        block.colSpan, config.columns, visibleWorkspaceBlocks.length,
+                        config.layoutPreset, config.freeLayoutAutoColumns !== false,
+                      )}
                       isMaximized={isMaximized}
                       isSuspended={maximizedBlockId !== null && !isMaximized}
                       terminalAutoScale={autoScaleCharts && chartProvider === 'hookchart'}

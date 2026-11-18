@@ -19,6 +19,7 @@ test('one Terminal coin uses the exact same normal resizable and removable grid 
   assert.match(page, /onOpenCoinSelector=\{handleOpenCoinSelector\}/);
   assert.match(item, /isSingleBlock=\{false\}/);
   assert.match(item, /isOnlyChart=\{isOnlyChart\}/);
+  assert.match(item, /responsiveSpanClass=\{responsiveSpanClass\}/);
   assert.match(page, /isOnlyChart=\{visibleWorkspaceBlocks\.length === 1\}/);
   assert.match(widget, /isSingleBlock \|\| isOnlyChart \|\| isMaximized/);
   assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \|\| isOnlyChart \? 1000 : 180\}/);
