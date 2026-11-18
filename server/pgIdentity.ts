@@ -252,6 +252,10 @@ export async function registerAccount(emailInput: unknown, passwordInput: unknow
       [id, email, passwordHash, displayName, JSON.stringify({
         defaultExchange: 'all', defaultMarketType: 'all', defaultTimeframe: '1h',
         soundAlertsEnabled: true, marketSentimentExpanded: true,
+        // Only new accounts start with compact chart detail panels.
+        // Per-user choices subsequently remain controlled by profile settings.
+        telegramPriceAlertCollapsed: true,
+        smartAnalysisCollapsed: true,
         watchlist: [], watchlistFolders: {},
         chartTradeMarkers: { showEntry: true, showTarget: true, showStop: true },
         chartLabelSettings: { entry: true, target: true, stop: true },

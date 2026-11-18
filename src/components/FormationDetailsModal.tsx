@@ -258,9 +258,13 @@ export const FormationDetailsModal: React.FC<FormationDetailsModalProps> = ({
     try { return window.localStorage; } catch { return null; }
   };
   const alertPanelKey = telegramAlertPanelStorageKey(user?.uid);
-  const [telegramAlertPanelCollapsed, setTelegramAlertPanelCollapsed] = useState<boolean>(
-    () => readTelegramAlertPanelCollapsed(alertPanelStorage(), user?.uid)
-  );
+  const [telegramAlertPanelCollapsed, setTelegramAlertPanelCollapsed] = useState<boolean>(() => {
+    // Render the saved profile preference on the first frame, before effects run.
+    const saved = profile?.uid === user?.uid ? profile?.telegramPriceAlertCollapsed : undefined;
+    const pending = !!user?.uid && isTelegramAlertPanelSyncPending(alertPanelStorage(), user.uid);
+    return !pending && typeof saved === 'boolean'
+      ? saved : readTelegramAlertPanelCollapsed(alertPanelStorage(), user?.uid);
+  });
   const [telegramAlertPanelSaveError, setTelegramAlertPanelSaveError] = useState(false);
   const pendingTelegramAlertPreferenceWrites = useRef(0);
 
@@ -307,9 +311,13 @@ export const FormationDetailsModal: React.FC<FormationDetailsModalProps> = ({
   // AI + Quant visibility is independent from the Telegram panel and shared
   // across every coin. The signed-in profile is the cross-device authority.
   const smartAnalysisStorageKey = smartAnalysisPanelStorageKey(user?.uid);
-  const [smartAnalysisCollapsed, setSmartAnalysisCollapsed] = useState(
-    () => readSmartAnalysisPanelCollapsed(alertPanelStorage(), user?.uid)
-  );
+  const [smartAnalysisCollapsed, setSmartAnalysisCollapsed] = useState<boolean>(() => {
+    // Avoid mounting the heavy analysis component before applying a saved collapse.
+    const saved = profile?.uid === user?.uid ? profile?.smartAnalysisCollapsed : undefined;
+    const pending = !!user?.uid && isSmartAnalysisPanelSyncPending(alertPanelStorage(), user.uid);
+    return !pending && typeof saved === 'boolean'
+      ? saved : readSmartAnalysisPanelCollapsed(alertPanelStorage(), user?.uid);
+  });
   const [smartAnalysisSaveError, setSmartAnalysisSaveError] = useState(false);
   const pendingSmartAnalysisWrites = useRef(0);
 
