@@ -1,0 +1,33 @@
+name: Verify standalone chart navigation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  chart-route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: TypeScript
+        run: npm run lint
+      - name: Navigation, chart gestures and archive Safari regression
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/monitoring-icon-consistency.test.ts tests/screener-action-icon-size.test.ts tests/hookchart-terminal-frame-coalescing.test.ts tests/chart-page-route.test.ts tests/hookchart-touch-hold.test.ts tests/hookchart-gestures.test.ts tests/chart-crosshair-alert-price.test.ts tests/smart-analysis-panel-preference.test.ts tests/hookchart-timeframe-picker.test.ts tests/archive-search-iphone.test.ts
+      - name: Formations page, quick chart and filter regression tests
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/formations-audit-regressions.test.ts tests/formation-list.test.ts tests/terminal-auto-scale.test.ts tests/formations-chart-scale-controls.test.ts tests/formations-card-history-load-favorites-20261115.test.ts
+      - name: Versioned header logo, mobile guide, and translated navigation tests
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/header-mobile-replay-formations-order.test.ts tests/main-header-desktop-center.test.ts tests/pages.test.ts tests/screener-hookchart-guides-four-languages.test.ts
+      - name: Market recurrence statistical and data-integrity tests
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/hookchart-market-recurrence.test.ts tests/hookchart-market-recurrence-history.test.ts tests/hookchart-market-recurrence-marks.test.ts
+      - name: Market recurrence CPU-only 4-chart benchmark
+        run: node --import tsx scripts/benchmark-market-recurrence.ts 4
+      - name: Production build
+        run: npm run build
