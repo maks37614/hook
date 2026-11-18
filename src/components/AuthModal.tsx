@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AuthCaptcha } from './AuthCaptcha';
-import { X, LogIn, UserPlus, Mail, Lock, UserRound, Eye, EyeOff, AlertCircle, CheckCircle2, ShieldCheck, KeyRound, ArrowLeft } from 'lucide-react';
+import { X, LogIn, UserPlus, Mail, Lock, UserRound, Eye, EyeOff, AlertCircle, CheckCircle2, ShieldCheck, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
@@ -289,16 +289,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 mode === 'forgot' ? 'Надіслати посилання' : mode === 'reset' ? 'Змінити пароль' : 'Увійти'}
             </button>
           </form>
-          {(authErrorCode === 'EMAIL_UNVERIFIED' || authErrorCode === 'EMAIL_EXISTS' || authErrorCode === 'MAIL_DELIVERY_FAILED') && (
+          {(mode === 'signin' || mode === 'signup') &&
+            (authErrorCode === 'EMAIL_UNVERIFIED' || authErrorCode === 'EMAIL_EXISTS' || authErrorCode === 'MAIL_DELIVERY_FAILED') && (
             <button type="button" disabled={busy || !captchaToken} onClick={sendAgain}
               className="mt-3 w-full rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-950/30 disabled:opacity-50">
               Надіслати лист підтвердження ще раз
-            </button>
-          )}
-          {(mode === 'forgot' || mode === 'reset') && (
-            <button type="button" onClick={() => changeMode('signin')}
-              className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-cyan-300">
-              <ArrowLeft size={15}/> Повернутися до входу
             </button>
           )}
         </div>

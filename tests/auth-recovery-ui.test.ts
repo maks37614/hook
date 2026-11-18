@@ -69,3 +69,20 @@ test('auth input icons stay vertically centered when mobile font sizes change', 
       'fixed top offsets drift when iOS increases input text size');
   }
 });
+
+test('password recovery forms have no copy or navigation below the submit button', () => {
+  const reset = view('signin', 'valid-reset-token-is-provided-by-email');
+  const belowSubmit = reset.slice(reset.indexOf('</form>'));
+  assert.ok(belowSubmit.length > 0, 'reset form must render');
+  assert.doesNotMatch(belowSubmit, /Повернутися до входу|Безкоштовний акаунт|Підтвердження email/,
+    'nothing should appear below the password reset button');
+  const authModal = readFileSync(new URL('../src/components/AuthModal.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(authModal, /\(mode === 'forgot' \|\| mode === 'reset'\) && \(/,
+    'forgot-password and new-password states must both be free of footer controls');
+  assert.match(authModal, /\(mode === 'signin' \|\| mode === 'signup'\) &&/,
+    'verification resend action must never appear below the recovery form');
+  assert.match(authModal, /mode === 'forgot' \? 'Надіслати посилання'/,
+    'the password recovery submit action must remain available');
+  assert.match(authModal, /mode === 'reset' \? 'Змінити пароль'/,
+    'the new-password submit action must remain available');
+});
