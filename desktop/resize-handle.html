@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}
+#grip{height:100%;width:100%;box-sizing:border-box;cursor:ns-resize;touch-action:none;
+-webkit-app-region:no-drag;border-top:2px solid rgba(89,224,216,.32);background:rgba(7,18,31,.16)}
+#grip:hover,#grip:focus-visible,#grip.dragging{border-color:rgba(109,253,240,.95);background:rgba(59,193,187,.19);outline:none}
+</style></head><body>
+<div id="grip" tabindex="0" role="separator" aria-orientation="horizontal"
+ aria-label="Змінити висоту прикріпленого вікна h00k"
+ title="Перетягніть вгору або вниз, щоб змінити висоту h00k"></div>
+<script>
+const grip=document.getElementById('grip');
+let pointer=null;
+grip.addEventListener('pointerdown',event=>{
+  if(event.button!==0 || pointer!==null)return;
+  pointer=event.pointerId;
+  event.preventDefault();
+  grip.classList.add('dragging');
+  grip.setPointerCapture(event.pointerId);
+  window.h00kDockResize.start();
+});
+grip.addEventListener('pointermove',event=>{
+  if(pointer===event.pointerId && (event.buttons&1))window.h00kDockResize.move();
+});
+function finish(event){
+  if(pointer!==event.pointerId)return;
+  pointer=null;
+  grip.classList.remove('dragging');
+  if(grip.hasPointerCapture(event.pointerId))grip.releasePointerCapture(event.pointerId);
+  window.h00kDockResize.end();
+}
+grip.addEventListener('pointerup',finish);
+grip.addEventListener('pointercancel',finish);
+grip.addEventListener('lostpointercapture',finish);
+window.addEventListener('blur',()=>{
+  if(pointer===null)return;
+  pointer=null;
+  grip.classList.remove('dragging');
+  window.h00kDockResize.end();
+});
+</script></body></html>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="70" viewBox="0 0 100 70" role="img" aria-labelledby="robot-logo-title">
+  <title id="loading-robot-logo-title">h00k</title>
+  <style>
+    .robot-eye {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: robot-eye-blink 6.8s ease-in-out infinite;
+    }
+    .robot-pupil {
+      animation: robot-eye-look 5.6s cubic-bezier(.45, 0, .2, 1) infinite;
+    }
+    /* Use the same gaze and blink timing as the original h00k loading logo. */
+    @keyframes robot-eye-look {
+      0%, 9%, 100% { transform: translate(0, 0); }
+      15%, 27% { transform: translate(2.6px, -1px); }
+      34%, 44% { transform: translate(-2.6px, 1px); }
+      51%, 60% { transform: translate(0, -3.2px); }
+      67%, 77% { transform: translate(2.2px, 2.6px); }
+      84%, 92% { transform: translate(-2.2px, -1.8px); }
+    }
+    @keyframes robot-eye-blink {
+      0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); }
+      46%, 94% { transform: scaleY(.08); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .robot-eye, .robot-pupil { animation: none; }
+    }
+  </style>
+  <defs>
+    <clipPath id="robot-eye-left">
+      <ellipse cx="36.123" cy="21.4" rx="5.8" ry="10.2" />
+    </clipPath>
+    <clipPath id="robot-eye-right">
+      <ellipse cx="60.205" cy="21.4" rx="5.8" ry="10.2" />
+    </clipPath>
+  </defs>
+  <!-- Stationary cyan letters and robot/TV bezel -->
+  <g fill="#22d3ee">
+    <path d="M20.91796875 21.80078125V36.0H15.234375V22.6796875Q15.234375 20.31640625 14.560546875 19.30078125Q13.88671875 18.28515625 12.36328125 18.28515625Q10.80078125 18.28515625 9.921875 19.662109375Q9.04296875 21.0390625 9.04296875 23.48046875V36.0H3.359375V5.609375H9.04296875V17.40625Q9.6484375 15.58984375 11.11328125 14.59375Q12.578125 13.59765625 14.6484375 13.59765625Q17.75390625 13.59765625 19.3359375 15.658203125Q20.91796875 17.71875 20.91796875 21.80078125Z" />
+    <path d="M75.64453125 5.609375H81.3671875V21.56640625L88.2421875 14.125H95.17578125L86.89453125 22.2890625L95.64453125 36.0H89.31640625L83.3203125 25.765625L81.3671875 27.640625V36.0H75.64453125Z" />
+  
+  </g>
+  <!-- Loading-screen-only robot legs, behind the motionless eye bezel. -->
+  <ellipse cx="48.5" cy="63.5" rx="22" ry="3" fill="#17344b" opacity=".42" />
+  <g fill="none" stroke="#a4bcd0" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M39.5 38.7 C39.3 44.4 35.2 45.7 34.8 52.8" />
+    <path d="M56.4 38.7 C56.8 44.4 61.3 45.7 61.8 52.8" />
+  </g>
+  <g fill="#9ac8df" stroke="#627f9a" stroke-width="1.1" stroke-linejoin="round">
+    <path d="M33.4 51.5 Q35 50.8 37 52.7 L39 55.8 Q40.3 59.3 37 60 H27.4 Q24.7 59.7 25.7 56.7 Q27.3 53.5 33.4 51.5Z" />
+    <path d="M60.6 51.5 Q62.5 50.8 64.4 52.7 L70.2 56.8 Q72.1 60 68.3 60 H58.8 Q55.6 59.1 57.3 55.5 Z" />
+  </g>
+  <g stroke="#d0effa" stroke-width=".9" stroke-linecap="round" opacity=".75">
+    <path d="M28.9 56.1 L33.7 55" />
+    <path d="M61.9 54.7 L67.3 57" />
+  </g>
+  <rect x="24.5" y="3.8" width="47.5" height="35.2" rx="12.4" fill="#080d1e" stroke="#64748b" stroke-width="1.7" />
+  <!-- Only the eye elements blink and glance around; the frame never moves. -->
+  <g class="robot-eye">
+    <ellipse cx="36.123" cy="21.4" rx="7.8" ry="12.2" fill="#67e8f9" />
+    <g clip-path="url(#robot-eye-left)">
+      <g class="robot-pupil">
+        <ellipse cx="36.123" cy="21.4" rx="2.8" ry="4.2" fill="#07111f" />
+        <circle cx="35.223" cy="19.9" r=".75" fill="#ffffff" />
+      </g>
+    </g>
+    <ellipse cx="36.123" cy="21.4" rx="7.8" ry="12.2" fill="none" stroke="#22d3ee" stroke-width="2.1" />
+  </g>
+  <g class="robot-eye">
+    <ellipse cx="60.205" cy="21.4" rx="7.8" ry="12.2" fill="#67e8f9" />
+    <g clip-path="url(#robot-eye-right)">
+      <g class="robot-pupil">
+        <ellipse cx="60.205" cy="21.4" rx="2.8" ry="4.2" fill="#07111f" />
+        <circle cx="59.305" cy="19.9" r=".75" fill="#ffffff" />
+      </g>
+    </g>
+    <ellipse cx="60.205" cy="21.4" rx="7.8" ry="12.2" fill="none" stroke="#22d3ee" stroke-width="2.1" />
+  </g>
+</svg>

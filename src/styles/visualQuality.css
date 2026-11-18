@@ -1,0 +1,78 @@
+/*
+ * h00k Visual Quality: static color refinements only.
+ * Vite bundles this CSS with the app; no runtime fetches, graphics filters,
+ * animations, backdrop effects, geometry, DPR or exchange/chart changes.
+ *
+ * Surface settings remain authoritative: only the four dark palettes below
+ * are adjusted. Pastel surfaces and non-cyan user accents remain unchanged.
+ * Trading semantics (green/red/amber), custom user CSS and HookChart's
+ * canvas drawing code are not modified.
+ */
+
+/* Classic: brighter typography, more distinct panel depths and boundaries. */
+html[data-site-surface="classic"] {
+  --site-body-background: #080e19;
+  --color-slate-50: #f7fbff;
+  --color-slate-100: #eaf3ff;
+  --color-slate-200: #d8e6f4;
+  --color-slate-300: #bed1e4;
+  --color-slate-400: #a0b6cb;
+  --color-slate-500: #7b96af;
+  --color-slate-600: #4d6882;
+  --color-slate-700: #34506c;
+  --color-slate-800: #20344b;
+  --color-slate-900: #111e30;
+  --color-slate-950: #070e19;
+}
+
+/* Midnight stays distinctly blue, with legible secondary labels. */
+html[data-site-surface="midnight"] {
+  --color-slate-100: #ecf3ff;
+  --color-slate-200: #dbe8f8;
+  --color-slate-300: #c2d4e9;
+  --color-slate-400: #a0b8d1;
+  --color-slate-500: #7d98b4;
+  --color-slate-700: #3a5171;
+  --color-slate-800: #1e304d;
+}
+
+/* Graphite retains neutral rather than blue-gray panels. */
+html[data-site-surface="graphite"] {
+  --color-slate-100: #f0f2f5;
+  --color-slate-200: #dfe4e9;
+  --color-slate-300: #c6cdd7;
+  --color-slate-400: #abb6c4;
+  --color-slate-500: #8695a5;
+  --color-slate-700: #424b58;
+  --color-slate-800: #2a3039;
+}
+
+/* Plum preserves its purple identity, with sharper foreground separation. */
+html[data-site-surface="plum"] {
+  --color-slate-100: #f5effd;
+  --color-slate-200: #e8dcf4;
+  --color-slate-300: #d3c3e5;
+  --color-slate-400: #bda9d1;
+  --color-slate-500: #9a84b2;
+  --color-slate-700: #533e69;
+  --color-slate-800: #342544;
+}
+
+/*
+ * Refine the default cyan accent alone. Other accent selections retain
+ * their own mappings from index.css. This affects Tailwind interface tokens,
+ * not the independent canvas colors or direction-of-trade colors.
+ */
+html[data-site-accent="cyan"] {
+  --color-cyan-50: #effcff;
+  --color-cyan-100: #d5f8ff;
+  --color-cyan-200: #adf1fd;
+  --color-cyan-300: #76e7fa;
+  --color-cyan-400: #3cdbf4;
+  --color-cyan-500: #13c3e4;
+  --color-cyan-600: #069fc2;
+  --color-cyan-700: #087d9f;
+  --color-cyan-800: #115d77;
+  --color-cyan-900: #133f53;
+  --color-cyan-950: #082b3a;
+}

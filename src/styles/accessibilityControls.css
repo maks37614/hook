@@ -1,0 +1,28 @@
+/*
+ * Accessible focus on site UI controls only (Visual Quality VI).
+ * No element dimensions, transitions, overlays, per-frame logic or new assets.
+ * Native title hints and aria labels are provided by existing React controls.
+ * The formation scope is present only in the non-chart information card.
+ * Trading chart controls, canvases, Replay and Terminal remain untouched.
+ */
+#root .app-header :is(button, select):focus-visible,
+#root .vq-filter-panel :is(button, input, select):focus-visible,
+#root .vq-data-panel :is(button, a):focus-visible,
+#root [data-ui-a11y="formation-info"] :is(button, select, summary):focus-visible,
+#root .watchlist-drawer :is(button, input, select):focus-visible,
+#root [data-watchlist-coin-actions] [role="menuitem"]:focus-visible,
+#root [data-watchlist-folder-menu] [role="option"]:focus-visible,
+#root [data-market-sentiment-header] button:focus-visible,
+#root [data-ui-a11y="archive-modal"] :is(button, input):focus-visible,
+#root [data-ui-a11y="telegram-alerts-modal"] :is(button, input, select, textarea):focus-visible,
+#root [data-ui-a11y="auth-modal"] :is(button, input):focus-visible,
+#root [data-ui-a11y="profile-account"] :is(button, input, select):focus-visible,
+#root footer[data-no-translate] a:focus-visible {
+  outline: 2px solid var(--site-a11y-focus-color, var(--color-cyan-400));
+  outline-offset: -2px;
+}
+
+/* Darker accent for visible focus on light UI surfaces; theme accents remain user-selected. */
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) {
+  --site-a11y-focus-color: var(--color-cyan-700);
+}

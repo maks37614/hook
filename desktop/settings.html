@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>h00k Desktop · Налаштування прикріплення</title>
+<link rel="stylesheet" href="./settings.css"></head><body>
+<header class="app-header">
+  <div class="head-brand">
+    <img src="./robot-logo.svg" width="116" height="56" alt="h00k robot logo">
+  </div>
+  <div class="header-actions">
+    <label class="language-switch" for="language"><span>Мова</span>
+      <select id="language" aria-label="Мова">
+        <option value="en">English</option><option value="uk">Українська</option>
+        <option value="ru">Русский</option><option value="pl">Polski</option>
+      </select>
+    </label>
+    <button class="action" id="standalone" title="Відкрити повноцінне вікно h00k">▣ Окреме вікно</button>
+    <button class="action" id="browser" title="Відкрити h00k.top у браузері">↗ У браузері</button>
+  </div>
+</header>
+<section class="onboarding" id="onboarding" hidden aria-labelledby="welcome-heading">
+  <span class="eyebrow"><span class="pulse"></span> ПЕРШИЙ ЗАПУСК · НАЛАШТУВАННЯ</span>
+  <h2 id="welcome-heading">Налаштуйте h00k під свій термінал</h2>
+  <p>Оберіть MetaScalp, Tiger.Trade або Vataga, спосіб прикріплення та розташування. Це можна змінити будь-коли через іконку <strong>⚙ праворуч</strong> у вікні h00k.</p>
+  <div class="onboarding-steps">
+    <span><b>01</b> Оберіть термінал</span>
+    <span><b>02</b> Налаштуйте панелі</span>
+    <span><b>03</b> Збережіть або прикріпіть</span>
+  </div>
+</section>
+<section><h2>1. Торговий термінал</h2><div class="tabs" id="tabs"></div><p>Для кожного термінала окремі налаштування. Можна прикріпити h00k до декількох терміналів одночасно.</p>
+<div id="status">Шукаю запущені термінали…</div>
+<label for="target"><small>Вибрати конкретне вікно вручну</small></label><select id="target"><option value="">Автоматичний пошук</option></select>
+<div class="warning" id="vataga" hidden>
+<strong>Vataga: прикріплення вікон доступне.</strong> Для підготовки до лінковки: у Vataga відкрийте
+«Налаштування → Загальні → Інше → Інтеграція застосунків», увімкніть її,
+потім у стакані виберіть «Прив'язка до вікна → Скринер».
+Передавання тикерів із h00k поки не активовано, оскільки локальний протокол команд не підтверджений.
+</div>
+</section>
+<section><h2>2. Що прикріпити?</h2><div class="grid" id="modes"></div>
+<p id="multiHelp" hidden>Мультивікна: окреме вікно h00k біля кожної запущеної копії обраного термінала (до 4). Можна додати інше вікно через ручний вибір вище. Для стабільної роботи одночасно активні не більше 6 мультивікон загалом. h00k не перекриває інші програми.</p>
+<div id="widgetArea" style="margin-top:16px"><h2>Вибрані блоки</h2><div class="checks" id="widgets"></div><p>Кожен блок відкриває відповідний розділ h00k у власному вікні.</p></div></section>
+<section><h2>3. Розташування</h2><div class="grid four" id="sides"></div>
+<div class="stack"><label><small>Ширина панелі, px</small><input type="number" id="width" min="240" max="1100"></label><label><small>Висота панелі, px</small><input type="number" id="height" min="140" max="1000"></label></div>
+<p>«Автоматично» перевіряє розташування інших відкритих програм на підключених моніторах, знаходить вільну ділянку біля термінала й не перекриває їхні вікна. Якщо місця немає, h00k повідомить про це. Ручний вибір сторони також доступний.</p></section>
+<section><h2>4. Автоматизація</h2><div class="checks">
+<label class="check"><input type="checkbox" id="enabled"> Увімкнути термінал</label>
+<label class="check"><input type="checkbox" id="autoAttach"> Прикріплювати автоматично</label>
+<label class="check"><input type="checkbox" id="follow"> Слідувати за вікном</label>
+<label class="check"><input type="checkbox" id="alwaysOnTop"> Завжди поверх вікон</label>
+</div><p>Коли «Слідувати» вимкнено, можна вільно розміщувати плаваючі панелі. Їхнє розташування на моніторах автоматично зберігається й відновлюється під час наступного запуску.</p></section>
+<div class="row"><button class="action primary" id="save">Зберегти налаштування</button><button class="action" id="attach">Автоприкріпити зараз</button><button class="action danger" id="detach">Відкріпити</button></div>
+<div id="feedback" role="status"></div><small>Налаштування зберігаються лише на цьому комп’ютері. Програма не запитує біржові API-ключі.</small>
+<p>Примітка: Google OAuth може не працювати у вбудованому вікні Windows через правила Google для embedded webviews. Для входу безпосередньо в h00k Desktop використовуйте email і пароль; вхід у зовнішньому браузері не переносить авторизацію автоматично.</p>
+<script src="./settings-i18n.js"></script>
+<script>
+'use strict';
+const api=window.h00kDesktop, byId=id=>document.getElementById(id);
+const i18n=window.h00kSettingsI18n;
+const LANGUAGE_KEY='h00k-desktop-settings-language';
+let language='uk';
+try { const saved=localStorage.getItem(LANGUAGE_KEY);
+  if(i18n.languages.includes(saved))language=saved;
+} catch (_) { /* Storage may be blocked in a hardened renderer. */ }
+const t=key=>i18n.translate(key,language);
+const staticNodes=[];
+const textWalker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+while(textWalker.nextNode()){
+  const node=textWalker.currentNode;
+  if(node.parentElement?.closest('script,style,#language'))continue;
+  const original=node.nodeValue, key=original.trim().replace(/\s+/g,' ');
+  if(key && i18n.keys.includes(key))staticNodes.push({node,original,key});
+}
+const staticAttrs=[];
+for(const el of document.querySelectorAll('[title],[alt],[aria-label]')){
+  for(const attr of ['title','alt','aria-label']){
+    const original=el.getAttribute(attr);
+    if(original && i18n.keys.includes(original))staticAttrs.push({el,attr,original});
+  }
+}
+function applyLanguage(){
+  document.documentElement.lang=language;
+  document.title='h00k Desktop · '+t('Налаштування прикріплення');
+  byId('language').value=language;
+  byId('language').setAttribute('aria-label',t('Мова'));
+  for(const {node,original,key} of staticNodes){
+    node.nodeValue=original.match(/^\s*/)[0]+t(key)+original.match(/\s*$/)[0];
+  }
+  for(const {el,attr,original} of staticAttrs)el.setAttribute(attr,t(original));
+  for(const {id,options} of [{id:'modes',options:modes},{id:'sides',options:sides},
+                              {id:'widgets',options:panels}]){
+    const names=new Map(options);
+    for(const input of byId(id).querySelectorAll('input')){
+      const label=input.closest('label');
+      if(label?.lastChild?.nodeType===Node.TEXT_NODE)
+        label.lastChild.nodeValue=t(names.get(input.value));
+    }
+  }
+  lastWindowsList=''; // The default choice is localized even when the window list is unchanged.
+  drawStatus();
+  if(feedbackValue)byId('feedback').textContent=feedbackIsStatus
+    ? i18n.translateStatus(feedbackValue,language):t(feedbackValue);
+}
+let feedbackValue='', feedbackIsStatus=false;
+function setFeedback(value,isStatus=false){
+  feedbackValue=value;feedbackIsStatus=isStatus;
+  byId('feedback').textContent=isStatus?i18n.translateStatus(value,language):t(value);
+}
+byId('language').onchange=e=>{
+  if(!i18n.languages.includes(e.target.value))return;
+  language=e.target.value;
+  try {localStorage.setItem(LANGUAGE_KEY,language);} catch (_) {}
+  applyLanguage(); // Do not render(): preserve unsaved checkbox and size edits.
+  // The native Windows gear menu belongs to the selected local UI language.
+  if(typeof api.setLanguage==='function') void api.setLanguage(language).catch(error);
+};
+
+const providers=[['metascalp','MetaScalp'],['tiger','Tiger.Trade'],['vataga','Vataga']];
+const modes=[['full','Весь h00k.top'],['blocks','Вибрані блоки'],['floating','Плаваючі вікна'],['multi','Мультивікна']];
+const sides=[['auto','Автоматично · де більше місця'],['right','Праворуч'],['bottom','Знизу'],['left','Ліворуч'],['top','Зверху']];
+const panels=[['screener','Скрінер'],['formations','Формації'],['early','Раннє виявлення'],['terminal','Термінал HookChart'],['surveillance','Спостереження'],['replay','Тестування']];
+let snap=null, active='metascalp', loadedMode='full', lastWindowsList='';
+function error(e){setFeedback(e?.message||String(e));}
+function radio(group, name, options, selected){
+  group.replaceChildren(...options.map(([value,title])=>{
+    const label=document.createElement('label'), input=document.createElement('input');
+    input.type='radio';input.name=name;input.value=value;input.checked=value===selected;
+    label.className=input.checked?'on':'';label.append(input,document.createTextNode(title));
+    input.onchange=()=>{
+      for(const l of group.querySelectorAll('label'))l.classList.toggle('on',l.querySelector('input').checked);
+      if(name==='mode'){
+        byId('widgetArea').hidden=value==='full'||value==='multi';
+        byId('multiHelp').hidden=value!=='multi';
+      }
+    };
+    return label;
+  }));
+}
+function selected(name){return document.querySelector('input[name="'+name+'"]:checked')?.value||'right';}
+function drawOnboarding(){
+  byId('onboarding').hidden=!snap || snap.settings.setupComplete;
+}
+function drawStatus(){
+  if(!snap)return;
+  const terminal=snap.terminals.find(x=>x.id===active);
+  byId('status').textContent=(terminal?.target?'● '+terminal.target.title+' • '+terminal.target.exe:'○ '+i18n.translate('Термінал не знайдено',language))+' — '+i18n.translateStatus(terminal?.status||'Очікування',language);
+  // Avoid recreating <option> nodes every ~160ms: live terminal titles may update constantly.
+  const listKey=snap.windows.map(w=>w.id+':'+w.exe).join('|');
+  if(lastWindowsList!==listKey){
+    byId('target').replaceChildren(new Option(t('Автоматично знайти'),''),
+      ...snap.windows.map(w=>new Option(w.exe+' • '+w.title.slice(0,90),w.id)));
+    lastWindowsList=listKey;
+  }
+  const hint=snap.settings.profiles[active].targetHint;
+  // Keep a manually selected HWND visible when its title changes frequently
+  // (live price/PnL) or several windows share the same executable.
+  const manual=snap.windows.find(w=>w.id===terminal?.selectedWindowId && (!hint || w.exe===hint.exe));
+  if(manual)byId('target').value=manual.id;
+  else if(hint){
+    const sameExe=snap.windows.filter(w=>w.exe===hint.exe);
+    const chosen=sameExe.find(w=>w.title===hint.title)||(sameExe.length===1?sameExe[0]:null);
+    byId('target').value=chosen?.id||'';
+  }else byId('target').value='';
+  byId('vataga').hidden=active!=='vataga';
+}
+function render(){
+  if(!snap)return;const p=snap.settings.profiles[active];loadedMode=p.mode;
+  byId('tabs').replaceChildren(...providers.map(([id,name])=>{
+    const b=document.createElement('button');b.type='button';b.className=id===active?'on':'';
+    b.textContent=name;b.onclick=()=>{active=id;render();};return b;
+  }));
+  radio(byId('modes'),'mode',modes.map(([key,title])=>[key,t(title)]),p.mode);
+  radio(byId('sides'),'side',sides.map(([key,title])=>[key,t(title)]),p.side);
+  byId('widgetArea').hidden=p.mode==='full'||p.mode==='multi';
+  byId('multiHelp').hidden=p.mode!=='multi';
+  byId('widgets').replaceChildren(...panels.map(([id,name])=>{
+    const label=document.createElement('label'), c=document.createElement('input');c.type='checkbox';
+    c.checked=p.widgets.includes(id);c.value=id;label.className='check';label.append(c,document.createTextNode(t(name)));return label;
+  }));
+  for(const id of ['enabled','autoAttach','follow','alwaysOnTop'])byId(id).checked=p[id];
+  for(const id of ['width','height'])byId(id).value=p[id];
+  drawOnboarding();
+  drawStatus();
+}
+function form(){
+  const mode=selected('mode');
+  return {enabled:byId('enabled').checked,autoAttach:byId('autoAttach').checked,
+    follow:loadedMode!=='floating'&&mode==='floating'?false:byId('follow').checked,
+    alwaysOnTop:byId('alwaysOnTop').checked,mode,side:selected('side'),
+    width:Number(byId('width').value),height:Number(byId('height').value),
+    widgets:[...byId('widgets').querySelectorAll('input:checked')].map(c=>c.value)};
+}
+byId('save').onclick=async()=>{try{snap=await api.save(active,form());render();setFeedback('Збережено');}catch(e){error(e);}};
+byId('attach').onclick=async()=>{
+  try{
+    // Explicit quick attach picks the best safe side even if an old profile used "right".
+    snap=await api.save(active,{...form(),enabled:true,side:'auto'});
+    snap=await api.attach(active);
+    render();
+    const terminal=snap.terminals.find(item=>item.id===active);
+    setFeedback(terminal?.status || 'Очікування термінала',true);
+  }catch(e){error(e);}
+};
+byId('detach').onclick=async()=>{try{snap=await api.detach(active);render();setFeedback('Відкріплено');}catch(e){error(e);}};
+byId('target').onchange=async e=>{try{snap=await api.pick(active,e.target.value);drawStatus();}catch(err){error(err);}};
+byId('standalone').onclick=async()=>{try{await api.openStandalone();}catch(e){error(e);}};
+byId('browser').onclick=async()=>{try{await api.openBrowser();}catch(e){error(e);}};
+function savedDraftMatches(profile){
+  if(!profile)return false;
+  const draft=form();
+  const keys=['enabled','autoAttach','follow','alwaysOnTop','mode','side','width','height'];
+  return keys.every(key=>draft[key]===profile[key]) &&
+    draft.widgets.length===profile.widgets.length &&
+    draft.widgets.every((id,index)=>id===profile.widgets[index]);
+}
+api.onSelectProvider(provider=>{if(providers.some(([id])=>id===provider)){active=provider;render();}});
+api.onSnapshot(value=>{
+  const previous=snap?.settings?.profiles?.[active];
+  // Quick toolbar changes must appear in an already-open settings window,
+  // but never erase edits the user has not saved yet.
+  const pristine=previous && savedDraftMatches(previous);
+  const changed=pristine && JSON.stringify(previous)!==JSON.stringify(value.settings.profiles[active]);
+  snap=value;
+  if(changed)render(); else {drawOnboarding();drawStatus();}
+});
+applyLanguage();
+api.snapshot().then(value=>{
+  snap=value;render();
+  // Restore the native menu language from the locally persisted UI selection.
+  if(typeof api.setLanguage==='function') void api.setLanguage(language).catch(error);
+}).catch(error);
+</script></body></html>

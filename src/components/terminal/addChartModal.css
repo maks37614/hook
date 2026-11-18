@@ -1,0 +1,24 @@
+/* Terminal coin selection: fluid dimensions for desktop and mobile. */
+.terminal-add-chart-modal { box-sizing: border-box; width: min(100%, 70rem); height: min(92vh, 900px); max-height: calc(100vh - 16px); }
+.terminal-add-chart-filters { max-height: min(38vh, 320px); }
+@supports (height: 100dvh) {
+  .terminal-add-chart-modal { height: min(92dvh, 900px); max-height: calc(100dvh - 16px); }
+  .terminal-add-chart-filters { max-height: min(38dvh, 320px); }
+}
+@media (max-width: 580px) {
+  .terminal-add-chart-coin-row { flex-wrap: wrap; }
+  .terminal-add-chart-coin-main, .terminal-add-chart-coin-action { min-width: 0; width: 100%; }
+  .terminal-add-chart-coin-action { justify-content: space-between; padding-left: 2.75rem; }
+}
+@media (max-width: 359px) {
+  .terminal-add-chart-filters, .terminal-add-chart-list { padding-left: 10px; padding-right: 10px; }
+  .terminal-add-chart-coin-action { padding-left: 0; }
+}
+@media (max-height: 540px) {
+  .terminal-add-chart-modal { height: calc(100vh - 12px); max-height: calc(100vh - 12px); }
+  .terminal-add-chart-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .terminal-add-chart-filters, .terminal-add-chart-list { max-height: none; flex: none; overflow: visible; }
+  @supports (height: 100dvh) {
+    .terminal-add-chart-modal { height: calc(100dvh - 12px); max-height: calc(100dvh - 12px); }
+  }
+}

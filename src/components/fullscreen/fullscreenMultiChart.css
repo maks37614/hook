@@ -1,0 +1,56 @@
+/* Fullscreen-only layout: use the existing Terminal cards and shared data streams. */
+/* Isolate the chart's high-z-index drag handles below the adjacent favorites drawer (z-30). */
+.fullscreen-multi-chart{position:relative;z-index:0;isolation:isolate;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;overflow:hidden;background:#090d16}
+.fullscreen-multi-cells{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(var(--fullscreen-chart-count),minmax(300px,1fr));gap:8px;flex:1;min-height:0;padding:8px;overflow-y:auto;overscroll-behavior:contain}
+.fullscreen-multi-cells:not(.is-multiple){grid-template-rows:minmax(0,1fr);overflow:hidden}
+.fullscreen-multi-cell{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:#090d16}
+.fullscreen-multi-cell-content{position:relative;display:flex;flex:1;min-width:0;min-height:0;flex-direction:column;overflow:hidden}
+/* Visually identify the chart that will receive the next favorite. This does not affect canvas size or hit-testing. */
+.fullscreen-multi-cell.is-active-slot .fullscreen-multi-cell-content::after{content:"";position:absolute;inset:0;z-index:42;border:1px solid rgba(34,211,238,.7);border-radius:9px;pointer-events:none}
+.fullscreen-multi-cell-content>.terminal-chart-block{flex:1}
+.fullscreen-multi-loading{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:#94a3b8}
+/* Favorited markets drop onto a chart (not into its ordering handle).
+ * The marker never intercepts chart panning, zooming or order-book tools. */
+.fullscreen-multi-cell.is-favorite-drop-target .fullscreen-multi-cell-content::before{
+  content:"";position:absolute;inset:2px;z-index:43;
+  border:3px solid rgba(34,211,238,.95);border-radius:9px;
+  background:rgba(8,145,178,.09);pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(103,232,249,.25);
+}
+/* Footer uses bg-slate-950/90 and border-slate-800/80. Match those exact tones. */
+.fullscreen-multi-dock{position:relative;z-index:22;align-self:center;width:94px;flex:none;min-height:18px;margin-bottom:2px;padding:0 5px 2px;border:1px solid rgba(30,41,59,.8);border-radius:11px;background:rgba(2,6,23,.9);touch-action:pan-x;user-select:none}
+.fullscreen-multi-dock.is-open{width:102px}
+.fullscreen-multi-handle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;width:100%;height:18px;border:0;background:transparent;color:#8ba4bd;cursor:pointer}
+.fullscreen-multi-grip{display:block;width:35px;height:2px;border-radius:999px;background:#45617a}
+.fullscreen-multi-dock-actions{display:flex;align-items:center;justify-content:center;min-height:27px;padding:0}
+.fullscreen-multi-add{display:flex;align-items:center;justify-content:center;width:27px;height:27px;padding:0;border:1px solid #2679b5;border-radius:8px;background:#12314b;color:#8ad8ff;cursor:pointer}
+.fullscreen-multi-add:hover:not(:disabled){background:#174767}
+.fullscreen-multi-add:disabled{opacity:.48;cursor:default;border-color:#304255;background:#17212d;color:#94a3b8}
+/* Reordering lives in the existing HookChart toolbar, not in a second title bar. */
+.fullscreen-multi-drag-anchor{position:absolute;left:5px;top:0;z-index:40;display:flex;align-items:center;gap:4px;height:28px;max-width:calc(100% - 10px);pointer-events:none}
+.fullscreen-multi-drag-anchor .fullscreen-multi-move{display:flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;padding:0;border:0;border-radius:4px;background:transparent;color:#9daebf;cursor:grab;touch-action:none;pointer-events:auto;user-select:none}
+.fullscreen-multi-drag-anchor .fullscreen-multi-move:hover{background:#1e293b;color:#e2e8f0}
+.fullscreen-multi-drag-anchor .fullscreen-multi-move:active{cursor:grabbing;background:#1e293b}
+.fullscreen-multi-drag-anchor .fullscreen-multi-move:focus-visible{outline:2px solid #67e8f9;outline-offset:0}
+.fullscreen-multi-drag-symbol{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d0d9e6;font:700 10px/1.1 ui-monospace,monospace}
+/* Reserve the handle width in both native toolbars. Single-chart layout is unchanged. */
+.fullscreen-multi-cell.is-reorderable .hookchart-root>.hookchart-toolbar{padding-left:34px}
+.fullscreen-multi-cell.is-reorderable.fullscreen-multi-primary .hookchart-root>.hookchart-toolbar{padding-left:116px}
+@media(pointer:coarse){
+  .fullscreen-multi-drag-anchor{left:4px;height:38px}
+  .fullscreen-multi-drag-anchor .fullscreen-multi-move{width:30px;height:30px}
+  .fullscreen-multi-cell.is-reorderable .hookchart-root>.hookchart-toolbar{padding-left:40px}
+  .fullscreen-multi-cell.is-reorderable.fullscreen-multi-primary .hookchart-root>.hookchart-toolbar{padding-left:120px}
+}
+.fullscreen-multi-chart .fullscreen-multi-secondary .terminal-chart-block{height:100%;min-height:0;max-height:100%;border:1px solid #263344;border-radius:10px;overflow:hidden}
+@media(min-width:900px){
+  .fullscreen-multi-cells[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);overflow:hidden}
+  .fullscreen-multi-cells[data-count="3"],.fullscreen-multi-cells[data-count="4"]{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));overflow:hidden}
+}
+@media(min-width:1200px){
+  .fullscreen-multi-cells[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr)}
+}
+@media(min-width:1750px){
+  .fullscreen-multi-cells[data-count="4"]{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:minmax(0,1fr)}
+}
+@media(min-width:640px){.fullscreen-multi-cells{gap:12px;padding:12px}}

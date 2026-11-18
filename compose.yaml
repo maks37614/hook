@@ -1,0 +1,71 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_LIQ_CLIENT_MULTIPLEX: ${VITE_LIQ_CLIENT_MULTIPLEX:-0}
+        VITE_H00K_SHARED_BINANCE_TRADES: ${VITE_H00K_SHARED_BINANCE_TRADES:-1}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PGHOST: postgres
+      PGDATABASE: h00k_users
+      PGUSER: h00k
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      AUTH_TRUST_PROXY: ${AUTH_TRUST_PROXY:-1}
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - app_data:/app/server/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: h00k_users
+      POSTGRES_USER: h00k
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    command:
+      - postgres
+      - -c
+      - max_connections=30
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - work_mem=4MB
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    shm_size: 64mb
+    mem_limit: 512m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U h00k -d h00k_users"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+
+volumes:
+  app_data:
+    name: h00k_app_data
+  pg_data:
+    name: h00k_pg_data

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}
+body{display:flex;align-items:center;justify-content:center;gap:4px}
+button{appearance:none;border:1px solid rgba(71,213,202,.52);border-radius:7px;background:rgba(10,22,33,.95);color:#72eee1;width:35px;height:35px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.25);-webkit-app-region:no-drag}
+button:hover,button:focus-visible{background:#173b42;border-color:#85fff3;outline:none}
+button#close:hover{background:#732735;border-color:#fa7185;color:white}
+svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+/* Attached views use the existing 20px reserved Desktop chrome row.
+   Keep the gear smaller than that row so chart Back/Close stays clickable. */
+body:not(.standalone){justify-content:flex-end;padding:0 3px;box-sizing:border-box;background:#070d18}
+body:not(.standalone) #dock{width:18px;height:18px;border-radius:3px;background:#0b1c2b;box-shadow:none}
+body:not(.standalone) #dock svg{width:12px;height:12px}
+.standalone-only{display:none}
+body.standalone{justify-content:stretch;gap:0;padding:0 3px;box-sizing:border-box;background:#070d18;-webkit-app-region:drag}
+body.standalone #dock{display:none}
+body.standalone .standalone-only{display:flex}
+.desktop-actions,.window-controls{align-items:center;gap:2px;-webkit-app-region:no-drag}
+.desktop-actions{min-width:0}
+.drag-space{flex:1;min-width:8px;height:100%;-webkit-app-region:drag}
+.window-controls{margin-left:auto}
+body.standalone button{height:18px;min-width:22px;width:auto;padding:0 5px;font:500 10px/1.1 system-ui,sans-serif;box-shadow:none;border-radius:3px;background:#0b1c2b;color:#9bebea}
+body.standalone button svg{width:11px;height:11px}
+body.standalone .desktop-actions button{gap:3px}
+body.standalone .window-controls button{width:23px;padding:0;color:#b6c7d5}
+body.standalone button#eco{min-width:38px;padding:0 5px;color:#bddad5}
+body.standalone button#eco[aria-pressed="true"]{color:#071e21;background:#73e2b9;border-color:#a5ffdc;font-weight:800}
+body.standalone button#close:hover{background:#732735;color:white}
+body.standalone button:hover,body.standalone button:focus-visible{background:#173b42}
+@media(max-width:700px){body.standalone .action-label{display:none}body.standalone .desktop-actions button{width:22px;padding:0}body.standalone .desktop-actions{gap:2px}}
+</style></head><body>
+<!-- Attached panes still have a local shortcut: they have no standalone title bar. -->
+<button type="button" id="dock" title="Налаштування прикріплення h00k (Ctrl+,)" aria-label="Налаштування прикріплення">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l1.9.4.7 2.1 1.7.7 2-.9 1.6 1.6-.9 2 .7 1.7 2.1.7.4 1.9-.4 1.9-2.1.7-.7 1.7.9 2-1.6 1.6-2-.9-1.7.7-.7 2.1-1.9.4-1.9-.4-.7-2.1-1.7-.7-2 .9-1.6-1.6.9-2-.7-1.7-2.1-.7-.4-1.9.4-1.9 2.1-.7.7-1.7-.9-2 1.6-1.6 2 .9 1.7-.7.7-2.1z" transform="translate(0 -0.8) scale(1 .94)"/><circle cx="12" cy="12" r="3.1"/></svg></button>
+<nav class="desktop-actions standalone-only" aria-label="h00k Desktop">
+<button type="button" id="attachment" title="Налаштування прикріплення"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="16" rx="1"/><path d="M11 12h2"/></svg><span class="action-label">Прикріплення</span></button>
+<button type="button" id="metascalp" title="MetaScalp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V6l8 8 8-8v12"/></svg><span class="action-label">MetaScalp</span></button>
+<button type="button" id="tiger" title="Tiger.Trade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M12 6v12"/></svg><span class="action-label">Tiger.Trade</span></button>
+<button type="button" id="vataga" title="Vataga"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l9 13 9-13"/></svg><span class="action-label">Vataga</span></button>
+<button type="button" id="browser" title="Відкрити h00k.top у браузері"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18M12 3c-5 5-5 13 0 18"/></svg><span class="action-label">h00k.top</span></button>
+<button type="button" id="eco" aria-pressed="false" title="Увімкнути ECO" aria-label="Увімкнути ECO">ECO</button>
+</nav>
+<div class="drag-space standalone-only" aria-hidden="true"></div>
+<div class="window-controls standalone-only">
+<button type="button" id="minimize" title="Згорнути вікно" aria-label="Згорнути вікно"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14"/></svg></button>
+<button type="button" id="fullscreen" title="На весь екран" aria-label="На весь екран"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg></button>
+<button type="button" id="close" title="Закрити вікно h00k" aria-label="Закрити вікно h00k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+</div>
+<script>
+const dock=document.getElementById('dock');
+const minimize=document.getElementById('minimize');
+const fullscreen=document.getElementById('fullscreen');
+const close=document.getElementById('close');
+const eco=document.getElementById('eco');
+if(new URLSearchParams(window.location.search).get('controls')==='1')document.body.classList.add('standalone');
+dock.addEventListener('click',()=>window.h00kDockButton.showMenu());
+eco.addEventListener('click',()=>window.h00kDockButton.toggleEco());
+for(const [id,action] of [['attachment','docking'],['metascalp','metascalp'],['tiger','tiger'],['vataga','vataga'],['browser','browser']]){
+  document.getElementById(id).addEventListener('click',()=>window.h00kDockButton.openAction(action));
+}
+minimize.addEventListener('click',()=>window.h00kDockButton.windowControl('minimize'));
+fullscreen.addEventListener('click',()=>window.h00kDockButton.windowControl('fullscreen'));
+close.addEventListener('click',()=>window.h00kDockButton.windowControl('close'));
+let ecoEnabled=false;
+let ecoEnableTitle='Увімкнути ECO';
+let ecoDisableTitle='Вимкнути ECO';
+function updateEco(){
+  eco.setAttribute('aria-pressed',String(ecoEnabled));
+  const title=ecoEnabled?ecoDisableTitle:ecoEnableTitle;
+  eco.title=title;
+  eco.setAttribute('aria-label',title);
+}
+updateEco();
+let fullscreenActive=false;
+let fullscreenLabels={fullscreen:'На весь екран',exitFullscreen:'Вийти з повного екрана'};
+function updateFullscreenTitle(){
+  const caption=fullscreenActive?fullscreenLabels.exitFullscreen:fullscreenLabels.fullscreen;
+  fullscreen.title=caption;
+  fullscreen.setAttribute('aria-label',caption);
+  fullscreen.setAttribute('aria-pressed',String(fullscreenActive));
+}
+function setAction(id,label,caption){
+  const el=document.getElementById(id);
+  el.title=caption||label;
+  el.setAttribute('aria-label',caption||label);
+  const span=el.querySelector('.action-label');
+  if(span)span.textContent=label;
+}
+function labels(next){
+  if(!next || typeof next.title!=='string' || typeof next.aria!=='string')return;
+  dock.title=next.title;
+  dock.setAttribute('aria-label',next.aria);
+  if(typeof next.docking==='string')setAction('attachment',next.docking,next.title);
+  for(const id of ['metascalp','tiger','vataga']){
+    if(typeof next[id]==='string')setAction(id,next[id],next.configure+next[id]);
+  }
+  if(typeof next.browser==='string')setAction('browser','h00k.top',next.browserTitle);
+  if(typeof next.ecoEnable==='string')ecoEnableTitle=next.ecoEnable;
+  if(typeof next.ecoDisable==='string')ecoDisableTitle=next.ecoDisable;
+  if(typeof next.ecoMode==='boolean')ecoEnabled=next.ecoMode;
+  updateEco();
+  if(typeof next.minimize==='string'){minimize.title=next.minimize;minimize.setAttribute('aria-label',next.minimize);}
+  if(typeof next.fullscreen==='string' && typeof next.exitFullscreen==='string'){
+    fullscreenLabels={fullscreen:next.fullscreen,exitFullscreen:next.exitFullscreen};
+    updateFullscreenTitle();
+  }
+  if(typeof next.close==='string'){close.title=next.close;close.setAttribute('aria-label',next.close);}
+}
+window.h00kDockButton.onWindowState(state=>{
+  if(typeof state?.fullscreen==='boolean'){fullscreenActive=state.fullscreen;updateFullscreenTitle();}
+});
+window.h00kDockButton.onLanguage(labels);
+window.h00kDockButton.language().then(labels).catch(()=>{});
+</script>
+</body></html>

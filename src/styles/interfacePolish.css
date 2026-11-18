@@ -1,0 +1,66 @@
+/*
+ * Visual Quality II: inexpensive, paint-only refinements for app chrome.
+ * All rules are scoped to dark surface themes and named UI components.
+ * No layout changes, filters, added shadows, animations or chart selectors.
+ */
+
+/* Header and main navigation: higher-definition boundaries and labels. */
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header {
+  border-bottom-color: var(--color-slate-700);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header nav[aria-label] {
+  border-color: var(--color-slate-700);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header :is(#nav-category-screener-btn, #nav-category-patterns-btn, #nav-category-replay-btn, #nav-category-terminal-btn):not([aria-current="page"]) {
+  color: var(--color-slate-300);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header :is(#nav-category-screener-btn, #nav-category-patterns-btn, #nav-category-replay-btn, #nav-category-terminal-btn):not([aria-current="page"]):hover {
+  color: var(--color-slate-50);
+  background-color: var(--color-slate-800);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header :is(#nav-category-screener-btn, #nav-category-patterns-btn, #nav-category-replay-btn, #nav-category-terminal-btn)[aria-current="page"] {
+  outline: 1px solid rgba(238, 247, 255, 0.28);
+  outline-offset: -1px;
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header :is(#open-watchlist-btn, #open-guide-btn) {
+  border-color: var(--color-slate-700);
+  color: var(--color-slate-200);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .app-header :is(#open-watchlist-btn, #open-guide-btn):hover {
+  background-color: var(--color-slate-800);
+  color: var(--color-slate-50);
+}
+
+/* Two independent screener filter areas and formation table only. */
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-filter-panel,
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-data-panel {
+  border-color: var(--color-slate-700);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-filter-panel :is(input, select, button):focus-visible {
+  outline: 2px solid var(--color-cyan-400);
+  outline-offset: 0px;
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-data-panel thead {
+  border-bottom-color: var(--color-slate-700);
+  color: var(--color-slate-300);
+}
+
+/* Formation-card chrome, never chart canvas/plot/axes or candle colors. */
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .formation-chart-card .formation-chart-header {
+  border-bottom-color: var(--color-slate-700);
+}
+
+/* Footer links are clearer without changing sizing or wrapping. */
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) footer[data-no-translate] {
+  border-top-color: var(--color-slate-700);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) footer[data-no-translate] nav a {
+  color: var(--color-slate-300);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) footer[data-no-translate] nav a:hover {
+  color: var(--color-cyan-300);
+}
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) footer[data-no-translate] a:focus-visible {
+  outline: 2px solid var(--color-cyan-400);
+  outline-offset: 2px;
+}

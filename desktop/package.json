@@ -1,0 +1,87 @@
+{
+  "name": "h00k-desktop",
+  "version": "0.1.12",
+  "description": "h00k Desktop application for Windows trading terminals",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --check main.cjs && node --check preload.cjs && node --check toolbar-preload.cjs && node --test test/*.test.cjs",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "brand-assets": "node scripts/generate-installer-assets.cjs",
+    "pretest": "npm run brand-assets && npm run installer-locales",
+    "predist": "npm run brand-assets && npm run installer-locales",
+    "installer-locales": "node scripts/generate-installer-locales.cjs"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.12",
+    "sharp": "^0.34.5"
+  },
+  "build": {
+    "appId": "top.h00k.desktop",
+    "productName": "h00k Desktop",
+    "files": [
+      "main.cjs",
+      "standalone-chrome.cjs",
+      "site-language-picker.cjs",
+      "os-compat.cjs",
+      "preload.cjs",
+      "profiles.cjs",
+      "layout.cjs",
+      "settings.html",
+      "settings-i18n.js",
+      "robot-logo.svg",
+      "settings.css",
+      "toolbar.html",
+      "toolbar-preload.cjs",
+      "resize-handle.html",
+      "resize-preload.cjs",
+      "workspace.cjs",
+      "native-i18n.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "win-agent.ps1",
+        "to": "win-agent.ps1"
+      }
+    ],
+    "win": {
+      "icon": "build/h00k.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/h00k-installer.ico",
+      "uninstallerIcon": "build/h00k-installer.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "include": "build/installer.nsh",
+      "artifactName": "h00k Desktop Setup ${version}.${ext}",
+      "installerLanguages": [
+        "en_US",
+        "pl_PL",
+        "ru_RU",
+        "uk_UA"
+      ],
+      "multiLanguageInstaller": true,
+      "displayLanguageSelector": false,
+      "language": "1033",
+      "shortcutName": "h00k"
+    },
+    "electronLanguages": [
+      "en-US",
+      "pl",
+      "ru",
+      "uk"
+    ],
+    "asar": true,
+    "compression": "normal"
+  }
+}

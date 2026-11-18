@@ -1,0 +1,18 @@
+:root{font:14px/1.5 "Segoe UI",system-ui,sans-serif;background:#070d18;color:#e9f7fd;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 0%,#0a2636,#080e19 70%)}.guide{min-height:100vh;padding:18px 26px;display:flex;flex-direction:column;gap:8px}
+header,.steps-head,footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+header{padding-bottom:10px;border-bottom:1px solid #284456}.brand{display:flex;align-items:baseline;gap:12px}.brand strong{color:#5de4ee;font-size:24px;letter-spacing:-2px}
+header label{display:flex;align-items:center;gap:10px;color:#9dbbc9;font-size:12px}
+select{background:#10283a;color:#c5eef9;border:1px solid #37647b;padding:7px 10px;border-radius:8px}
+.steps-head{padding:2px 0;color:#77ddec;font-size:12px;font-weight:650}.segments{display:flex;gap:5px}
+.segments span{width:35px;height:4px;background:#174253;border-radius:8px}.segments span.active{background:#37ebee;box-shadow:0 0 7px #18c8eec5}
+#steps{flex:1;display:flex;flex-direction:column;gap:12px;padding:5px 0;overflow:auto}
+.step{border:1px solid #244759;border-radius:11px;background:#0b1b2abf;display:flex;gap:14px;align-items:flex-start;padding:16px 18px;line-height:1.55;color:#d3e4ef}
+.step-number{font-size:16px;font-weight:750;background:#123745;color:#5ff1e9;border-radius:9px;min-width:35px;height:35px;display:grid;place-items:center}
+.safety{padding:14px 16px;display:flex;gap:12px;align-items:center;border:1px solid #35646b;background:#0a2a31;border-radius:11px;color:#b5e7e4;font-size:12px}
+.shield{font-size:22px;color:#62f4e7}footer{border-top:1px solid #254557;padding-top:18px}
+button{background:#102839;color:#b2dfec;border:1px solid #335c70;border-radius:9px;padding:10px 15px;cursor:pointer;font:inherit;font-size:12px}button:hover{background:#1a4253}button:disabled{opacity:.3;cursor:default}
+button.primary{background:#37dfdc;color:#062a32;border-color:#2ee1e0;font-weight:750}
+button.launch{border-color:#3f8c8f;color:#75ecde}.fill{flex:1}
+button:focus-visible,select:focus-visible{outline:2px solid #71fff5;outline-offset:2px}
+@media(max-width:700px){.guide{padding:14px}footer{flex-wrap:wrap}.step{padding:11px 13px}.brand span{display:none}}

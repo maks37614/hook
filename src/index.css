@@ -1,0 +1,824 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-size: calc(13.5px * var(--site-text-scale, 1));
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: calc(14px * var(--site-text-scale, 1));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      font-size: calc(13.5px * var(--site-text-scale, 1));
+    }
+  }
+
+  @media (min-width: 1440px) {
+    html {
+      font-size: calc(14px * var(--site-text-scale, 1));
+    }
+  }
+
+  @media (min-width: 1920px) {
+    html {
+      font-size: calc(14.5px * var(--site-text-scale, 1));
+    }
+  }
+
+  body {
+    font-family: var(--site-font-family, Verdana, Geneva, sans-serif);
+    background-color: var(--site-body-background, #090d16);
+    color: #f1f5f9;
+    overflow-x: hidden;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  html {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  #root {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Universal scrollbar removal across the whole application */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
+
+html,
+body,
+#root,
+main,
+dialog,
+div,
+section,
+article,
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Smooth momentum scrolling for iOS/Android touch devices */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Show the horizontal scrollbar only for the wide Screener table.
+ * Preserve hidden scrollbars and canvas rendering everywhere else. */
+#root .screener-data-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: #64748b transparent !important;
+}
+#root .screener-data-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+#root .screener-data-scroll::-webkit-scrollbar-thumb {
+  background-color: #64748b;
+  border-radius: 999px;
+}
+#root .screener-data-scroll::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Formation coin cards: conceal the visual scrollbar, but preserve mouse-wheel,
+ * touch, trackpad and keyboard scrolling for long explanations. No overflow:hidden
+ * or height changes; quick-chart scroll regions are not affected. */
+#root .formation-card-info-scroll {
+  scrollbar-width: none !important;
+  overscroll-behavior-y: contain;
+}
+#root .formation-card-info-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Show a scrollbar only for the scrollable Terminal coin-picker list,
+ * without affecting chart scroll behavior or global scrollbar settings. */
+#root .terminal-chart-coin-list {
+  scrollbar-width: thin !important;
+  scrollbar-color: #64748b transparent !important;
+}
+#root .terminal-chart-coin-list::-webkit-scrollbar {
+  display: block !important;
+  width: 5px !important;
+}
+#root .terminal-chart-coin-list::-webkit-scrollbar-thumb {
+  background-color: #64748b;
+  border-radius: 999px;
+}
+#root .terminal-chart-coin-list::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Translated options must wrap inside narrow Terminal tile menus. */
+#root .terminal-chart-span-menu {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#root .terminal-chart-span-menu > button {
+  min-width: 0;
+  white-space: normal;
+}
+
+/* Chart controls respond to their own block, including narrow desktop columns. */
+.terminal-chart-block {
+  container: terminal-chart / inline-size;
+}
+
+.terminal-chart-header {
+  --chart-icon-size: 14px;
+  --chart-control-size: 28px;
+  --chart-control-gap: 6px;
+}
+
+.terminal-chart-toolbar-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+
+.terminal-chart-toolbar-row {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  gap: var(--chart-control-gap);
+  padding-block: 2px;
+  white-space: nowrap;
+}
+
+.terminal-chart-toolbar-group {
+  flex-shrink: 0;
+  gap: var(--chart-control-gap);
+}
+
+.terminal-chart-toolbar-group > * {
+  flex-shrink: 0;
+}
+
+.terminal-chart-toolbar-row button,
+.terminal-chart-header-actions button,
+.terminal-chart-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--chart-control-size);
+  min-height: var(--chart-control-size);
+}
+
+.terminal-chart-drag-handle {
+  min-width: calc(var(--chart-control-size) - 8px);
+  min-height: calc(var(--chart-control-size) - 8px);
+}
+
+.terminal-chart-toolbar-row svg,
+.terminal-chart-header-actions svg,
+.terminal-chart-drag-handle svg {
+  flex-shrink: 0;
+  width: var(--chart-icon-size);
+  height: var(--chart-icon-size);
+}
+
+.terminal-chart-drag-handle svg {
+  width: calc(var(--chart-icon-size) - 2px);
+  height: calc(var(--chart-icon-size) - 2px);
+}
+
+.terminal-chart-header-popover {
+  max-width: calc(100% - 16px);
+}
+
+@container terminal-chart (max-width: 420px) {
+  .terminal-chart-header {
+    --chart-icon-size: 12px;
+    --chart-control-size: 24px;
+    --chart-control-gap: 4px;
+  }
+
+  .terminal-chart-optional-label {
+    display: none;
+  }
+}
+
+
+/* Keyboard focus is scoped to information cards and Terminal headers;
+ * HookChart's drawing toolbar, canvas and candlestick colors stay untouched. */
+#root [data-ui-a11y="formation-info"] :is(button, select):focus-visible,
+#root .terminal-chart-header button:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+/* Both confirmed and early formation information cards: keep six actions
+ * on one compact row, including multi-column desktop layouts. Chart expansion
+ * retains its own tools. The parent is sized by the existing card grid. */
+#root [data-ui-a11y="formation-info"] {
+  container: formation-info / inline-size;
+}
+#root .formation-card-footer {
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+#root .formation-card-footer > div {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+}
+#root .formation-card-footer button {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 10px;
+  justify-content: center;
+  align-items: center;
+}
+#root .formation-card-footer button > svg {
+  width: 13px;
+  height: 13px;
+}
+/* Narrow multi-column cards fit even when all optional actions are present. */
+@container formation-info (max-width: 260px) {
+  #root .formation-card-footer,
+  #root .formation-card-footer > div {
+    gap: 2px;
+  }
+  #root .formation-card-footer button {
+    flex-basis: 27px;
+    width: 27px;
+    height: 27px;
+    min-width: 27px;
+    min-height: 27px;
+  }
+}
+@container formation-info (max-width: 210px) {
+  #root .formation-card-footer button {
+    flex-basis: 24px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+}
+
+
+/* Formations quick-chart header must respond to card width, not viewport width. */
+.formation-chart-card {
+  container: formation-card / inline-size;
+}
+
+.formation-chart-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.formation-chart-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 3px;
+  min-width: 0;
+}
+
+.formation-chart-symbol {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.formation-chart-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.formation-chart-header-actions > button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Quick-chart extra tools remain in the main toolbar. Restrict overflow to
+ * their own scroll region so the settings/action icons stay pinned. */
+.formation-chart-card .hookchart-root:not(.hookchart-terminal) > .hookchart-toolbar {
+  overflow: hidden;
+}
+
+@container formation-card (max-width: 365px) {
+  .formation-chart-header {
+    gap: 4px;
+  }
+
+  .formation-chart-identity {
+    column-gap: 4px;
+  }
+
+  .formation-chart-header-actions {
+    gap: 3px;
+  }
+
+  .formation-chart-header-actions > button {
+    flex-basis: 24px;
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/*
+ * Routed chart background: a frozen copy of the previous screen.
+ * The live Screener / Formations DOM is unmounted; this layer never receives
+ * pointer events or runs JS, WebSockets, network polling or CSS animations.
+ * Keep the HookChart panels themselves opaque for clear prices and candles.
+ */
+.chart-page-backdrop {
+  position:fixed;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  user-select:none;
+  background:linear-gradient(150deg,#0a1627 0%,#070a12 72%);
+  contain:paint;
+}
+.chart-page-backdrop__frozen {
+  position:absolute;
+  inset:0;
+  opacity:.48;
+  pointer-events:none;
+}
+.chart-page-backdrop__frozen,
+.chart-page-backdrop__frozen *,
+.chart-page-backdrop__frozen *::before,
+.chart-page-backdrop__frozen *::after {
+  animation:none!important;
+  transition:none!important;
+  scroll-behavior:auto!important;
+  pointer-events:none!important;
+  caret-color:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.chart-page-backdrop::after {
+  position:absolute;
+  inset:0;
+  content:"";
+  background:linear-gradient(180deg,rgba(5,9,18,.36),rgba(5,9,18,.60));
+}
+@media (max-width:640px) {
+  .chart-page-backdrop__frozen {opacity:.40}
+}
+
+
+/*
+ * Encyclopedia typography: keep phone, tablet and narrow-window sizes intact.
+ * Tailwind v4 text-xs/text-sm/etc. utilities read these scoped font variables,
+ * so all nested encyclopedia articles and navigation inherit the larger desktop
+ * type without changing buttons or content elsewhere in the application.
+ */
+@media (min-width: 1280px) {
+  .encyclopedia-modal {
+    font-size: 1.15rem;
+    --text-xs: 0.95rem;
+    --text-xs--line-height: 1.5;
+    --text-sm: 1.1rem;
+    --text-sm--line-height: 1.5;
+    --text-base: 1.25rem;
+    --text-base--line-height: 1.55;
+    --text-lg: 1.5rem;
+    --text-lg--line-height: 1.4;
+    --text-xl: 1.75rem;
+    --text-xl--line-height: 1.35;
+  }
+
+  /* Arbitrary Tailwind pixel sizes do not use the theme variables. */
+  .encyclopedia-modal .text-\[10px\] {
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .encyclopedia-modal .text-\[11px\] {
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+}
+
+/*
+ * Site-wide appearance palettes. Tailwind v4 utilities use these CSS color
+ * tokens, so all routes, dialogs and menus update client-side without rerendering
+ * charts or fetching anything from the server.
+ * Exchange candles, PnL green/red and liquidation semantics are untouched.
+ */
+html[data-site-surface="midnight"] {
+  --site-body-background: #050a1b;
+  --color-slate-50: #f3f7ff;
+  --color-slate-100: #e7eefb;
+  --color-slate-200: #d4e1f3;
+  --color-slate-300: #b6c7dc;
+  --color-slate-400: #91a6be;
+  --color-slate-500: #6d839e;
+  --color-slate-600: #506581;
+  --color-slate-700: #354864;
+  --color-slate-800: #1b2a44;
+  --color-slate-900: #0b1530;
+  --color-slate-950: #040a1b;
+}
+html[data-site-surface="graphite"] {
+  --site-body-background: #0b0d11;
+  --color-slate-50: #f5f6f8;
+  --color-slate-100: #eceef1;
+  --color-slate-200: #d9dde4;
+  --color-slate-300: #bac2cd;
+  --color-slate-400: #939eae;
+  --color-slate-500: #728093;
+  --color-slate-600: #566070;
+  --color-slate-700: #3d444f;
+  --color-slate-800: #282c35;
+  --color-slate-900: #171a20;
+  --color-slate-950: #0b0d11;
+}
+html[data-site-surface="plum"] {
+  --site-body-background: #0e0917;
+  --color-slate-50: #faf7fd;
+  --color-slate-100: #f0eafa;
+  --color-slate-200: #dfd6eb;
+  --color-slate-300: #cbbcdc;
+  --color-slate-400: #a997bd;
+  --color-slate-500: #8b769f;
+  --color-slate-600: #68547c;
+  --color-slate-700: #49365d;
+  --color-slate-800: #30233f;
+  --color-slate-900: #21152d;
+  --color-slate-950: #100a1c;
+}
+
+/* Community-inspired dark mint background: static paint only. The palette
+ * changes site chrome/panels, never exchange candles or HookChart canvases. */
+html[data-site-surface="mint-dark"] {
+  --site-body-background:#080e18;
+  --color-slate-50:#f5fbff;
+  --color-slate-100:#ecf5fb;
+  --color-slate-200:#d3e4ef;
+  --color-slate-300:#b8ccdc;
+  --color-slate-400:#91a7bb;
+  --color-slate-500:#6f899e;
+  --color-slate-600:#4a657b;
+  --color-slate-700:#314a5f;
+  --color-slate-800:#182c3f;
+  --color-slate-900:#101928;
+  --color-slate-950:#0a1322;
+}
+html[data-site-surface="mint-dark"] body {
+  background-image: radial-gradient(ellipse 900px 460px at 50% 0%, rgba(12, 93, 105, .25), transparent 76%);
+  background-repeat: no-repeat;
+}
+
+/* Only the original cyan accent palette is swapped. Semantic red/green/amber
+ * used for market direction, TP/SL, liquidation and warnings stays unchanged. */
+html[data-site-accent="blue"] {
+  --color-cyan-50: #eff6ff;
+  --color-cyan-100: #dbeafe;
+  --color-cyan-200: #bfdbfe;
+  --color-cyan-300: #93c5fd;
+  --color-cyan-400: #60a5fa;
+  --color-cyan-500: #3b82f6;
+  --color-cyan-600: #2563eb;
+  --color-cyan-700: #1d4ed8;
+  --color-cyan-800: #1e40af;
+  --color-cyan-900: #1e3a8a;
+  --color-cyan-950: #172554;
+}
+html[data-site-accent="violet"] {
+  --color-cyan-50: #f5f3ff;
+  --color-cyan-100: #ede9fe;
+  --color-cyan-200: #ddd6fe;
+  --color-cyan-300: #c4b5fd;
+  --color-cyan-400: #a78bfa;
+  --color-cyan-500: #8b5cf6;
+  --color-cyan-600: #7c3aed;
+  --color-cyan-700: #6d28d9;
+  --color-cyan-800: #5b21b6;
+  --color-cyan-900: #4c1d95;
+  --color-cyan-950: #2e1065;
+}
+html[data-site-accent="teal"] {
+  --color-cyan-50: #f0fdfa;
+  --color-cyan-100: #ccfbf1;
+  --color-cyan-200: #99f6e4;
+  --color-cyan-300: #5eead4;
+  --color-cyan-400: #2dd4bf;
+  --color-cyan-500: #14b8a6;
+  --color-cyan-600: #0d9488;
+  --color-cyan-700: #0f766e;
+  --color-cyan-800: #115e59;
+  --color-cyan-900: #134e4a;
+  --color-cyan-950: #042f2e;
+}
+html[data-site-accent="amber"] {
+  --color-cyan-50: #fffbeb;
+  --color-cyan-100: #fef3c7;
+  --color-cyan-200: #fde68a;
+  --color-cyan-300: #fcd34d;
+  --color-cyan-400: #fbbf24;
+  --color-cyan-500: #f59e0b;
+  --color-cyan-600: #d97706;
+  --color-cyan-700: #b45309;
+  --color-cyan-800: #92400e;
+  --color-cyan-900: #78350f;
+  --color-cyan-950: #451a03;
+}
+
+
+/* Personal font choices: all app routes and dialogs. Numeric data remains tabular. */
+html[data-site-font] #root,
+html[data-site-font] #root button,
+html[data-site-font] #root input,
+html[data-site-font] #root select,
+html[data-site-font] #root textarea,
+html[data-site-font] #root .hookchart-root {
+  font-family: var(--site-font-family, system-ui, sans-serif);
+}
+html[data-site-font]:not([data-site-font="jakarta"]) #root .font-mono {
+  font-family: var(--site-font-family, system-ui, sans-serif);
+}
+
+/* Pastel daytime themes: accessible secondary text over light cards.
+   Charts remain dark for legible price axes, volume bars and green/red candles.
+   --color-slate-400/500 remain distinct and are contrast-safe on common panels. */
+html[data-site-surface="mist"] {
+  --site-body-background:#e8f2fc;
+  --color-slate-50:#101c34; --color-slate-100:#182944;
+  --color-slate-200:#263953; --color-slate-300:#354961;
+  --color-slate-400:#52657b; --color-slate-500:#4c5e72;
+  --color-slate-600:#afc1d4; --color-slate-700:#cbd9e9;
+  --color-slate-800:#dce8f4; --color-slate-900:#f5f9ff;
+  --color-slate-950:#e8f2fc;
+}
+html[data-site-surface="sand"] {
+  --site-body-background:#fff2e4;
+  --color-slate-50:#281e21; --color-slate-100:#322629;
+  --color-slate-200:#45383a; --color-slate-300:#5b4e4e;
+  --color-slate-400:#705e55; --color-slate-500:#68544d;
+  --color-slate-600:#d0bcb0; --color-slate-700:#e4d2c5;
+  --color-slate-800:#f4e5d9; --color-slate-900:#fffcf7;
+  --color-slate-950:#fff2e4;
+}
+html[data-site-surface="lavender"] {
+  --site-body-background:#f2edfc;
+  --color-slate-50:#241835; --color-slate-100:#302447;
+  --color-slate-200:#423656; --color-slate-300:#584966;
+  --color-slate-400:#69577b; --color-slate-500:#625073;
+  --color-slate-600:#c5b8d5; --color-slate-700:#d9cdea;
+  --color-slate-800:#e9e1f5; --color-slate-900:#fcfaff;
+  --color-slate-950:#f2edfc;
+}
+html[data-site-surface="mint"] {
+  --site-body-background:#e9f9f3;
+  --color-slate-50:#102f2b; --color-slate-100:#1c3935;
+  --color-slate-200:#2b4c47; --color-slate-300:#415f5a;
+  --color-slate-400:#506e64; --color-slate-500:#4a665c;
+  --color-slate-600:#b0cfc4; --color-slate-700:#cee4da;
+  --color-slate-800:#def0e8; --color-slate-900:#f5fffa;
+  --color-slate-950:#e9f9f3;
+}
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) body {
+  color: var(--color-slate-100);
+  color-scheme: light;
+}
+/* Many existing cards use text-white explicitly rather than palette tokens. */
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .text-white {
+  color: var(--color-slate-100);
+}
+/* Preserve high-contrast labels on saturated CTA buttons and the dark chart. */
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root button.bg-cyan-600.text-white,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .hookchart-root .text-white,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .terminal-chart-block .text-white {
+  color: #f8fafc;
+}
+/*
+ * Personal color decorates ONLY the outside border of chart cards.
+ * Never alter .hookchart-root, .chartWrap, chart canvas, price scales or volumes.
+ * A non-interactive overlay keeps layout/size and mobile touch gestures intact.
+ */
+html[data-site-chart-custom="true"] #root .formation-chart-card {
+  position: relative;
+}
+html[data-site-chart-custom="true"] #root .terminal-chart-block::after,
+html[data-site-chart-custom="true"] #root .formation-chart-card::after,
+html[data-site-chart-custom="true"] #root .site-chart-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--site-chart-frame-color, #131722);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Readability on pastel panels: the same slate tokens also serve border and
+   background utilities, so give text utilities their own accessible foreground. */
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .text-slate-600,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .text-slate-700 {
+  color: var(--color-slate-300);
+}
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .text-cyan-200,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .text-cyan-300 {
+  color: var(--color-cyan-700);
+}
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .hookchart-root .text-slate-600,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .hookchart-root .text-slate-700,
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .hookchart-root .text-cyan-300 {
+  color: #a5b4cf;
+}
+
+/* Scale fixed-pixel Tailwind text utilities too; rem utilities already inherit root scaling. */
+html #root .text-\[7px\] { font-size: calc(7px * var(--site-text-scale, 1)); }
+html #root .text-\[8px\] { font-size: calc(8px * var(--site-text-scale, 1)); }
+html #root .text-\[9px\] { font-size: calc(9px * var(--site-text-scale, 1)); }
+html #root .text-\[10px\] { font-size: calc(10px * var(--site-text-scale, 1)); }
+html #root .text-\[11px\] { font-size: calc(11px * var(--site-text-scale, 1)); }
+html #root .text-\[12px\] { font-size: calc(12px * var(--site-text-scale, 1)); }
+html #root .text-\[13px\] { font-size: calc(13px * var(--site-text-scale, 1)); }
+html #root .text-\[14px\] { font-size: calc(14px * var(--site-text-scale, 1)); }
+html #root .text-\[15px\] { font-size: calc(15px * var(--site-text-scale, 1)); }
+html #root .text-\[16px\] { font-size: calc(16px * var(--site-text-scale, 1)); }
+html #root .text-\[18px\] { font-size: calc(18px * var(--site-text-scale, 1)); }
+html #root .text-\[20px\] { font-size: calc(20px * var(--site-text-scale, 1)); }
+html #root .text-\[22px\] { font-size: calc(22px * var(--site-text-scale, 1)); }
+@media (min-width: 1280px) {
+  /* Preserve the deliberately enlarged Encyclopedia desktop typography. */
+  html #root .encyclopedia-modal .text-\[10px\] { font-size: 0.86rem; }
+  html #root .encyclopedia-modal .text-\[11px\] { font-size: 0.94rem; }
+}
+
+/* Thin text style for the screenshot-like Inter Light selection only.
+ * Keep explicit font-bold/font-semibold UI hierarchy intact; the regular
+ * paragraph and unstyled control text use the real 300-weight glyphs.
+ * Chart canvas axes retain their own rendering for stability.
+ */
+html[data-site-font="inter-light"] body,
+html[data-site-font="inter-light"] #root {
+  font-weight: 300;
+}
+html[data-site-font="inter-light"] #root :is(button, input, select, textarea):not(.font-bold):not(.font-semibold):not(.font-extrabold):not(.font-medium) {
+  font-weight: 300;
+}
+
+
+/*
+ * High-contrast UI glyphs and exchange marks (CSS-only, zero extra network work).
+ * Keep HookChart/Replay chart toolbars, canvases and all SVG chart data untouched.
+ * Icon dimensions, hit areas and DOM structure remain unchanged.
+ */
+#root svg.lucide:is([stroke-width="1.5"], [stroke-width="1.75"], [stroke-width="2"]):not(.hookchart-root *) {
+  stroke-width: 2.1;
+}
+
+/* Brand marks keep reliable exchange colors independently of the site palette. */
+/* Brand contrast only: all font sizes, line heights, margins, padding and
+   control dimensions still come from their original per-page utility classes. */
+#root .site-exchange-badge {
+  font-weight: 800;
+  text-transform: uppercase;
+}
+#root .site-exchange-badge--compact {
+  /* Kept as a semantic marker; deliberately no geometry overrides. */
+}
+#root .site-exchange-badge[data-exchange="binance"] {
+  color: #ffdf78;
+  background-color: #342504;
+  border-color: #d7a431;
+}
+#root .site-exchange-badge[data-exchange="bybit"] {
+  color: #ffd092;
+  background-color: #38210e;
+  border-color: #e79039;
+}
+
+/* Exchange selection: brighter labels; no gradients, filters or animation. */
+#root .site-exchange-filter[data-exchange="binance"] {
+  color: #f4c653;
+  font-weight: 750;
+}
+#root .site-exchange-filter[data-exchange="bybit"] {
+  color: #ffb879;
+  font-weight: 750;
+}
+#root .site-exchange-filter[data-exchange="binance"][aria-pressed="true"] {
+  color: #ffe496;
+  background-color: #483309;
+  box-shadow: inset 0 0 0 1px #c99a32;
+}
+#root .site-exchange-filter[data-exchange="bybit"][aria-pressed="true"] {
+  color: #ffdaa5;
+  background-color: #46260e;
+  box-shadow: inset 0 0 0 1px #da8433;
+}
+
+/* Header shortcut controls: a consistent hit area with larger main glyphs.
+ * Preserve the tiny lock/count indicators and chart toolbars unchanged. */
+#root .app-header :is(
+  #open-metascalp-btn,
+  #open-watchlist-btn,
+  #open-telegram-btn,
+  #open-surveillance-btn,
+  #open-archive-btn,
+  #open-guide-btn
+) {
+  min-width: 32px;
+  min-height: 32px;
+  justify-content: center;
+}
+#root .app-header :is(
+  #open-metascalp-btn,
+  #open-watchlist-btn,
+  #open-telegram-btn,
+  #open-archive-btn,
+  #open-guide-btn
+) > svg:first-child,
+#root .app-header #open-surveillance-btn > span:first-child {
+  width: 16px;
+  height: 16px;
+}
+
+/* Help low-contrast monochrome glyphs without altering their status semantics. */
+#root :is(button, a, [role="button"]):not(.hookchart-root *) svg.lucide.text-slate-400 {
+  color: var(--color-slate-300);
+}
+
+/* In pastel themes, inactive brand labels must stay readable on light panels. */
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .site-exchange-filter[data-exchange="binance"]:not([aria-pressed="true"]) {
+  color: #815400;
+}
+:is(html[data-site-surface="mist"], html[data-site-surface="sand"], html[data-site-surface="lavender"], html[data-site-surface="mint"]) #root .site-exchange-filter[data-exchange="bybit"]:not([aria-pressed="true"]) {
+  color: #934500;
+}
+
+
+/* Terminal multi-chart auto-fit: inherit the height for the ACTUAL responsive
+ * grid columns. Saved 3-column presets stack on mobile rather than showing
+ * the first chart at fullscreen height with the others far below the fold. */
+.terminal-workspace-grid {
+  --terminal-chart-height: var(--terminal-height-mobile);
+}
+@media (min-width: 768px) {
+  .terminal-workspace-grid {
+    --terminal-chart-height: var(--terminal-height-tablet);
+  }
+}
+@media (min-width: 1024px) {
+  .terminal-workspace-grid {
+    --terminal-chart-height: var(--terminal-height-desktop);
+  }
+}
+@media (min-width: 1280px) {
+  .terminal-workspace-grid {
+    --terminal-chart-height: var(--terminal-height-wide);
+  }
+}

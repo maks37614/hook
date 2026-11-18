@@ -1,0 +1,3006 @@
+.hookchart-root { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0; color: #b2b5be; background: #131722; font: 11px system-ui, sans-serif; isolation: isolate; container-type: inline-size; }
+.hookchart-root .hookchart-toolbar { display: flex; align-items: center; flex: 0 0 28px; gap: 1px; min-width: 0; padding: 0 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; border-bottom: 1px solid #20252d; }
+.hookchart-root .hookchart-toolbar::-webkit-scrollbar, .hookchart-root .floatingDrawTools::-webkit-scrollbar { display: none; }
+.hookchart-root .hookchart-toolbar button, .hookchart-root .floatingDrawTools button, .hookchart-root .drawPanelToggle, .hookchart-root .indicatorDrawer button, .hookchart-root .hookchart-options-head button { display: grid; place-items: center; flex-shrink: 0; width: 27px; height: 27px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #8793a4; cursor: pointer; touch-action: manipulation; }
+.hookchart-root .hookchart-toolbar button:hover, .hookchart-root .floatingDrawTools button:hover { background: #1b232d; color: #dce5ef; }
+.hookchart-root .hookchart-toolbar button.active, .hookchart-root .floatingDrawTools button.active { background: #16334c; color: #5fb7ff; }
+.hookchart-root button:focus-visible { outline: 2px solid #67e8f9; outline-offset: -2px; }
+.hookchart-root .hookchart-timeframes { display: flex; align-items: center; flex: 0 0 auto; gap: 0; padding: 1px; margin-right: 3px; border: 1px solid #27313c; border-radius: 5px; background: #11161d; font-variant-numeric: tabular-nums; }
+.hookchart-root .hookchart-timeframes button { width: auto; min-width: 23px; height: 23px; padding: 0 3px; color: #8794a5; font-size: 9px; font-weight: 650; }
+.hookchart-root .hookchart-timeframes button.active { background: #1f6aa5; color: #eef7ff; }
+.hookchart-root .hookchart-timeframes > span { padding: 3px 6px; color: #eef7ff; font-size: 10px; }
+.hookchart-root .autoOverlayTools { display: flex; align-items: center; flex: 0 0 auto; gap: 2px; }
+.hookchart-root .toolbarRight { position: sticky; right: 0; z-index: 2; display: flex; align-items: center; flex: 0 0 auto; margin-left: auto; padding: 0 3px 0 7px; background: #131722; }
+.hookchart-root .toolbarRight button { width: 28px; }
+.hookchart-root .hookchart-options { position: absolute; z-index: 50; top: 38px; right: 6px; width: min(260px, calc(100% - 12px)); max-height: calc(100% - 44px); display: flex; flex-direction: column; padding: 6px; border: 1px solid #303946; border-radius: 6px; box-shadow: 0 10px 28px #0007; background: #11161d; }
+.hookchart-root .hookchart-options-head, .hookchart-root .indicatorDrawerHead { display: flex; align-items: center; flex: 0 0 auto; gap: 5px; min-height: 29px; padding: 0 5px 4px; margin-bottom: 4px; border-bottom: 1px solid #252d37; }
+.hookchart-root .hookchart-options-head b, .hookchart-root .indicatorDrawerHead b { color: #dce4ee; font-size: 10px; }
+.hookchart-root .hookchart-options-head button, .hookchart-root .indicatorDrawerHead button { width: 25px; height: 25px; margin-left: auto; }
+.hookchart-root .hookchart-options-list { display: flex; flex-direction: column; gap: 5px; min-height: 0; overflow: auto; }
+.hookchart-root .hookchart-options label { display: flex; align-items: center; gap: 6px; padding: 4px; color: #cbd5e1; font-size: 10px; cursor: pointer; }
+.hookchart-root .hookchart-options input { width: 13px; height: 13px; flex: 0 0 13px; margin: 0; accent-color: #22d3ee; }
+.hookchart-root .drawPanelToggle { position: absolute; z-index: 35; left: 6px; top: 8px; width: 25px; height: 28px; color: #778495; font-size: 16px; line-height: 1; background: transparent; border: 0; box-shadow: none; }
+.hookchart-root .drawPanelToggle.open { left: 48px; }
+.hookchart-root .drawPanelToggle:hover { color: #dce5ef; }
+.hookchart-root .floatingDrawTools { position: absolute; z-index: 34; left: 6px; top: 8px; width: 36px; max-height: calc(100% - 16px); display: flex; flex-direction: column; gap: 3px; padding: 5px 4px; border: 1px solid #303946; border-radius: 6px; box-shadow: 0 8px 24px #0006; background: rgba(13,17,23,.94); backdrop-filter: blur(5px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+.hookchart-root .floatingDrawTools button { width: 26px; height: 28px; flex: 0 0 28px; color: #9da9b8; }
+.hookchart-root .floatingDrawTools button.active { background: #1b568c; color: #fff; }
+.hookchart-root .floatingDivider { height: 1px; flex: 0 0 1px; background: #303844; margin: 4px 2px; }
+.hookchart-root .floatingDrawTools .clearChartBtn { color: #db7b82; }
+.hookchart-root .floatingDrawTools .clearChartBtn:hover { background: #3a2026; }
+.hookchart-root .indicatorDrawer { position: absolute; z-index: 36; left: 48px; top: 42px; width: min(224px, calc(100% - 56px)); max-height: calc(100% - 50px); display: flex; flex-direction: column; padding: 5px; background: rgba(13,17,23,.97); border: 1px solid #303946; border-radius: 6px; box-shadow: 0 10px 28px #0007; backdrop-filter: blur(5px); }
+.hookchart-root .indicatorDrawerList { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.hookchart-root .indicatorDrawerList > button { width: 100%; height: auto; min-height: 34px; padding: 3px 7px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 7px; align-items: center; text-align: left; color: #909dab; }
+.hookchart-root .indicatorDrawerList > button i { height: 23px; display: grid; place-items: center; border: 1px solid #2f3946; border-radius: 4px; font-style: normal; font-size: 8px; font-weight: 800; color: #7f8c9d; }
+.hookchart-root .indicatorDrawerList > button span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.hookchart-root .indicatorDrawerList > button em { font-style: normal; font-size: 8px; color: #657486; }
+.hookchart-root .indicatorDrawerList > button.on { color: #dcecff; background: #14283a; }
+.hookchart-root .indicatorDrawerList > button.on i { border-color: #3b79ab; color: #72c1ff; background: #102c42; }
+.hookchart-root .indicatorDrawerList > button.on em { color: #65b9ff; }
+.hookchart-root .indicatorDrawerList > button:disabled { opacity: .45; cursor: default; }
+.hookchart-root .hookchart-text-input { position: absolute; top: 42px; left: 48px; max-width: calc(100% - 56px); z-index: 36; display: flex; align-items: center; gap: 6px; padding: 6px; background: #11161d; font-size: 10px; border-radius: 5px; }
+.hookchart-root .hookchart-text-input input { width: 120px; min-width: 0; padding: 3px 5px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; color: #cbd5e1; }
+.hookchart-root .chartStage { min-height: 80px; flex: 1 1 0; overflow: hidden !important; }
+.hookchart-root .chartStage > .chartWrap { position: absolute; inset: 0; width: 100%; height: 100%; padding-bottom: 0; }
+.hookchart-root .chartStage > .chartWrap > .chartCanvasSurface { width: 100%; height: 100%; }
+
+/* iOS Safari can open the native "Copy" menu when a long chart gesture lands
+ * on HTML overlays (HUD labels, timeframe controls or the time axis), even
+ * though the drawing canvas itself is already non-selectable. Keep gestures
+ * intact: this is selection/callout prevention, NOT touchstart prevention. */
+.hookchart-root :is(.hookchart-toolbar, .chartWrap, .chartTimeAxis, .indicatorDock),
+.hookchart-root :is(.hookchart-toolbar, .chartWrap, .chartTimeAxis, .indicatorDock) * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Text and date/time fields inside the chart still need native caret,
+ * selection, copy/paste and the iOS edit menu. */
+.hookchart-root :is(.hookchart-toolbar, .chartWrap, .chartTimeAxis, .indicatorDock) :is(input, textarea, [contenteditable="true"]),
+.hookchart-root :is(.hookchart-toolbar, .chartWrap, .chartTimeAxis, .indicatorDock) [contenteditable="true"] * {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.hookchart-root .chartStage[data-drawing-tools="open"] .timeJumpDock { left: auto; }
+.hookchart-root .timeJumpPopover { max-width: calc(100cqw - var(--time-jump-right, 7px) - 8px); }
+.hookchart-root .chartStage[data-drawing-tools="open"] .timeJumpPopover { max-width: calc(100cqw - var(--time-jump-right, 7px) - 56px); }
+.hookchart-root .chartTimeAxis { height: 26px; min-height: 26px; flex: 0 0 26px; }
+.hookchart-root .indicatorDock { max-height: 38%; flex-shrink: 1; }
+.hookchart-root .indicatorPanelHead > span { display: none; }
+.hookchart-root .indicatorLatest { overflow: hidden; text-overflow: ellipsis; }
+.hookchart-root .hookchart-empty { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #64748b; font-size: 11px; }
+.hookchart-root .hookchart-save-error, .hookchart-root .hookchart-feed-status { position: absolute; bottom: 28px; left: 48px; z-index: 40; max-width: calc(100% - 56px); padding: 3px 5px; background: #11161d; color: #fbbf24; font-size: 9px; border: 0; }
+.hookchart-root .hookchart-feed-status { pointer-events: none; }
+@container (max-width: 480px) {
+  .hookchart-root .hookchart-toolbar { gap: 2px; }
+  .hookchart-root .hookchart-timeframes button { min-width: 27px; height: 26px; }
+  .hookchart-root .hookchart-toolbar .autoOverlayTools button { width: 24px; height: 22px; }
+  .hookchart-root .indicatorPanelHead b { font-size: 8px; }
+  .hookchart-root .indicatorLatest em { font-size: 7px; }
+}
+@media (pointer: coarse) {
+  .hookchart-root .hookchart-toolbar { flex-basis: 38px; }
+  .hookchart-root .hookchart-toolbar button { min-width: 30px; height: 30px; }
+  .hookchart-root .floatingDrawTools button { height: 32px; flex-basis: 32px; }
+  .hookchart-root .indicatorDrawerList > button { min-height: 38px; }
+  .hookchart-root .hookchart-options { top: 42px; max-height: calc(100% - 48px); }
+}
+/* Original hookchart settings panel */
+
+/* Original hookchart settings panel */
+.hookchart-root .densityQuickWrap{position:relative;display:flex;align-items:center;flex:0 0 auto}
+.hookchart-root .densityQuickPopup{position:absolute;z-index:74;top:31px;left:0;width:178px;padding:7px;border:1px solid #303946;border-radius:6px;background:#11161df7;box-shadow:0 10px 28px #0009;display:grid;gap:5px}
+.hookchart-root .densityQuickPopup label{display:flex;align-items:center;gap:7px;min-height:24px;padding:2px 4px;color:#c7d0da;font-size:9px;white-space:nowrap}
+.hookchart-root .densityQuickPopup input{accent-color:#22d3ee}
+.hookchart-root .hookchartExchangeBadge{height:23px;min-width:30px;display:grid;place-items:center;padding:0 5px;border:1px solid #2e3945;border-radius:4px;background:#10161d;color:#8da0b2;font:700 8px/1 system-ui;letter-spacing:.05em}
+
+.hookchart-root .originalSettingsBackdrop{position:absolute;z-index:120;inset:0;display:flex;align-items:center;justify-content:center;padding:8px;background:rgba(3,7,12,.76);backdrop-filter:blur(4px)}
+.hookchart-root .originalSettingsPanel{width:min(780px,100%);height:min(690px,100%);min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #303946;border-radius:8px;background:#0d1117;box-shadow:0 20px 60px #000c;color:#cbd5df}
+.hookchart-root .settingsHeader{display:flex;align-items:center;gap:10px;flex:0 0 46px;padding:6px 9px 6px 12px;border-bottom:1px solid #252d37;background:#111821}
+.hookchart-root .settingsHeader>div{display:flex;min-width:0;flex-direction:column;gap:1px}
+.hookchart-root .settingsHeader b{color:#f1f5f9;font-size:12px;line-height:15px}
+.hookchart-root .settingsHeader small{color:#758395;font-size:8px}
+.hookchart-root .settingsHeader>button{margin-left:auto;width:28px;height:28px;border:0;border-radius:5px;background:transparent;color:#8996a6;font-size:20px;line-height:1;cursor:pointer}
+.hookchart-root .settingsHeader>button:hover{background:#202936;color:#fff}
+.hookchart-root .settingsTabs{display:flex;gap:3px;flex:0 0 35px;padding:4px 8px;border-bottom:1px solid #252d37;background:#0f151d;overflow-x:auto}
+.hookchart-root .settingsTabs button{height:26px;padding:0 11px;border:1px solid transparent;border-radius:5px;background:transparent;color:#8794a4;font:650 9px/1 system-ui;cursor:pointer;white-space:nowrap}
+.hookchart-root .settingsTabs button:hover{background:#18212b;color:#dce5ef}
+.hookchart-root .settingsTabs button.active{border-color:#27618b;background:#12314a;color:#79c6ff}
+.hookchart-root .settingsBody{flex:1 1 auto;min-height:0;overflow:auto;padding:7px 8px 24px;scrollbar-width:thin;scrollbar-color:#34404d transparent}
+.hookchart-root .settingsSection{margin:0 0 7px;border:1px solid #252e39;border-radius:6px;background:#10161e;overflow:hidden}
+.hookchart-root .settingsSection>h3{height:29px;display:flex;align-items:center;margin:0;padding:0 9px;border-bottom:1px solid #252e39;background:#131b25;color:#d8e0e9;font:700 9px/1 system-ui;letter-spacing:.015em}
+.hookchart-root .settingRow{min-height:38px;display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,1.12fr);align-items:center;gap:10px;padding:5px 8px;border-bottom:1px solid #1d2530}
+.hookchart-root .settingRow:last-child{border-bottom:0}
+.hookchart-root .settingText{min-width:0;display:flex;flex-direction:column;gap:2px}
+.hookchart-root .settingText>b{color:#c9d3de;font:600 9px/1.25 system-ui}
+.hookchart-root .settingText>small{color:#6f7d8d;font:400 7.7px/1.3 system-ui}
+.hookchart-root .settingControl{min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.hookchart-root .settingsSwitch{position:relative;width:31px;height:17px;flex:0 0 31px;display:block}
+.hookchart-root .settingsSwitch input{position:absolute;opacity:0;pointer-events:none}
+.hookchart-root .settingsSwitch span{position:absolute;inset:0;border:1px solid #3b4652;border-radius:12px;background:#202833;transition:.14s}
+.hookchart-root .settingsSwitch span:after{content:"";position:absolute;left:2px;top:2px;width:11px;height:11px;border-radius:50%;background:#8794a4;transition:.14s}
+.hookchart-root .settingsSwitch input:checked+span{border-color:#2878aa;background:#134268}
+.hookchart-root .settingsSwitch input:checked+span:after{left:15px;background:#69c7ff}
+.hookchart-root .numInput,.hookchart-root .settingControl select{height:25px;min-width:64px;max-width:132px;padding:0 6px;border:1px solid #34404d;border-radius:4px;outline:0;background:#0b1118;color:#d6dee7;font:600 9px/1 system-ui}
+.hookchart-root .numInput:focus,.hookchart-root .settingControl select:focus{border-color:#2c82b9}
+.hookchart-root .numInput:disabled{opacity:.45}
+.hookchart-root .valueBadge{min-width:20px;color:#758395;font:600 8px/1 system-ui}
+.hookchart-root .colorInput{width:38px;height:25px;padding:1px;border:1px solid #34404d;border-radius:4px;background:#0b1118}
+.hookchart-root .settingsChips{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:3px;min-width:0}
+.hookchart-root .settingsChips button,.hookchart-root .densityModeRow button{min-height:24px;padding:0 7px;border:1px solid #303b47;border-radius:4px;background:#111821;color:#8998a8;font:650 8px/1 system-ui;cursor:pointer}
+.hookchart-root .settingsChips button:hover,.hookchart-root .densityModeRow button:hover{border-color:#40566a;color:#d7e4ee}
+.hookchart-root .settingsChips button.sel,.hookchart-root .densityModeRow button.sel{border-color:#2777a8;background:#123653;color:#70c7ff}
+.hookchart-root .settingsChips button:disabled{opacity:.35;cursor:not-allowed}
+.hookchart-root .settingsChips.muted button{opacity:.62}
+.hookchart-root .sortGroups{display:grid;gap:4px;justify-items:end}
+.hookchart-root .sortGroups small{color:#697789;font-size:7px}
+.hookchart-root .densityVisibilityRow{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+.hookchart-root .densityVisibilityRow label{display:flex;align-items:center;gap:4px;color:#8e9baa;font-size:8px}
+.hookchart-root .densityVisibilityRow input{accent-color:#22d3ee}
+.hookchart-root .densityModeRow{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px}
+.hookchart-root .densityModeRow .numInput{width:90px}
+.hookchart-root .settingsHint{margin:0 0 7px;padding:7px 9px;border:1px solid #25445b;border-radius:5px;background:#102536;color:#89b9d7;font-size:8px;line-height:1.4}
+.hookchart-root .strategyOff,.hookchart-root .resetHotkeys{height:27px;margin:0 0 7px;padding:0 10px;border:1px solid #374250;border-radius:5px;background:#141b24;color:#a9b4c1;font:650 8px/1 system-ui;cursor:pointer}
+.hookchart-root .strategyOff.active{border-color:#2c82b9;color:#79caff;background:#123552}
+.hookchart-root .strategyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:6px}
+.hookchart-root .strategyCard{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:5px;min-height:120px;padding:8px;border:1px solid #2c3541;border-radius:6px;background:#0d131a;color:#aeb9c6;cursor:pointer}
+.hookchart-root .strategyCard:hover{border-color:#40566c;background:#101a24}
+.hookchart-root .strategyCard.active{border-color:#2c91cb;box-shadow:inset 0 0 0 1px #1a618d;background:#102435}
+.hookchart-root .strategyTitle{display:flex;align-items:center;gap:6px}
+.hookchart-root .strategyTitle b{min-width:0;color:#e4eaf0;font-size:9px}
+.hookchart-root .strategyTitle span{margin-left:auto;padding:2px 4px;border-radius:3px;background:#1d2834;color:#8aa2b8;font-size:6.5px;text-transform:uppercase}
+.hookchart-root .strategyCard p{margin:0;color:#8492a1;font-size:7.5px;line-height:1.4}
+.hookchart-root .strategyCard strong{color:#9eacba;font-size:7px}
+.hookchart-root .strategyCard ul{margin:0;padding-left:14px;color:#7d8b9a;font-size:7px;line-height:1.4}
+.hookchart-root .strategyNote{padding:5px;border-radius:4px;background:#2b2110;color:#d5ad65;font-size:6.5px;line-height:1.35}
+.hookchart-root .hotkeySettings{position:relative}
+.hookchart-root .resetHotkeys{position:absolute;right:0;top:0;margin:0}
+.hookchart-root .hotkeyRow{min-height:34px;display:grid;grid-template-columns:minmax(140px,1fr) minmax(112px,auto) 23px 23px;align-items:center;gap:4px;padding:4px 7px;border-bottom:1px solid #1d2530;color:#b7c2ce;font-size:8px}
+.hookchart-root .hotkeyRow:last-child{border-bottom:0}
+.hookchart-root .hotkeyRow>button{height:24px;border:1px solid #303b47;border-radius:4px;background:#111821;color:#a7b7c7;font:600 8px/1 system-ui;cursor:pointer}
+.hookchart-root .hotkeyRow>button.recording{border-color:#d98c2a;background:#32240f;color:#ffd38a}
+.hookchart-root .hotkeyRow>.hotkeyClear,.hookchart-root .hotkeyRow>.hotkeyResetOne{width:23px;padding:0;color:#758395}
+.hookchart-root .hotkeyRow>.hotkeyClear:hover{color:#ff7e87}.hookchart-root .hotkeyRow>.hotkeyResetOne:hover{color:#72c7ff}
+
+@container (max-width: 620px){
+  .hookchart-root .originalSettingsBackdrop{padding:4px}
+  .hookchart-root .originalSettingsPanel{border-radius:5px}
+  .hookchart-root .settingRow{grid-template-columns:minmax(118px,.9fr) minmax(150px,1.1fr);gap:6px;padding:4px 6px}
+  .hookchart-root .strategyGrid{grid-template-columns:1fr}
+  .hookchart-root .hotkeyRow{grid-template-columns:minmax(118px,1fr) minmax(96px,auto) 22px 22px}
+}
+@container (max-width: 430px){
+  .hookchart-root .settingRow{grid-template-columns:1fr;gap:4px}
+  .hookchart-root .settingControl{justify-content:flex-start}
+  .hookchart-root .settingsChips,.hookchart-root .densityVisibilityRow,.hookchart-root .densityModeRow{justify-content:flex-start}
+  .hookchart-root .sortGroups{justify-items:start}
+  .hookchart-root .hotkeyRow{grid-template-columns:1fr minmax(90px,1fr) 22px 22px}
+}
+
+.hookchart-root .hookchart-options-compat{display:none!important}
+
+
+/* Exact original hookchart geometry overrides */
+.hookchart-root .hookchart-toolbar{
+  box-sizing:border-box;
+  height:28px;
+  min-height:28px;
+  flex:0 0 28px;
+  padding:0 4px;
+  gap:1px;
+  overflow:visible;
+}
+.hookchart-root .hookchart-timeframes{
+  gap:0;
+  padding:0;
+  margin-right:1px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.hookchart-root .hookchart-timeframes button{
+  min-width:26px;
+  height:22px;
+  padding:0 4px;
+  font-size:9px;
+}
+.hookchart-root .topToolbarToggle{width:22px;min-width:22px;height:22px;border:0!important;border-radius:0;box-shadow:none!important}
+.hookchart-root .autoOverlayTools{flex:0 1 auto;min-width:0;gap:1px;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+.hookchart-root .autoOverlayTools::-webkit-scrollbar{display:none}
+.hookchart-root .hookchart-toolbar .autoOverlayTools button{width:24px;min-width:24px;height:22px}
+.hookchart-root .densityQuickWrap{margin-left:1px}
+.hookchart-root .densityQuickWrap>button{
+  width:24px;
+  min-width:24px;
+  height:22px;
+  border-radius:0;
+  background:transparent!important;
+}
+.hookchart-root .densityQuickPopup{
+  top:30px;
+  left:0;
+  width:210px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.hookchart-root .densityQuickHead{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px;color:#8290a1}
+.hookchart-root .densityQuickHead b{font-size:10px;color:#dce4ee;font-variant-numeric:tabular-nums}
+.hookchart-root .densityQuickStatus{font-size:9px;color:#fbbf24}
+.hookchart-root .densityQuickStatus[data-live="true"]{color:#34d399}
+.hookchart-root .densityQuickHint{font-size:9px;line-height:1.4;color:#8290a1}
+.hookchart-root .densityQuickAutoStats{display:grid;gap:4px;border:1px solid #283849;border-radius:5px;padding:6px;background:#15212d}
+.hookchart-root .densityQuickAutoStats div{display:flex;justify-content:space-between;gap:6px;font-size:9px;color:#c9d6e3}
+.hookchart-root .densityQuickAutoStats b{font-variant-numeric:tabular-nums;color:#a5f3fc}
+.hookchart-root .densityQuickAutoStats small{font-size:8px;line-height:1.4;color:#8498ab}
+.hookchart-root .densityQuickReaction{display:grid;gap:5px;padding:6px;border:1px solid #394431;border-radius:5px;background:#202518}
+.hookchart-root .densityQuickReaction small{font-size:8px;line-height:1.45;color:#b4bdab}
+.hookchart-root .densityQuickTierModes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.hookchart-root .densityQuickTierModes button{min-height:28px;padding:3px 4px;border:1px solid #454d36;border-radius:4px;background:#191e18;color:#c0c7b2;font-size:9px;line-height:1.25;cursor:pointer}
+.hookchart-root .densityQuickTierModes button.sel{background:#514420;border-color:#d7a942;color:#ffe5a0}
+.hookchart-root .densityQuickModes{display:flex;gap:4px}
+.hookchart-root .densityQuickModes button{
+  height:25px;
+  flex:1;
+  padding:0 7px;
+  border:1px solid #303946;
+  background:#151a22;
+  color:#8794a5;
+  font-size:9px;
+}
+.hookchart-root .densityQuickModes button.sel{background:#1d5f9e!important;border-color:#2985dc;color:#fff!important}
+.hookchart-root .densityQuickInput{
+  height:29px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:0 7px;
+  background:#0c1117;
+  border:1px solid #2e3743;
+  border-radius:4px;
+  color:#7f8b9a;
+}
+.hookchart-root .densityQuickInput input{
+  width:100%;
+  min-width:0;
+  background:transparent;
+  border:0;
+  outline:0;
+  color:#e0e7ef;
+  font-size:10px;
+  font-variant-numeric:tabular-nums;
+}
+.hookchart-root .densityQuickVisibility{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.hookchart-root .densityQuickVisibility button{
+  height:24px;
+  padding:0 5px;
+  border:1px solid #2d3743;
+  background:#111820;
+  color:#6f7c8c;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.25px;
+  border-radius:4px;
+}
+.hookchart-root .densityQuickVisibility button.on{border-color:#3b78aa;background:#16334c;color:#dbeaf7}
+.hookchart-root .densityHoldInput{display:flex;align-items:center;gap:5px;color:#7f8b9a;font-size:8px}
+.hookchart-root .densityHoldInput span{flex:1}
+.hookchart-root .densityHoldInput input{
+  width:62px;height:24px;padding:0 5px;background:#0c1117;border:1px solid #2e3743;border-radius:4px;color:#e0e7ef;font-size:9px
+}
+.hookchart-root .densityHoldInput b{font-size:8px;font-weight:500;color:#6f7d8e}
+.hookchart-root .toolbarRight{position:static;right:auto;margin-left:auto;display:flex;align-items:center;gap:0;flex:0 0 auto;padding:0;background:#131722}
+.hookchart-root .toolbarRight .chartSettingsBtn{
+  width:25px;
+  min-width:25px;
+  height:22px;
+  margin-left:0!important;
+  border-left:1px solid #2a313b!important;
+  border-radius:0!important;
+  padding-left:0!important;
+  flex:0 0 auto;
+}
+.hookchart-root .hookchart-chart-actions{display:flex;align-items:center;flex:0 0 auto;gap:2px;margin-left:4px}
+.hookchart-root .hookchart-chart-actions button{width:24px;min-width:24px;height:22px;flex:0 0 24px;margin:0;padding:0;touch-action:manipulation}
+.hookchart-root .hookchart-chart-actions .chart-archive-action{color:#d8b4fe;background:rgba(147,51,234,.2)}
+.hookchart-root .hookchart-chart-actions .chart-archive-action:hover{color:#d8b4fe;background:rgba(147,51,234,.3)}
+.hookchart-root .hookchart-chart-actions .chart-fullscreen-action{color:#67e8f9;background:rgba(6,182,212,.15)}
+.hookchart-root .hookchart-chart-actions .chart-fullscreen-action:hover{color:#67e8f9;background:rgba(6,182,212,.25)}
+.hookchart-root .hookchart-chart-actions button:disabled{opacity:.5;cursor:default}
+.hookchart-root .floatingDrawTools{
+  left:6px;
+  top:8px;
+  bottom:8px;
+  width:36px;
+  max-height:calc(100% - 16px);
+  padding:5px 4px;
+  gap:3px;
+  border-radius:6px;
+}
+.hookchart-root .floatingDrawTools button{width:100%;height:28px;min-height:28px;flex:0 0 28px}
+.hookchart-root .drawPanelToggle{left:6px;top:8px;width:25px;height:30px;border-radius:0}
+.hookchart-root .drawPanelToggle.open{left:48px}
+.hookchart-root .marketStatsBar{
+  height:22px;
+  min-height:22px;
+  flex:0 0 22px;
+  border-top:1px solid #2A2E39;
+  background:#101319;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:0 9px;
+  color:#687587;
+  font-size:9px;
+  white-space:nowrap;
+  overflow:hidden;
+  font-variant-numeric:tabular-nums;
+}
+.hookchart-root .marketStatsBar span{display:inline-flex;align-items:center;gap:4px}
+.hookchart-root .marketStatsBar b{font-weight:600;color:#aeb9c7}
+.hookchart-root .marketStatsBar span+span:before{content:'·';color:#394451;margin-right:10px}
+
+.hookchart-root .originalSettingsBackdrop{padding:12px;background:rgba(0,0,0,.58)}
+.hookchart-root .originalSettingsPanel{
+  width:min(760px,calc(100% - 24px));
+  height:min(820px,calc(100% - 24px));
+  border:1px solid #2b3440;
+  border-radius:8px;
+  background:#11151b;
+  box-shadow:0 18px 70px rgba(0,0,0,.55);
+}
+.hookchart-root .settingsHeader{
+  height:54px;
+  min-height:54px;
+  flex:0 0 54px;
+  padding:0 14px;
+  border-bottom:1px solid #29313b;
+  background:#11151b;
+}
+.hookchart-root .settingsHeader b{font-size:14px;color:#eef3f9}
+.hookchart-root .settingsHeader small{font-size:9px;color:#758190}
+.hookchart-root .settingsTabs{
+  height:38px;
+  min-height:38px;
+  flex:0 0 38px;
+  padding:5px 14px;
+  gap:4px;
+  border-bottom:1px solid #29313b;
+  background:#11151b;
+}
+.hookchart-root .settingsTabs button{height:27px;padding:0 10px;font-size:9px}
+.hookchart-root .settingsBody{padding:0 14px 24px}
+.hookchart-root .settingsSection{
+  margin:0;
+  padding:13px 0 6px;
+  border:0;
+  border-bottom:1px solid #242b34;
+  border-radius:0;
+  background:transparent;
+}
+.hookchart-root .settingsSection>h3{
+  height:auto;
+  margin:0 0 8px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#e0e6ee;
+  font-size:12px;
+  font-weight:700;
+}
+.hookchart-root .settingRow{
+  min-height:44px;
+  grid-template-columns:minmax(230px,1fr) minmax(220px,.9fr);
+  gap:16px;
+  padding:5px 0;
+  border:0;
+}
+.hookchart-root .settingText>b{font-size:10px;color:#c7d0dc;font-weight:600}
+.hookchart-root .settingText>small{font-size:9px;line-height:1.35;color:#737f8e}
+.hookchart-root .settingControl{gap:7px}
+.hookchart-root .numInput{width:92px;height:27px;text-align:right;font-size:10px}
+.hookchart-root .settingsSwitch{width:34px;height:18px;flex-basis:34px}
+.hookchart-root .settingsSwitch span:after{width:12px;height:12px}
+.hookchart-root .settingsSwitch input:checked+span:after{left:18px}
+.hookchart-root .settingsChips button,.hookchart-root .densityModeRow button{height:25px;min-height:25px;padding:0 8px;font-size:9px}
+
+@container (max-width:760px){
+  .hookchart-root .originalSettingsBackdrop{padding:6px}
+  .hookchart-root .originalSettingsPanel{width:calc(100% - 12px);height:calc(100% - 12px)}
+  .hookchart-root .settingRow{grid-template-columns:1fr;gap:6px}
+  .hookchart-root .settingControl,.hookchart-root .settingsChips,.hookchart-root .densityVisibilityRow,.hookchart-root .densityModeRow{justify-content:flex-start}
+  .hookchart-root .settingsBody{padding:0 10px 18px}
+  .hookchart-root .hookchart-toolbar{height:28px;min-height:28px;flex-basis:28px}
+  .hookchart-root .hookchart-timeframes button{height:22px;min-width:26px;padding:0 4px}
+  .hookchart-root .marketStatsBar{gap:8px;font-size:8px;overflow-x:auto;scrollbar-width:none}
+  .hookchart-root .marketStatsBar span+span:before{margin-right:4px}
+}
+
+/* Exact original hookchart scale / time-axis placement */
+.hookchart-root .chartStage{
+  overflow:visible!important;
+  z-index:4;
+}
+.hookchart-root .chartStage>.chartWrap{
+  height:100%!important;
+  padding-bottom:0!important;
+  overflow:visible!important;
+}
+.hookchart-root .chartScaleDock{
+  position:static;
+  display:flex;
+  align-items:center;
+  flex:0 0 auto;
+  margin-left:auto;
+  max-width:none;
+  height:24px;
+  z-index:30!important;
+  gap:2px;
+  background:#131722!important;
+  border-left:0!important;
+  padding-left:5px!important;
+  padding-right:2px!important;
+  box-shadow:none!important;
+}
+.hookchart-root .hookchart-footer{
+  display:flex;
+  align-items:center;
+  flex:0 0 26px;
+  min-height:26px;
+  min-width:0;
+  gap:4px;
+  padding:0 4px;
+  border-top:1px solid #2a2e39;
+  background:#131722;
+}
+.hookchart-root .hookchart-footer-controls{
+  display:flex;
+  align-items:center;
+  flex:0 1 auto;
+  margin-left:auto;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.hookchart-root .hookchart-footer-controls::-webkit-scrollbar{display:none}
+.hookchart-root .hookchart-footer>.marketStatsBar{
+  flex:1 1 0;
+  height:auto;
+  min-height:0;
+  min-width:0;
+  padding:0 5px;
+  border-top:0;
+  background:transparent;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.hookchart-root .hookchart-footer>.marketStatsBar::-webkit-scrollbar{display:none}
+.hookchart-root .hookchart-footer-actions{display:flex;align-items:center;flex:0 0 auto}
+.hookchart-root .hookchart-footer .hookchart-dom-toggle{height:24px;padding:0 4px;gap:4px}
+.hookchart-root .barCountdown{height:24px;padding:0 5px}
+.hookchart-root .barCountdown b{font-size:10px}
+.hookchart-root .scaleTools{gap:1px}
+.hookchart-root .scaleTools button,
+.hookchart-root .scaleDockToggle{height:24px}
+.hookchart-root .scaleTools button{min-width:24px;padding:0 4px}
+.hookchart-root .scaleTools .scaleReset{min-width:38px;font-size:9px}
+.hookchart-root .scaleTools .scaleHistory{width:27px;min-width:27px}
+.hookchart-root .scaleTools>span{display:none!important}
+@container (max-width:300px){
+  .hookchart-root .hookchart-footer .scaleTools button{min-width:20px;padding:0 2px}
+  .hookchart-root .hookchart-footer .scaleTools .scaleReset{min-width:32px}
+  .hookchart-root .hookchart-footer .scaleTools .scaleHistory{width:22px;min-width:22px}
+  .hookchart-root .hookchart-footer .scaleDockToggle{width:20px;min-width:20px}
+  .hookchart-root .hookchart-footer .barCountdown{padding:0 2px}
+}
+.hookchart-root .chartTimeAxis{
+  height:24px!important;
+  min-height:24px!important;
+  flex:0 0 24px!important;
+  z-index:2;
+}
+.hookchart-root .chartTimeTick i{height:4px!important}
+.hookchart-root .chartTimeTick.major i{height:6px!important}
+.hookchart-root .chartTimeTick span{
+  top:6px!important;
+  font-size:9px!important;
+  line-height:12px!important;
+}
+.hookchart-root .chartTimeScaleSpacer{
+  box-sizing:border-box;
+  overflow:visible;
+  background:transparent!important;
+  border-left:0!important;
+  box-shadow:none!important;
+  padding-bottom:2px!important;
+  font-size:6.5px!important;
+}
+.hookchart-root .chartTimeScaleSpacer .barCountdown{
+  position:absolute;
+  top:0;
+  right:0;
+  min-width:54px;
+  height:100%;
+  padding:0;
+  justify-content:center;
+  background:#131722;
+  font-variant-numeric:tabular-nums;
+}
+.hookchart-root .densityQuickInput input[type=number]{
+  -moz-appearance:textfield;
+  appearance:textfield;
+}
+.hookchart-root .densityQuickInput input[type=number]::-webkit-outer-spin-button,
+.hookchart-root .densityQuickInput input[type=number]::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+@container (max-width:760px){
+  .hookchart-root .chartScaleDock{height:23px}
+  .hookchart-root .chartTimeAxis{height:23px!important;min-height:23px!important;flex-basis:23px!important}
+  .hookchart-root .chartTimeTick span{top:6px!important;font-size:8.5px!important}
+}
+
+/* Exact original settings overlay geometry */
+.hookchart-root .originalSettingsBackdrop{
+  position:fixed!important;
+  inset:0!important;
+  z-index:80!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))!important;
+  overflow:hidden!important;
+  background:rgba(0,0,0,.58)!important;
+  backdrop-filter:none!important;
+}
+.hookchart-root .originalSettingsPanel{
+  width:min(760px,calc(100vw - 24px))!important;
+  height:min(820px,calc(100vh - 32px))!important;
+  max-height:calc(100vh - 32px)!important;
+  margin:auto!important;
+  border:1px solid #2b3440!important;
+  border-radius:8px!important;
+  background:#11151b!important;
+  box-shadow:0 18px 70px rgba(0,0,0,.55)!important;
+}
+@supports(height:100dvh){
+  .hookchart-root .originalSettingsPanel{
+    height:min(820px,calc(100dvh - 32px))!important;
+    max-height:calc(100dvh - 32px)!important;
+  }
+}
+.hookchart-root .settingsTabs{
+  height:38px!important;
+  min-height:38px!important;
+  flex:0 0 38px!important;
+  display:flex!important;
+  align-items:end!important;
+  gap:4px!important;
+  padding:0 14px!important;
+  border-bottom:1px solid #29313b!important;
+  background:#0e1319!important;
+}
+.hookchart-root .settingsTabs button{
+  height:31px!important;
+  padding:0 13px!important;
+  border:0!important;
+  border-bottom:2px solid transparent!important;
+  background:transparent!important;
+  color:#7f8b9b!important;
+  font-size:10px!important;
+  border-radius:0!important;
+}
+.hookchart-root .settingsTabs button.active{
+  color:#eef3f9!important;
+  border-bottom-color:#2f8be7!important;
+  background:transparent!important;
+}
+.hookchart-root .settingsSwitch{
+  width:34px!important;
+  height:18px!important;
+  flex-basis:34px!important;
+}
+.hookchart-root .settingsSwitch span{
+  background:#303846!important;
+  border:1px solid #46505e!important;
+  border-radius:12px!important;
+}
+.hookchart-root .settingsSwitch span:after{
+  width:12px!important;
+  height:12px!important;
+  left:2px!important;
+  top:2px!important;
+  background:#a9b3c0!important;
+}
+.hookchart-root .settingsSwitch input:checked+span{
+  background:#176bc5!important;
+  border-color:#2b8af0!important;
+}
+.hookchart-root .settingsSwitch input:checked+span:after{
+  left:18px!important;
+  background:#fff!important;
+}
+@media(max-width:900px){
+  .hookchart-root .originalSettingsBackdrop{
+    padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))!important;
+  }
+  .hookchart-root .originalSettingsPanel{
+    width:100%!important;
+    height:calc(100vh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    max-height:calc(100vh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    border-radius:10px!important;
+  }
+  @supports(height:100dvh){
+    .hookchart-root .originalSettingsPanel{
+      height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+      max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    }
+  }
+  .hookchart-root .settingsHeader{height:50px!important;min-height:50px!important;flex-basis:50px!important;padding:0 12px!important}
+  .hookchart-root .settingsHeader b{font-size:13px!important}
+  .hookchart-root .settingsTabs{height:42px!important;min-height:42px!important;flex-basis:42px!important;padding:0 8px!important}
+  .hookchart-root .settingsTabs button{height:36px!important;padding:0 12px!important;font-size:11px!important}
+  .hookchart-root .settingsBody{padding:0 12px 18px!important}
+  .hookchart-root .settingsSection{padding-top:12px!important}
+  .hookchart-root .settingRow{grid-template-columns:1fr!important;gap:7px!important;min-height:0!important;padding:8px 0!important}
+  .hookchart-root .settingText>b{font-size:11px!important}
+  .hookchart-root .settingText>small{font-size:9.5px!important;max-width:none!important}
+  .hookchart-root .settingControl{width:100%!important;justify-content:flex-start!important;align-items:center!important;flex-wrap:wrap!important;gap:7px!important}
+  .hookchart-root .settingsChips{justify-content:flex-start!important}
+}
+
+
+/* Terminal cards retain compact plot navigation with the original toolbars. */
+.hookchart-terminal .chartStage canvas { touch-action:none; user-select:none; }
+.hookchart-terminal .chartScaleDock .scaleTools { gap:2px; }
+.hookchart-terminal .hookchart-footer { min-height:24px; }
+
+/* Single-row terminal controls: only the content scrolls, while expand/settings stay visible. */
+.hookchart-terminal .hookchart-terminal-toolbar {
+  height:28px;
+  min-height:28px;
+  flex:0 0 28px;
+  flex-wrap:nowrap;
+  gap:2px;
+  overflow:visible;
+}
+/* Expanded tools live in a full-width dock below timeframes, rather than a
+ * few pixels squeezed between the timeframe buttons and settings. Both mouse
+ * wheel and touch can scroll the strip, while arrows support desktop mice. */
+.hookchart-root .hookchart-extra-dock {
+  position:absolute;
+  z-index:65;
+  top:30px;
+  left:4px;
+  right:4px;
+  display:flex;
+  align-items:center;
+  box-sizing:border-box;
+  width:auto;
+  min-width:0;
+  max-width:calc(100% - 8px);
+  height:34px;
+  padding:2px;
+  gap:2px;
+  border:1px solid #303946;
+  border-radius:6px;
+  background:rgba(15,21,30,.98);
+  box-shadow:0 8px 24px #0009;
+}
+.hookchart-root .hookchart-extra-dock > .hookchart-extra-nav {
+  display:grid;
+  place-items:center;
+  flex:0 0 24px;
+  width:24px;
+  min-width:24px;
+  height:28px;
+  min-height:28px;
+  padding:0;
+  border:0;
+  border-radius:4px;
+  background:#1b2735;
+  color:#b5c9dc;
+  cursor:pointer;
+}
+.hookchart-root .hookchart-extra-dock > .hookchart-extra-nav:hover {
+  background:#24435d;
+  color:#fff;
+}
+/* Standalone charts (including the formations quick view) keep the original
+ * ONE-row toolbar. Only the optional icons scroll; timeframes, chevron and
+ * settings remain visible. The integrated terminal keeps its popup dock. */
+.hookchart-root:not(.hookchart-terminal) .hookchart-standalone-extra-dock {
+  position:static;
+  inset:auto;
+  z-index:auto;
+  flex:1 1 0;
+  width:auto;
+  max-width:none;
+  min-width:0;
+  height:28px;
+  min-height:0;
+  padding:0;
+  margin:0;
+  gap:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.hookchart-root:not(.hookchart-terminal) .hookchart-toolbar .hookchart-timeframes,
+.hookchart-root:not(.hookchart-terminal) .hookchart-toolbar .topToolbarToggle,
+.hookchart-root:not(.hookchart-terminal) .hookchart-toolbar .toolbarRight {
+  flex-shrink:0;
+}
+.hookchart-root:not(.hookchart-terminal) .hookchart-toolbar .toolbarRight {
+  margin-left:0;
+}
+.hookchart-root:not(.hookchart-terminal) .hookchart-standalone-extras {
+  flex:1 1 0;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  overscroll-behavior-x:contain;
+  touch-action:pan-x;
+  -webkit-overflow-scrolling:touch;
+}
+/* The optional icons are wider than the viewport: never shrink them to fit.
+ * Only their own scroll region moves, while settings, archive and fullscreen
+ * buttons remain anchored at the right end of the chart toolbar. */
+.hookchart-root:not(.hookchart-terminal) > .hookchart-toolbar {
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+  flex-wrap:nowrap;
+}
+.hookchart-root:not(.hookchart-terminal) > .hookchart-toolbar > .hookchart-standalone-extra-dock {
+  flex:1 1 0;
+  min-width:0;
+  overflow:hidden;
+}
+.hookchart-root:not(.hookchart-terminal) > .hookchart-toolbar > .toolbarRight {
+  position:relative;
+  right:0;
+  z-index:3;
+  flex:0 0 auto;
+  margin-left:auto;
+  background:#131722;
+}
+.hookchart-root:not(.hookchart-terminal) .hookchart-standalone-extras > .autoOverlayTools {
+  display:flex;
+  flex:0 0 auto;
+  width:max-content;
+  min-width:max-content;
+  overflow:visible;
+}
+.hookchart-root:not(.hookchart-terminal) .hookchart-standalone-extras > .autoOverlayTools > button {
+  flex:0 0 24px;
+  width:24px;
+  min-width:24px;
+}
+.hookchart-root .hookchart-standalone-extras,
+.hookchart-terminal .hookchart-terminal-extra-row {
+  position:static;
+  display:flex;
+  align-items:center;
+  flex:1 1 auto;
+  min-width:0;
+  max-width:none;
+  width:auto;
+  height:28px;
+  margin:0;
+  padding:0 2px;
+  gap:3px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  white-space:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  touch-action:pan-x;
+  -webkit-overflow-scrolling:touch;
+}
+/* Nonshrinking content rail is essential: flex shrinking can otherwise make
+ * scrollWidth == clientWidth even when the buttons appear cut off. */
+.hookchart-root .hookchart-extras-content {
+  display:flex;
+  align-items:center;
+  flex:0 0 max-content;
+  width:max-content;
+  min-width:max-content;
+  height:100%;
+  padding:0;
+  gap:3px;
+  white-space:nowrap;
+}
+.hookchart-root .hookchart-extras-content > button,
+.hookchart-root .hookchart-extras-content > .densityQuickWrap,
+.hookchart-root .hookchart-extras-content > .autoOverlayTools {
+  flex:0 0 auto;
+}
+.hookchart-root .hookchart-extras-content > .autoOverlayTools {
+  display:flex;
+  width:max-content;
+  min-width:max-content;
+  flex:0 0 max-content;
+  overflow:visible;
+}
+.hookchart-root .hookchart-extras-content > .autoOverlayTools > button {
+  flex:0 0 24px;
+  min-width:24px;
+}
+.hookchart-root .hookchart-standalone-extras::-webkit-scrollbar,
+.hookchart-terminal .hookchart-terminal-extra-row::-webkit-scrollbar { display:none; }
+.hookchart-root .hookchart-standalone-extras > button,
+.hookchart-root .hookchart-standalone-extras > .densityQuickWrap,
+.hookchart-root .hookchart-standalone-extras > .autoOverlayTools,
+.hookchart-terminal .hookchart-terminal-extra-row > button,
+.hookchart-terminal .hookchart-terminal-extra-row > .densityQuickWrap,
+.hookchart-terminal .hookchart-terminal-extra-row > .autoOverlayTools {
+  flex:0 0 auto;
+}
+.hookchart-root .hookchart-standalone-extras .autoOverlayTools {
+  flex:0 0 auto;
+  overflow:visible;
+}
+.hookchart-root:not(.hookchart-terminal) > .densityQuickPopup {
+  max-width:calc(100% - 16px);
+  max-height:calc(100% - 44px);
+  overflow-y:auto;
+}
+.hookchart-terminal .hookchart-terminal-scroll {
+  display:flex;
+  align-items:center;
+  gap:3px;
+  flex:1 1 0;
+  min-width:0;
+  height:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  touch-action:pan-x;
+  white-space:nowrap;
+}
+.hookchart-terminal .hookchart-terminal-scroll::-webkit-scrollbar { display:none; }
+.hookchart-terminal .hookchart-toolbar-actions { display:flex;flex:0 0 auto;min-width:max-content; }
+.hookchart-terminal .hookchart-terminal-scroll .hookchart-timeframes { flex:0 0 auto; }
+.hookchart-terminal .hookchart-terminal-toolbar .topToolbarToggle { flex:0 0 26px; }
+.hookchart-terminal .hookchart-terminal-toolbar .toolbarRight { position:static;flex:0 0 28px;margin-left:0;padding:0;z-index:30; }
+.hookchart-terminal .hookchart-terminal-extra-row .autoOverlayTools { flex:0 0 auto;overflow:visible; }
+.hookchart-root .hookchart-toolbar .trade-level-toggle-button {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  width:auto;
+  min-width:51px;
+  height:24px;
+  padding:0 3px;
+  white-space:nowrap;
+  font-size:9px;
+  font-weight:700;
+}
+.hookchart-root .hookchart-toolbar .neckline-toggle-button {
+  flex:0 0 26px;
+  width:26px;
+  min-width:26px;
+  height:24px;
+}
+.hookchart-root .hookchart-toolbar .neckline-toggle-button.active {
+  background:rgba(245,158,11,.13);
+  color:#f5b43d;
+}
+.hookchart-root .hookchart-toolbar .neckline-toggle-button:hover {
+  color:#fbbf24;
+}
+.hookchart-root .hookchart-toolbar .neckline-toggle-button:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+}
+.hookchart-root .hookchart-toolbar .trade-level-toggle-button:disabled {
+  opacity:.48;
+  cursor:not-allowed;
+}
+.hookchart-terminal .hookchart-terminal-extra-row .trade-level-toggle-button {
+  min-width:58px;
+  height:23px;
+  padding:0 5px;
+  font-size:10px;
+}
+.hookchart-terminal .terminal-chart-integrated-toolbar {
+  --chart-icon-size:12px;
+  --chart-control-size:24px;
+  --chart-control-gap:3px;
+  position:static;
+  flex:0 0 auto;
+  width:max-content;
+  min-width:0;
+  gap:2px;
+  padding:0;
+  border:0;
+  background:transparent;
+  font-size:10px;
+}
+.hookchart-terminal .terminal-chart-integrated-toolbar .terminal-chart-toolbar-row { padding-block:0; }
+.hookchart-terminal .terminal-chart-integrated-toolbar .terminal-chart-toolbar-scroll { flex:0 0 auto;overflow:visible; }
+.hookchart-terminal .terminal-chart-integrated-toolbar button {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  min-width:24px;
+  height:22px;
+  min-height:22px;
+  padding:0 4px;
+}
+.terminal-chart-block.terminal-chart-hookchart {
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+.hookchart-terminal .hookchart-toolbar-overlays { position:absolute;inset:0;z-index:75;pointer-events:none; }
+.hookchart-terminal .terminal-chart-integrated-menus .terminal-chart-header-popover {
+  top:32px;
+  bottom:auto;
+  margin-top:0;
+  max-height:calc(100% - 64px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  pointer-events:auto;
+}
+.hookchart-terminal .terminal-chart-integrated-menus .terminal-chart-header-popover > * { flex-shrink:0; }
+.hookchart-terminal .terminal-chart-integrated-menus .terminal-chart-header-popover:has(.terminal-chart-coin-list) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.hookchart-terminal .terminal-chart-integrated-menus .terminal-chart-coin-list {
+  flex:1 1 auto;
+  min-height:0;
+}
+.hookchart-terminal > .densityQuickPopup { top:63px;left:8px;max-width:calc(100% - 16px);max-height:calc(100% - 75px);overflow:auto; }
+.hookchart-terminal .marketStatsBar { overscroll-behavior-x:contain;touch-action:pan-x; }
+
+/* Chart settings belong to the viewport, never to a small or maximized chart tile.
+ * The portal is a body child, preserving .hookchart-root-scoped controls and
+ * responsive container queries without inheriting terminal overflow/stacking.
+ */
+.hookchart-root.hookchart-settings-portal{
+  position:fixed!important;
+  inset:0!important;
+  z-index:2147483000!important;
+  width:100vw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  min-width:0;
+  overflow:hidden!important;
+  background:#11151b!important;
+}
+.hookchart-root.hookchart-settings-portal .originalSettingsBackdrop{
+  position:absolute!important;
+  inset:0!important;
+  padding:0!important;
+  background:#11151b!important;
+  backdrop-filter:none!important;
+}
+.hookchart-root.hookchart-settings-portal .originalSettingsPanel{
+  box-sizing:border-box;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.hookchart-root.hookchart-settings-portal .settingsHeader{
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+  padding-top:env(safe-area-inset-top);
+  min-height:calc(54px + env(safe-area-inset-top));
+  flex-basis:calc(54px + env(safe-area-inset-top));
+}
+.hookchart-root.hookchart-settings-portal .settingsBody{
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
+
+/* Timeframe buttons must not consume the space needed to scroll extra tools in
+ * narrow charts. Expanded toolbars use a compact, custom dark dropdown instead
+ * of the white iOS native select. Wide charts keep all timeframe buttons. */
+.hookchart-root .hookchart-timeframes-buttons {
+  display:flex;
+  align-items:center;
+  flex:0 0 auto;
+  gap:0;
+}
+.hookchart-root .hookchart-timeframes-compact {
+  display:none;
+}
+/* At every screen width, the collapsed row has regular TF buttons followed
+ * immediately by the tools chevron. The secondary TF menu belongs ONLY to
+ * the expanded tools row; never show a duplicate timeframe control closed. */
+.hookchart-root[data-extra-tools-open="true"] .hookchart-timeframes-buttons {
+  display:none;
+}
+.hookchart-root[data-extra-tools-open="true"] .hookchart-timeframes-compact {
+  display:inline-flex;
+  flex:0 0 auto;
+  box-sizing:border-box;
+  align-items:center;
+  justify-content:space-between;
+  gap:4px;
+  width:59px;
+  min-width:59px;
+  max-width:66px;
+  height:25px;
+  padding:0 5px;
+  border:1px solid #34618b;
+  border-radius:4px;
+  color:#eef7ff;
+  background:#193c5b;
+  font:700 11px system-ui,sans-serif;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-root .hookchart-timeframes-compact > svg { flex-shrink:0; }
+.hookchart-root[data-extra-tools-open="true"] .hookchart-timeframes {
+  flex:0 0 auto;
+  min-width:0;
+  margin-right:2px;
+}
+/* The expand button must stay visible and tappable on small phone widths. */
+.hookchart-root:not(.hookchart-terminal) .hookchart-toolbar > .topToolbarToggle {
+  display:grid;
+  place-items:center;
+  position:relative;
+  z-index:4;
+  flex:0 0 22px;
+  min-width:22px;
+  touch-action:manipulation;
+}
+
+/* Portal menu must be global: HookChart's toolbar and chart canvas clip overflow. */
+.hookchart-timeframe-menu {
+  position:fixed;
+  z-index:2147482000;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  padding:6px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  border:1px solid #26364b;
+  border-radius:12px;
+  background:#060b1f;
+  box-shadow:0 16px 36px rgba(0,0,0,.65);
+  color:#9aabc3;
+}
+.hookchart-timeframe-menu .hookchart-timeframe-option {
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:0 0 41px;
+  width:100%;
+  min-height:41px;
+  padding:0 12px;
+  border:0;
+  border-radius:9px;
+  background:transparent;
+  color:#a4b4ca;
+  font:500 15px/1.25 system-ui,sans-serif;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-timeframe-menu .hookchart-timeframe-option:hover,
+.hookchart-timeframe-menu .hookchart-timeframe-option:focus-visible {
+  background:#17243a;
+  color:#e2ecf6;
+  outline:none;
+}
+.hookchart-timeframe-menu .hookchart-timeframe-option.selected {
+  background:#1e2b41;
+  color:#59d9ec;
+  font-weight:650;
+}
+.hookchart-timeframe-menu .hookchart-timeframe-option-check {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 18px;
+  width:18px;
+  height:18px;
+  color:#59d9ec;
+}
+
+/* Chart price alerts: confirmation is anchored inside the plot, not a tooltip
+ * outside the viewport. Touch targets stay usable on compact mobile charts. */
+.hookchart-root .hookchart-alert-confirm {
+  position:absolute;
+  z-index:42;
+  top:44px;
+  left:clamp(8px, 16%, 120px);
+  width:min(265px, calc(100% - 24px));
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  padding:12px;
+  border:1px solid #4e6275;
+  border-radius:9px;
+  background:rgba(12,18,29,.98);
+  box-shadow:0 12px 35px #000a;
+  color:#dfe9f4;
+  font-size:12px;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .hookchart-alert-confirm strong{color:#f6f8fc}
+.hookchart-root .hookchart-alert-confirm small{color:#c7a46a}
+.hookchart-root .hookchart-alert-confirm > div{display:flex;gap:8px;justify-content:flex-end}
+.hookchart-root .hookchart-alert-confirm button{
+  min-height:34px;
+  padding:6px 12px;
+  border-radius:6px;
+  border:1px solid #3b5065;
+  background:#1c2a3b;
+  color:#deebfa;
+  cursor:pointer;
+}
+.hookchart-root .hookchart-alert-confirm button.danger{background:#622534;border-color:#a84a60;color:#fff}
+.hookchart-root .hookchart-alert-confirm button:disabled{opacity:.5;cursor:default}
+.hookchart-root .hookchart-alert-notice {
+  position:absolute;
+  z-index:40;
+  bottom:10px;
+  left:8px;
+  right:8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px;
+  border-radius:7px;
+  border:1px solid #256b56;
+  background:rgba(9,45,35,.97);
+  color:#b9fce6;
+  font-size:11px;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .hookchart-alert-notice.error{border-color:#a44c5a;background:rgba(62,20,34,.98);color:#ffccd4}
+.hookchart-root .hookchart-alert-notice button{flex:0 0 30px;min-height:30px;padding:0;color:inherit;background:transparent;font-size:20px;cursor:pointer}
+
+/* Keep the inspected date/time aligned with the freely moving crosshair. */
+.hookchart-root .chartCrosshairTime {
+  position:absolute; top:0; bottom:0; z-index:4;
+  display:flex; align-items:center; justify-content:center;
+  box-sizing:border-box; padding:0 6px;
+  background:#303946; color:#f1f5f9;
+  font:500 10px system-ui,sans-serif; font-variant-numeric:tabular-nums;
+  white-space:nowrap; overflow:hidden; pointer-events:none;
+}
+@container (max-width:760px) {
+  .hookchart-root .chartCrosshairTime { font-size:9px; }
+}
+
+/* Passive chart HUD text must not invoke iOS text selection during inspection. */
+.hookchart-root .liqRiskHud, .hookchart-root .strategyHud {
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+
+/* Pointer presentation does not repaint candles or allocate full-DPI bitmaps on idle charts. */
+.hookchart-root .chartCanvasSurface { position:relative; width:100%; height:100%; min-width:0; min-height:0; }
+.hookchart-root .chartCanvasSurface > .chartInteractionCanvas {
+  position:absolute; inset:0; z-index:18; width:100%; height:100%; background:transparent; pointer-events:none!important;
+}
+.hookchart-root .timeJumpDock { z-index:19; }
+
+/* Strategy cards: legible descriptions and applied settings in the mobile dialog.
+   Keep these rules scoped to Strategies rather than changing chart text sizes. */
+.hookchart-root .strategySettings .settingsHint {
+  color:#c9e4f6;
+  font-size:12px;
+  line-height:1.55;
+  padding:10px 12px;
+}
+.hookchart-root .strategySettings .strategyOff {
+  min-height:34px;
+  padding:6px 14px;
+  color:#e0e9f4;
+  font-size:12px;
+}
+.hookchart-root .strategySettings .settingsSection > h3 {
+  color:#f1f5f9;
+  font-size:15px;
+  line-height:1.4;
+}
+.hookchart-root .strategySettings .strategyGrid {
+  gap:10px;
+  padding:8px 0 12px;
+}
+.hookchart-root .strategySettings .strategyCard {
+  min-height:0;
+  gap:9px;
+  padding:14px;
+  border-color:#3b4a5d;
+  background:#0e151e;
+  color:#e2e8f0;
+  line-height:1.5;
+  white-space:normal;
+  overflow-wrap:break-word;
+}
+.hookchart-root .strategySettings .strategyCard:focus-visible {
+  outline:2px solid #38bdf8;
+  outline-offset:2px;
+}
+.hookchart-root .strategySettings .strategyTitle {
+  flex-wrap:wrap;
+  gap:7px;
+}
+.hookchart-root .strategySettings .strategyTitle b {
+  flex:1 1 175px;
+  color:#f8fafc;
+  font-size:15px;
+  line-height:1.35;
+}
+.hookchart-root .strategySettings .strategyTitle span {
+  flex-shrink:0;
+  padding:4px 7px;
+  color:#bfd7ea;
+  font-size:10px;
+  line-height:1.3;
+}
+.hookchart-root .strategySettings .strategyCard p {
+  color:#d1dce8;
+  font-size:13px;
+  line-height:1.55;
+}
+.hookchart-root .strategySettings .strategyCard strong {
+  color:#e2edf9;
+  font-size:12px;
+  line-height:1.4;
+}
+.hookchart-root .strategySettings .strategyCard ul {
+  padding-left:19px;
+  color:#c0cfde;
+  font-size:12px;
+  line-height:1.55;
+  list-style:disc;
+}
+.hookchart-root .strategySettings .strategyCard li + li { margin-top:3px; }
+.hookchart-root .strategySettings .strategyNote {
+  display:block;
+  padding:9px 10px;
+  border:1px solid #684c21;
+  border-radius:6px;
+  background:#302311;
+  color:#f7ce8a;
+  font-size:12px;
+  line-height:1.5;
+}
+@container (max-width:620px) {
+  .hookchart-root .strategySettings .strategyGrid { grid-template-columns:1fr; }
+  .hookchart-root .strategySettings .strategyCard { padding:13px; }
+  .hookchart-root .strategySettings .strategyCard p,
+  .hookchart-root .strategySettings .strategyCard ul,
+  .hookchart-root .strategySettings .strategyNote { font-size:13px; }
+}
+
+/* HookChart → Основні: match Hotkeys' readable 15px headings,
+   14px setting labels and 13px controls in every settings category.
+   This does not change chart canvas text sizes. */
+.hookchart-root .settingsBody.uniformSettingsReadable .settingsSection>h3 {
+  font-size:15px;
+  line-height:1.4;
+  margin-bottom:9px;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .settingRow {
+  min-height:48px;
+  gap:12px;
+  padding:8px 0;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .settingText>b {
+  font-size:14px;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .settingText>small {
+  font-size:12px;
+  line-height:1.45;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .settingsHint {
+  font-size:12px;
+  line-height:1.55;
+  padding:10px 12px;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .numInput,
+.hookchart-root .settingsBody.uniformSettingsReadable .settingControl select {
+  height:36px;
+  font-size:13px;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .settingsChips button,
+.hookchart-root .settingsBody.uniformSettingsReadable .densityModeRow button {
+  height:auto;
+  min-height:35px;
+  padding:7px 10px;
+  font-size:12px;
+  line-height:1.3;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .valueBadge,
+.hookchart-root .settingsBody.uniformSettingsReadable .sortGroups small,
+.hookchart-root .settingsBody.uniformSettingsReadable .densityVisibilityRow label {
+  font-size:12px;
+  line-height:1.4;
+}
+@container (max-width:620px) {
+  /* The shared mobile settings rules use !important; keep labels readable across every tab. */
+  .hookchart-root .settingsBody.uniformSettingsReadable .settingText>b {
+    font-size:13px!important;
+  }
+  .hookchart-root .settingsBody.uniformSettingsReadable .settingText>small {
+    font-size:12px!important;
+  }
+  .hookchart-root .settingsBody.uniformSettingsReadable .settingRow {
+    gap:7px!important;
+    padding:9px 0!important;
+  }
+  .hookchart-root .settingsBody.uniformSettingsReadable .settingsChips {
+    justify-content:flex-start;
+  }
+}
+
+/* All HookChart category tab titles match the Hotkeys row text size. */
+.hookchart-root .originalSettingsPanel .settingsTabs button { font-size:14px!important; }
+@container (max-width:620px) {
+  .hookchart-root .originalSettingsPanel .settingsTabs button { font-size:13px!important; }
+}
+
+/* HookChart → Hotkeys: match the legibility of the Strategies tab.
+   Only this tab's typography and row geometry change; hotkey bindings,
+   rendering and the other chart settings remain untouched. */
+.hookchart-root .hotkeySettings .settingsHint {
+  color:#c9e4f6;
+  font-size:12px;
+  line-height:1.55;
+  padding:10px 122px 10px 12px;
+  margin-bottom:12px;
+}
+.hookchart-root .hotkeySettings .resetHotkeys {
+  top:3px;
+  right:4px;
+  height:34px;
+  padding:0 12px;
+  color:#dce7f3;
+  font:650 12px/1.25 system-ui;
+}
+.hookchart-root .hotkeySettings .settingsSection {
+  padding-top:13px;
+  padding-bottom:9px;
+}
+.hookchart-root .hotkeySettings .settingsSection>h3 {
+  color:#f1f5f9;
+  font-size:15px;
+  line-height:1.4;
+  margin-bottom:9px;
+}
+.hookchart-root .hotkeySettings .hotkeyRow {
+  grid-template-columns:minmax(0,1fr) minmax(164px,auto) 34px 34px;
+  min-height:48px;
+  gap:8px;
+  padding:7px 9px;
+  color:#d1dce8;
+  font-size:14px;
+  line-height:1.45;
+}
+.hookchart-root .hotkeySettings .hotkeyRow>span {
+  min-width:0;
+  overflow-wrap:break-word;
+}
+.hookchart-root .hotkeySettings .hotkeyRow>button {
+  min-width:0;
+  height:36px;
+  min-height:36px;
+  padding:0 9px;
+  border-radius:6px;
+  color:#e2edf9;
+  font:600 13px/1.3 system-ui;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .hotkeySettings .hotkeyRow>.hotkeyClear,
+.hookchart-root .hotkeySettings .hotkeyRow>.hotkeyResetOne {
+  width:34px;
+  padding:0;
+  font-size:20px;
+}
+.hookchart-root .hotkeySettings .hotkeyRow>button:focus-visible,
+.hookchart-root .hotkeySettings .resetHotkeys:focus-visible {
+  outline:2px solid #38bdf8;
+  outline-offset:2px;
+}
+@container (max-width:620px) {
+  .hookchart-root .hotkeySettings .settingsHint {
+    padding:10px 12px;
+  }
+  .hookchart-root .hotkeySettings .resetHotkeys {
+    position:static;
+    display:block;
+    margin:0 0 10px auto;
+  }
+  .hookchart-root .hotkeySettings .hotkeyRow {
+    grid-template-columns:minmax(0,1fr) 34px 34px;
+    grid-template-areas:"label label label" "shortcut clear reset";
+    min-height:0;
+    gap:7px;
+    padding:9px 7px;
+    font-size:13px;
+  }
+  .hookchart-root .hotkeySettings .hotkeyRow>span { grid-area:label; }
+  .hookchart-root .hotkeySettings .hotkeyRow>button:not(.hotkeyClear):not(.hotkeyResetOne) { grid-area:shortcut; }
+  .hookchart-root .hotkeySettings .hotkeyRow>.hotkeyClear { grid-area:clear; }
+  .hookchart-root .hotkeySettings .hotkeyRow>.hotkeyResetOne { grid-area:reset; }
+}
+
+/* Profile-only embedded chart settings. The generic HookChart backdrop is
+   position:fixed!important; every conflicting property MUST override its
+   important rule or the profile tab becomes a full-screen dark overlay on iOS.
+   Live chart popups and the Screener are intentionally unaffected. */
+.hookchart-root.profile-hookchart-settings {
+  height:100%;
+  min-height:0;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+}
+.hookchart-root.profile-hookchart-settings .originalSettingsBackdrop.embeddedSettingsBackdrop {
+  position:relative!important;
+  inset:auto!important;
+  z-index:auto!important;
+  display:flex!important;
+  flex:1 1 auto;
+  min-height:0;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  width:100%!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:transparent!important;
+  backdrop-filter:none!important;
+}
+.hookchart-root.profile-hookchart-settings .originalSettingsBackdrop.embeddedSettingsBackdrop .originalSettingsPanel {
+  box-sizing:border-box;
+  flex:1 1 auto;
+  min-height:0!important;
+  width:100%!important;
+  height:100%!important;
+  max-height:100%!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+/* The profile owns the one and only window frame. Embedded HookChart
+   settings must look like a native profile section rather than a second modal. */
+.hookchart-root.profile-hookchart-settings .originalSettingsPanel .settingsHeader,
+.hookchart-root.profile-hookchart-settings .originalSettingsPanel .settingsTabs,
+.hookchart-root.profile-hookchart-settings .originalSettingsPanel .settingsBody {
+  background:transparent!important;
+}
+.hookchart-root.profile-hookchart-settings .originalSettingsBackdrop.embeddedSettingsBackdrop .settingsBody {
+  min-height:0;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+/* Profile chart help: anchored to the header, never clipped by its narrow mobile button. */
+.hookchart-root.profile-hookchart-settings .settingsHeader {
+  position:relative;
+  z-index:10;
+}
+.hookchart-root.profile-hookchart-settings .profileSettingsHelp {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-left:auto;
+  flex-shrink:0;
+}
+.hookchart-root.profile-hookchart-settings .profileSettingsHelpButton {
+  display:inline-flex;
+  width:32px;
+  height:32px;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #256c83;
+  border-radius:50%;
+  background:#102b3b;
+  color:#8ee4ff;
+  font:700 15px/1 system-ui;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-root.profile-hookchart-settings .profileSettingsHelpButton:hover,
+.hookchart-root.profile-hookchart-settings .profileSettingsHelpButton[aria-expanded="true"] {
+  border-color:#22d3ee;
+  background:#164455;
+  color:#effbff;
+}
+.hookchart-root.profile-hookchart-settings .profileSettingsHelpButton:focus-visible {
+  outline:2px solid #67e8f9;
+  outline-offset:3px;
+}
+.hookchart-root.profile-hookchart-settings .profileSettingsHelpPopover {
+  position:absolute;
+  z-index:20;
+  top:calc(100% + 2px);
+  right:10px;
+  box-sizing:border-box;
+  width:min(350px,calc(100% - 20px));
+  padding:12px 14px;
+  border:1px solid #277d95;
+  border-radius:10px;
+  background:#101e2c;
+  box-shadow:0 12px 30px #000b;
+  color:#dbeafe;
+  font:400 12px/1.6 system-ui;
+  white-space:normal;
+  text-align:left;
+  overflow-wrap:anywhere;
+}
+@media (max-width:600px) {
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyCard { padding:12px; }
+}
+
+/* Desktop readability for the entire embedded Profile > Chart editor.
+   Scoped to profile-only embedding so chart popups, mobile and tablet stay as-is. */
+@media (min-width:1024px) {
+  .hookchart-root.profile-hookchart-settings > div:first-child {
+    font-size:14px;
+    line-height:1.5;
+    gap:10px;
+  }
+  .hookchart-root.profile-hookchart-settings .originalSettingsPanel .settingsHeader {
+    height:64px;
+    min-height:64px;
+    flex:0 0 64px;
+    padding:0 18px;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsHeader b {
+    font-size:17px;
+    line-height:1.4;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsHeader small {
+    font-size:12px;
+    line-height:1.4;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsTabs {
+    height:49px!important;
+    min-height:49px!important;
+    flex:0 0 49px!important;
+    align-items:center!important;
+    gap:8px!important;
+    padding:0 18px!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsTabs button {
+    height:37px!important;
+    padding:0 16px!important;
+    font-size:14px!important;
+    line-height:1.2!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsBody {
+    padding:10px 18px 28px!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsSection {
+    padding:16px 0 10px;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsSection>h3 {
+    font-size:15px;
+    line-height:1.4;
+    margin-bottom:12px;
+  }
+  .hookchart-root.profile-hookchart-settings .settingRow {
+    min-height:56px;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:16px;
+    padding:9px 0;
+  }
+  .hookchart-root.profile-hookchart-settings .settingText {
+    gap:4px;
+  }
+  .hookchart-root.profile-hookchart-settings .settingText>b {
+    font-size:14px;
+    line-height:1.4;
+  }
+  .hookchart-root.profile-hookchart-settings .settingText>small {
+    font-size:12px;
+    line-height:1.45;
+  }
+  .hookchart-root.profile-hookchart-settings .settingControl {
+    gap:9px;
+    flex-wrap:wrap;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsHint {
+    font-size:13px;
+    line-height:1.5;
+    padding:11px 13px;
+    margin-bottom:12px;
+  }
+  .hookchart-root.profile-hookchart-settings .numInput,
+  .hookchart-root.profile-hookchart-settings .settingControl select {
+    height:36px;
+    min-width:88px;
+    max-width:176px;
+    font:600 13px/1.2 system-ui;
+    padding:0 9px;
+  }
+  .hookchart-root.profile-hookchart-settings .numInput {
+    width:112px;
+  }
+  .hookchart-root.profile-hookchart-settings .colorInput {
+    width:45px;
+    height:35px;
+  }
+  .hookchart-root.profile-hookchart-settings .valueBadge {
+    font:600 12px/1.2 system-ui;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsSwitch {
+    width:44px!important;
+    height:24px!important;
+    flex-basis:44px!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsSwitch span:after {
+    width:16px!important;
+    height:16px!important;
+    left:3px!important;
+    top:3px!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsSwitch input:checked+span:after {
+    left:23px!important;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsChips {
+    gap:7px;
+  }
+  .hookchart-root.profile-hookchart-settings .settingsChips button,
+  .hookchart-root.profile-hookchart-settings .densityModeRow button {
+    height:35px;
+    min-height:35px;
+    padding:0 11px;
+    font:650 12px/1.2 system-ui;
+  }
+  .hookchart-root.profile-hookchart-settings .sortGroups {
+    gap:7px;
+  }
+  .hookchart-root.profile-hookchart-settings .sortGroups small,
+  .hookchart-root.profile-hookchart-settings .densityVisibilityRow label {
+    font-size:12px;
+    line-height:1.4;
+  }
+  .hookchart-root.profile-hookchart-settings .densityVisibilityRow,
+  .hookchart-root.profile-hookchart-settings .densityModeRow {
+    gap:9px;
+  }
+  .hookchart-root.profile-hookchart-settings .strategyOff {
+    height:36px;
+    padding:0 14px;
+    font:650 12px/1.2 system-ui;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyGrid {
+    gap:12px;
+    padding:10px 0 14px;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyCard {
+    gap:11px;
+    padding:17px;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyTitle b {
+    font-size:16px;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyTitle span {
+    font-size:11px;
+    padding:5px 8px;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyCard p {
+    font-size:14px;
+    line-height:1.55;
+  }
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyCard strong,
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyCard ul,
+  .hookchart-root.profile-hookchart-settings .strategySettings .strategyNote {
+    font-size:13px;
+    line-height:1.5;
+  }
+}
+
+/* The Hotkeys tab has extra row-specific sizing immediately below. */
+/* Larger, readable keyboard shortcut editor only inside Profile > Chart,
+   and only on desktop. The chart popup and mobile editor keep their sizes. */
+@media (min-width:1024px) {
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .settingsHint {
+    font-size:13px;
+    line-height:1.55;
+    padding:11px 108px 11px 14px;
+    margin-bottom:13px;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .resetHotkeys {
+    top:3px;
+    right:4px;
+    height:36px;
+    padding:0 14px;
+    font:650 12px/1.2 system-ui;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .settingsSection {
+    padding-top:17px;
+    padding-bottom:12px;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .settingsSection>h3 {
+    font-size:15px;
+    line-height:1.4;
+    margin-bottom:11px;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .hotkeyRow {
+    grid-template-columns:minmax(0,1fr) minmax(174px,auto) 34px 34px;
+    min-height:48px;
+    gap:9px;
+    padding:7px 10px;
+    font-size:14px;
+    line-height:1.4;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .hotkeyRow>button {
+    height:34px;
+    min-height:34px;
+    border-radius:6px;
+    padding:0 9px;
+    font:600 13px/1.2 system-ui;
+  }
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .hotkeyRow>.hotkeyClear,
+  .hookchart-root.profile-hookchart-settings .hotkeySettings .hotkeyRow>.hotkeyResetOne {
+    width:34px;
+    padding:0;
+    font-size:20px;
+  }
+}
+
+/* Help beside the Long / Short controls; hover on desktop, tap/focus on mobile. */
+.liqSettingHelp{display:inline-flex;position:relative;margin-inline-start:6px;vertical-align:middle}
+.liqSettingHelp>button{width:17px;height:17px;display:inline-grid;place-items:center;border:1px solid #718198;border-radius:50%;background:transparent;color:#acbdd0;font:700 11px/1 system-ui;cursor:help;padding:0}
+.liqSettingHelp>span{position:absolute;z-index:100;bottom:calc(100% + 7px);left:0;width:min(260px,70vw);max-width:70vw;background:#141d2b;border:1px solid #46596e;border-radius:6px;padding:8px 10px;color:#e7eef8;font:12px/1.45 system-ui;box-shadow:0 8px 25px rgba(0,0,0,.4);display:none;white-space:normal}
+.liqSettingHelp:hover>span,.liqSettingHelp:focus-within>span{display:block}
+
+
+/* Visual editor chart-type dropdown: unlike iOS native select, it is dark
+   everywhere. Only this picker changes; all other site selects stay intact. */
+.hookchart-root .visualProfileEditor .settingControl > .visualContextPicker {
+  display:block;
+  width:min(100%, 380px);
+  max-width:100%;
+  min-width:0;
+}
+.hookchart-root .visualProfileEditor .visualContextTrigger {
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  min-height:46px;
+  gap:12px;
+  padding:10px 14px;
+  border:1px solid #375473;
+  border-radius:11px;
+  background:linear-gradient(180deg,#13233a,#0c1729);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  color:#e9f3ff;
+  font:600 15px/1.35 system-ui;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-root .visualProfileEditor .visualContextTrigger:hover,
+.hookchart-root .visualProfileEditor .visualContextTrigger[aria-expanded="true"] {
+  border-color:#4b95d0;
+  background:linear-gradient(180deg,#193451,#0e2036);
+}
+.hookchart-root .visualProfileEditor .visualContextTrigger:focus-visible {
+  outline:2px solid #63c4fa;
+  outline-offset:2px;
+}
+.hookchart-root .visualProfileEditor .visualContextTriggerLabel {
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.hookchart-root .visualProfileEditor .visualContextChevron {
+  flex:0 0 auto;
+  color:#87b9da;
+  font:700 21px/1 system-ui;
+  transition:transform .17s ease;
+}
+.hookchart-root .visualProfileEditor .visualContextChevron.open {transform:rotate(180deg)}
+
+/* This menu is portalled to document.body so settingsSection overflow:hidden
+   never cuts it off. Its z-index is above the fullscreen settings portal. */
+.hookchart-visual-context-menu {
+  box-sizing:border-box;
+  position:fixed;
+  z-index:2147483500;
+  display:block;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:7px;
+  border:1px solid #334b65;
+  border-radius:15px;
+  background:#0d1726;
+  box-shadow:0 18px 52px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.04);
+  color:#dceafb;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.hookchart-visual-context-menu .visualContextGroup {
+  margin:5px 5px 3px;
+  padding:8px 8px 5px;
+  color:#83a9c8;
+  font:700 11px/1.2 system-ui;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+}
+.hookchart-visual-context-menu .visualContextGroup:not(:first-child) {
+  margin-top:9px;
+  border-top:1px solid #28384d;
+}
+.hookchart-visual-context-menu .visualContextOption {
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-height:43px;
+  gap:11px;
+  padding:9px 11px;
+  border:1px solid transparent;
+  border-radius:9px;
+  background:transparent;
+  color:#dce7f3;
+  font:550 14px/1.35 system-ui;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-visual-context-menu .visualContextOption:hover,
+.hookchart-visual-context-menu .visualContextOption:focus-visible {
+  background:#172e45;
+  border-color:#335873;
+  outline:none;
+}
+.hookchart-visual-context-menu .visualContextOption[aria-selected="true"] {
+  background:#153751;
+  border-color:#2c658b;
+  color:#f4fbff;
+}
+.hookchart-visual-context-menu .visualContextCheck {
+  display:grid;
+  flex:0 0 19px;
+  width:19px;
+  place-items:center;
+  color:#5bc7ff;
+  font:750 17px/1 system-ui;
+}
+.hookchart-visual-context-menu .visualContextOptionLabel {
+  flex:1 1 auto;
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.hookchart-root .visualProfileEditor .visualProfileRange {
+  flex: 1 1 130px;
+  width: min(220px, 100%);
+  min-width: 80px;
+  height: 30px;
+  accent-color: #22d3ee;
+  cursor: pointer;
+}
+.hookchart-root .visualProfileEditor .settingControl > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.hookchart-root .visualProfileEditor .valueBadge {
+  min-width: 35px;
+  text-align: right;
+  font-size: 11px;
+}
+@media (max-width: 620px) {
+  .hookchart-root .visualProfileEditor .settingRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 0;
+  }
+  .hookchart-root .visualProfileEditor .settingControl {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .hookchart-root .visualProfileEditor .visualContextTrigger {
+    min-height:48px;
+    font-size:16px;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileRange {
+    min-width: 110px;
+    width: min(240px, 70vw);
+  }
+}
+
+
+/* Interactive real HookChart preview in Visual Settings. The preview reuses
+   OHLCV from its parent chart and is mounted only while the Chart tab is open. */
+.hookchart-root .hookchart-visual-preview {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:9px;
+  min-width:0;
+  margin:10px 0 14px;
+}
+.hookchart-root .hookchart-visual-preview-caption {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  color:#a3b3c6;
+  font:600 11px/1.4 system-ui;
+}
+.hookchart-root .hookchart-visual-preview-caption strong {
+  color:#e2f4ff;
+  font-weight:800;
+  font-size:13px;
+}
+.hookchart-root .hookchart-visual-preview-caption span {
+  padding:3px 6px;
+  border:1px solid #263747;
+  border-radius:5px;
+  background:#0e1a29;
+}
+.hookchart-root .hookchart-visual-preview-caption .hookchart-visual-preview-live {
+  margin-left:auto;
+  color:#71d9d3;
+  border-color:#1b564f;
+  background:#0b2628;
+  font-size:10px;
+}
+.hookchart-root .hookchart-visual-preview-frame {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:9px;
+  border:1px solid #34475a;
+  background:#131722;
+  box-shadow:0 10px 24px #0005;
+}
+.hookchart-root .hookchart-visual-preview-chart {
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  flex:0 0 265px;
+  height:265px;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+}
+.hookchart-root .hookchart-visual-preview-chart > .chartWrap {
+  flex:1 1 0!important;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  height:100%;
+  padding:0!important;
+  touch-action:none;
+}
+.hookchart-root .hookchart-visual-preview-chart .chartCanvasSurface {
+  position:relative;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+}
+.hookchart-root .hookchart-visual-preview-chart .chartCanvasSurface canvas {
+  touch-action:none;
+}
+.hookchart-root .hookchart-visual-preview-frame > .chartTimeAxis {
+  flex:0 0 26px;
+  height:26px;
+  min-height:26px;
+  width:100%;
+}
+.hookchart-root .hookchart-visual-preview-actions {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  font:400 11px/1.5 system-ui;
+  color:#9ca9b7;
+}
+.hookchart-root .hookchart-visual-preview-actions button {
+  min-height:35px;
+  border:1px solid #2478ac;
+  border-radius:7px;
+  padding:8px 12px;
+  background:#0e314d;
+  color:#90ddff;
+  font:700 12px/1.25 system-ui;
+  cursor:pointer;
+}
+.hookchart-root .hookchart-visual-preview-actions button:hover,
+.hookchart-root .hookchart-visual-preview-actions button:focus-visible {
+  border-color:#45bce5;
+  background:#154462;
+  outline:2px solid #1a768c;
+  outline-offset:1px;
+}
+.hookchart-root .hookchart-visual-preview-empty {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  min-height:150px;
+  border:1px dashed #315064;
+  border-radius:9px;
+  padding:20px;
+  background:#111b28;
+  color:#aab8c7;
+  text-align:center;
+  font:500 12px/1.6 system-ui;
+}
+.hookchart-root .hookchart-visual-preview-info {
+  margin:0;
+  font:400 10px/1.55 system-ui;
+  color:#778b9d;
+}
+@media(max-width:600px) {
+  .hookchart-root .hookchart-visual-preview-chart {
+    flex-basis:220px;
+    height:220px;
+  }
+  .hookchart-root .hookchart-visual-preview-actions button {
+    width:100%;
+    min-height:42px;
+    font-size:13px;
+  }
+  .hookchart-root .hookchart-visual-preview-caption .hookchart-visual-preview-live {
+    margin-left:0;
+  }
+}
+
+/* iOS Safari otherwise zooms the whole settings page when a tiny number field gets focus. */
+@media (max-width:767px) {
+  .hookchart-root .originalSettingsPanel .numInput,
+  .hookchart-root.profile-hookchart-settings .originalSettingsPanel .numInput {
+    font-size:16px !important;
+    min-height:36px;
+  }
+}
+
+/* Offline settings-only HookChart, full-width for accurate viewport geometry. */
+.hookchart-root .hookchart-visual-preview .hookchart-visual-preview-frame {
+  max-width:none;
+  width:100%;
+}
+.hookchart-root .hookchart-live-metrics {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  font:500 10px/1.35 system-ui;
+}
+.hookchart-root .hookchart-live-metrics span {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:5px 7px;
+  border:1px solid #294358;
+  border-radius:5px;
+  background:#0e1b2a;
+  color:#93abc0;
+}
+.hookchart-root .hookchart-live-metrics b { color:#bce7ff; font-variant-numeric:tabular-nums; }
+.hookchart-root .hookchart-device-notice {
+  margin:0;
+  border-left:3px solid #cf9b44;
+  padding:8px 10px;
+  background:#272012;
+  color:#f4cb85;
+  font:500 11px/1.45 system-ui;
+}
+@media (max-width:600px) {
+  .hookchart-root .hookchart-visual-preview-chart { flex-basis:300px; height:300px; }
+}
+
+/* Minimal chart-settings preview: no canvas, gestures, or market feed. */
+.hookchart-root .hookchart-mini-preview {
+  box-sizing:border-box;
+  max-width:440px;
+  border:1px solid #29415a;
+  border-radius:10px;
+  padding:8px;
+  background:#0c1726;
+  pointer-events:none;
+  user-select:none;
+}
+.hookchart-root .hookchart-mini-title {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:6px;
+  color:#9cc5dd;
+  font:600 10px/1.4 system-ui;
+  padding-bottom:6px;
+}
+.hookchart-root .hookchart-mini-title span:first-child { color:#c8e9ff; font-weight:800; }
+.hookchart-root .hookchart-mini-gap-status {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:3px;
+  margin-top:8px;
+  padding:7px 9px;
+  border:1px solid #225c6d;
+  border-radius:7px;
+  background:#123044;
+  color:#a6d7ea;
+  font:500 11px/1.35 system-ui;
+}
+.hookchart-root .hookchart-mini-gap-status strong {
+  margin-inline:3px;
+  color:#5eead4;
+  font-weight:700;
+}
+.hookchart-root .hookchart-mini-note {
+  margin:6px 0 0;
+  font:400 10px/1.45 system-ui;
+  color:#849fb5;
+}
+@media (max-width:600px) {
+  .hookchart-root .hookchart-mini-preview { padding:6px; max-width:100%; }
+}
+
+
+/* Chart visual settings: a centered preview with every adjustment underneath.
+   Scoped to the editor, so other HookChart settings and Terminal layouts are unchanged. */
+.hookchart-root .visualProfileEditor {
+  width:100%;
+  min-width:0;
+}
+.hookchart-root .visualProfileEditor .visualProfileSelection,
+.hookchart-root .visualProfileEditor .visualProfileControls,
+.hookchart-root .visualProfileEditor .visualProfileActions {
+  box-sizing:border-box;
+  width:min(100%, 760px);
+  max-width:100%;
+  margin-inline:auto;
+}
+.hookchart-root .visualProfileEditor .visualProfileSelection {
+  display:grid;
+  grid-template-columns:minmax(0, 1fr);
+  gap:6px;
+}
+.hookchart-root .visualProfileEditor .visualProfileSelection .settingRow {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  padding:9px 0;
+}
+.hookchart-root .visualProfileEditor .visualProfileSelection .settingControl {
+  width:100%;
+  justify-content:flex-start;
+}
+.hookchart-root .visualProfileEditor .visualProfileSelection .settingControl > .visualContextPicker {
+  width:100%;
+  max-width:100%;
+}
+.hookchart-root .visualProfileEditor .visualProfilePreviewStage {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:14px auto 20px;
+  padding-inline:clamp(0px, 1vw, 12px);
+}
+.hookchart-root .visualProfileEditor .visualProfilePreviewStage .hookchart-mini-preview {
+  width:min(100%, 760px);
+  max-width:760px;
+  margin-inline:auto;
+  padding:clamp(8px, 1.6vw, 16px);
+}
+.hookchart-root .visualProfileEditor .visualProfilePreviewStage .hookchart-mini-preview svg {
+  display:block;
+  width:100%;
+  height:auto;
+  max-width:none;
+}
+.hookchart-root .visualProfileEditor .visualProfilePreviewStage .hookchart-mini-title,
+.hookchart-root .visualProfileEditor .visualProfilePreviewStage .hookchart-mini-note {
+  font-size:clamp(10px, 1.15vw, 12px);
+  line-height:1.5;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls {
+  display:grid;
+  grid-template-columns:minmax(0, 1fr);
+  gap:12px;
+  margin-bottom:16px;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .settingRow {
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  min-width:0;
+  min-height:0;
+  gap:11px;
+  padding:clamp(12px, 1.6vw, 18px);
+  border:1px solid #263b50;
+  border-radius:12px;
+  background:#111d2b;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .settingText {
+  width:100%;
+  min-width:0;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .settingControl {
+  width:100%;
+  min-width:0;
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap:12px;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .settingControl > div {
+  display:flex;
+  flex:1 1 auto;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  align-items:center;
+  gap:12px;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .visualProfileRange {
+  display:block;
+  flex:1 1 auto;
+  width:100%;
+  min-width:0;
+  height:40px;
+  touch-action:pan-y;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .numInput {
+  box-sizing:border-box;
+  flex:0 0 98px;
+  width:98px;
+  min-width:80px;
+  max-width:115px;
+  height:40px;
+  font-size:14px;
+}
+.hookchart-root .visualProfileEditor .visualProfileControls .valueBadge {
+  flex:0 0 auto;
+  min-width:35px;
+  text-align:right;
+  font-size:12px;
+}
+.hookchart-root .visualProfileEditor .visualProfileActions {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:stretch;
+  justify-content:center;
+  gap:10px;
+  margin-top:16px;
+  margin-bottom:15px;
+}
+.hookchart-root .visualProfileEditor .visualProfileActions button {
+  min-height:40px;
+  white-space:normal;
+  text-align:center;
+}
+@media (max-width:620px) {
+  .hookchart-root .visualProfileEditor .visualProfilePreviewStage {
+    margin:10px auto 16px;
+    padding-inline:0;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileControls {
+    gap:9px;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileControls .settingRow {
+    display:flex;
+    padding:12px;
+    gap:9px;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileControls .settingControl,
+  .hookchart-root .visualProfileEditor .visualProfileControls .settingControl > div {
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileControls .visualProfileRange {
+    width:100%;
+    min-width:0;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileControls .numInput {
+    flex:0 0 78px;
+    width:78px;
+    min-width:70px;
+    font-size:13px;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileActions {
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .hookchart-root .visualProfileEditor .visualProfileActions button {
+    width:100%;
+  }
+}
+
+
+/* Compact, viewport-aware visual profile editor. A minimal, readable fallback
+   remains scrollable when a device has too little physical vertical space. */
+.hookchart-root .visualProfileEditor.visualProfileCompact {
+  width:100%;
+  min-width:0;
+  margin:0;
+}
+.hookchart-root .visualProfileCompact .settingsSection {
+  margin:0;
+  padding:0!important;
+}
+.hookchart-root .visualProfileCompact .settingsSection>h3 {
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:32px;
+  height:auto;
+  padding:5px 12px;
+  margin:0;
+}
+.hookchart-root .visualSettingHelp {
+  display:inline-flex;
+  vertical-align:middle;
+  flex:0 0 auto;
+  margin-left:5px;
+}
+.hookchart-root .visualSettingHelpButton {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  width:24px;
+  height:24px;
+  padding:0;
+  border:1px solid #317b91;
+  border-radius:50%;
+  background:#103041;
+  color:#8ae7f4;
+  font:700 12px/1 system-ui;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-root .visualSettingHelpButton:hover,
+.hookchart-root .visualSettingHelpButton[aria-expanded="true"] {
+  background:#165368;
+  border-color:#5eead4;
+  color:#efffff;
+}
+.hookchart-root .visualSettingHelpButton:focus-visible {
+  outline:2px solid #67e8f9;
+  outline-offset:2px;
+}
+.hookchartVisualHelpPopover {
+  box-sizing:border-box;
+  z-index:2147483000;
+  max-height:min(45dvh, 180px);
+  overflow-y:auto;
+  padding:10px 12px;
+  border:1px solid #2d879e;
+  border-radius:9px;
+  background:#101e2c;
+  box-shadow:0 12px 35px #000b;
+  color:#e0f2fe;
+  font:400 13px/1.5 system-ui;
+  overflow-wrap:anywhere;
+  white-space:normal;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection {
+  box-sizing:border-box;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:center;
+  width:min(100%, 840px);
+  gap:5px 12px;
+  margin:0 auto;
+  padding:6px 12px 0;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingRow {
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-between;
+  min-width:0;
+  min-height:36px!important;
+  padding:3px 2px!important;
+  gap:6px;
+  border:0;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingText {
+  flex:0 0 auto;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingControl {
+  flex:1 1 auto;
+  min-width:0;
+  width:auto;
+  justify-content:flex-end;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingControl > .visualContextPicker {
+  box-sizing:border-box;
+  width:100%;
+  max-width:270px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingsChips {
+  justify-content:flex-end;
+  flex-wrap:nowrap;
+}
+.hookchart-root .visualProfileCompact .visualProfilePreviewStage {
+  width:min(100%, 840px);
+  margin:4px auto 7px;
+  padding:0 9px;
+}
+.hookchart-root .visualProfileCompact .visualProfilePreviewStage .hookchart-mini-preview {
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  margin:0 auto;
+  padding:5px 7px;
+}
+.hookchart-root .visualProfileCompact .hookchart-mini-title {
+  padding:0 0 3px;
+  font-size:10px;
+}
+.hookchart-root .visualProfileCompact .hookchart-mini-gap-status {
+  margin-top:3px;
+  padding:3px 6px;
+  font-size:10px;
+  line-height:1.2;
+}
+.hookchart-root .visualProfileCompact .hookchart-mini-note {
+  display:none;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  width:min(100%, 840px);
+  gap:5px;
+  margin:0 auto;
+  padding:0 9px;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingRow {
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:1px;
+  min-width:0;
+  min-height:0!important;
+  padding:6px 12px!important;
+  margin:0;
+  border:1px solid #263b50;
+  border-radius:9px;
+  background:#111d2b;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingText {
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:flex-start;
+  min-height:27px;
+  width:100%;
+  gap:4px;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingText>b {
+  display:inline-flex;
+  align-items:center;
+  font-size:clamp(11px, 1.2vw, 13px);
+  line-height:1.2;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingControl,
+.hookchart-root .visualProfileCompact .visualProfileControls .settingControl > div {
+  box-sizing:border-box;
+  display:flex;
+  flex-wrap:nowrap;
+  width:100%;
+  min-width:0;
+  justify-content:flex-start;
+  align-items:center;
+  gap:9px;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .visualProfileRange {
+  box-sizing:border-box;
+  flex:1 1 auto;
+  width:100%;
+  min-width:0;
+  height:30px;
+  touch-action:pan-y;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .numInput {
+  box-sizing:border-box;
+  flex:0 0 80px;
+  width:80px;
+  min-width:68px;
+  max-width:88px;
+  height:32px;
+  font-size:13px;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .valueBadge {
+  min-width:26px;
+  font-size:11px;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingRow.visualProfileAutoScaleRow {
+  flex-direction:row;
+  justify-content:space-between;
+  align-items:center;
+}
+.hookchart-root .visualProfileCompact .visualProfileControls .settingRow.visualProfileAutoScaleRow .settingControl {
+  width:auto;
+  flex:0 0 auto;
+  justify-content:flex-end;
+}
+.hookchart-root .visualProfileCompact .settingsSwitch {
+  width:40px;
+  height:24px;
+  flex-basis:40px;
+  touch-action:manipulation;
+}
+.hookchart-root .visualProfileCompact .settingsSwitch span {
+  border-radius:14px;
+}
+.hookchart-root .visualProfileCompact .settingsSwitch span:after {
+  width:16px;
+  height:16px;
+  left:3px;
+  top:3px;
+}
+.hookchart-root .visualProfileCompact .settingsSwitch input:checked+span:after {left:19px}
+.hookchart-root .visualProfileCompact .settingsSwitch input:focus-visible+span {
+  outline:2px solid #67e8f9;
+  outline-offset:3px;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions {
+  display:grid;
+  box-sizing:border-box;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  width:min(100%, 840px);
+  gap:8px;
+  align-items:stretch;
+  margin:8px auto 6px;
+  padding:0 9px;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionButton {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  width:100%;
+  min-height:39px;
+  padding:7px 10px;
+  border:1px solid #245a70;
+  border-radius:9px;
+  background:#133449;
+  color:#aeeaff;
+  font:650 clamp(10px,1vw,12px)/1.25 system-ui;
+  text-align:center;
+  white-space:normal;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionPrimary {
+  border-color:#238fa8;
+  background:#0e5266;
+  color:#e3fbff;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionReset {
+  border-color:#515768;
+  background:#202633;
+  color:#dce5ef;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionButton:hover:not(:disabled) {
+  filter:brightness(1.18);
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionButton:focus-visible {
+  outline:2px solid #67e8f9;
+  outline-offset:2px;
+}
+.hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionButton:disabled {
+  opacity:.42;
+  cursor:not-allowed;
+}
+.hookchart-root .visualProfileCompact .visualProfileActionStatus {
+  box-sizing:border-box;
+  width:min(100% - 18px, 822px);
+  margin:3px auto 6px;
+  padding:6px 9px;
+  border:1px solid #205f71;
+  border-radius:7px;
+  background:#0e2b3b;
+  color:#a9f0dd;
+  font:500 11px/1.4 system-ui;
+}
+.hookchart-root .visualProfileCompact .visualProfileTransientHint {
+  max-width:840px;
+  margin:0 auto;
+  padding:4px 10px;
+  color:#9cb0c5;
+  font:400 10px/1.3 system-ui;
+}
+@media (max-width:680px) {
+  .hookchart-root .visualProfileCompact .visualProfileSelection {
+    grid-template-columns:minmax(0,1fr);
+    gap:0;
+    padding:3px 8px 0;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileSelection .settingRow {
+    min-height:33px!important;
+  }
+  .hookchart-root .visualProfileCompact .visualProfilePreviewStage {margin:3px auto 6px;padding:0 6px}
+  .hookchart-root .visualProfileCompact .visualProfilePreviewStage .hookchart-mini-preview {
+    width:100%;
+    padding:4px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls {
+    gap:4px;
+    padding:0 6px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls .settingRow {
+    padding:4px 8px!important;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls .visualProfileRange {
+    height:28px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileActions {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:5px;
+    margin-top:6px;
+    padding:0 6px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionPrimary {
+    grid-column:1/-1;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileActions .visualProfileActionButton {
+    min-height:40px;
+    padding:5px 8px;
+    font-size:11px;
+  }
+}
+@media (max-height:710px) and (min-width:681px) {
+  .hookchart-root .visualProfileCompact .visualProfileControls {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls .settingRow {
+    min-height:52px!important;
+    padding:4px 9px!important;
+  }
+  .hookchart-root .visualProfileCompact .visualProfilePreviewStage .hookchart-mini-preview {
+    width:100%;
+  }
+}
+@media (max-height:600px) and (max-width:680px) {
+  .hookchart-root .visualProfileCompact .visualProfilePreviewStage .hookchart-mini-preview {
+    width:100%;
+  }
+  .hookchart-root .visualProfileCompact .hookchart-mini-title span:last-child:not(:only-child) {display:none}
+  .hookchart-root .visualProfileCompact .visualProfileControls .settingRow {
+    padding:3px 7px!important;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls .settingControl .visualProfileRange {
+    height:26px;
+  }
+}
+
+@media (max-height:650px) and (min-width:490px) and (max-width:680px) {
+  .hookchart-root .visualProfileCompact .visualProfileControls {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .hookchart-root .visualProfileCompact .visualProfileControls .settingRow {
+    min-height:51px!important;
+  }
+}
+
+/* Scale-tab selectors: keep chart type and device controls compact without
+   changing the full-size chart preview, sliders, or other HookChart tabs. */
+.hookchart-root .visualProfileCompact .visualProfileSelection {
+  width:min(100%, 670px);
+  gap:4px 10px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingRow {
+  min-height:34px!important;
+  padding:2px 0!important;
+  gap:5px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingControl > .visualContextPicker {
+  max-width:240px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .visualContextTrigger {
+  min-height:36px;
+  padding:6px 9px;
+  border-radius:8px;
+  gap:7px;
+  font-size:12px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .visualContextChevron {
+  font-size:17px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingsChips {
+  gap:4px;
+}
+.hookchart-root .visualProfileCompact .visualProfileSelection .settingsChips button {
+  min-height:30px;
+  height:30px;
+  padding:0 8px;
+  font-size:11px;
+}
+@media (max-width:620px) {
+  .hookchart-root .visualProfileCompact .visualProfileSelection {
+    width:100%;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileSelection .visualContextTrigger {
+    min-height:42px;
+    font-size:14px;
+  }
+  .hookchart-root .visualProfileCompact .visualProfileSelection .settingsChips button {
+    min-height:34px;
+    height:34px;
+    padding:0 9px;
+    font-size:12px;
+  }
+}
+
+/* Scale uses compact layouts. Keep settings labels the same size as Hotkeys;
+   the mini chart's own preview annotations remain appropriately compact. */
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileControls .settingText>b {
+  font-size:14px;
+  line-height:1.45;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileControls .valueBadge,
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileActionStatus {
+  font-size:12px;
+}
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileSelection .visualContextTrigger,
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileSelection .settingsChips button,
+.hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileActions .visualProfileActionButton {
+  font-size:13px;
+  line-height:1.35;
+}
+@container (max-width:620px) {
+  .hookchart-root .settingsBody.uniformSettingsReadable .visualProfileCompact .visualProfileControls .settingText>b {
+    font-size:13px!important;
+  }
+}
+
+/* Small hover/focus/tap help buttons only for HookChart → Основні.
+   The tooltip itself is a fixed body portal so clipped settings cannot hide it. */
+.hookchart-root .visualSettingHelp.mainSettingHelp {
+  margin-left:5px;
+  vertical-align:middle;
+}
+.hookchart-root .visualSettingHelp.mainSettingHelp .visualSettingHelpButton {
+  width:16px;
+  height:16px;
+  min-width:16px;
+  min-height:16px;
+  padding:0;
+  border-radius:50%;
+  border-color:#46738d;
+  color:#9ac7dd;
+  font:700 10px/1 system-ui;
+  touch-action:manipulation;
+  cursor:help;
+}
+@media (hover:none) and (pointer:coarse) {
+  .hookchart-root .visualSettingHelp.mainSettingHelp .visualSettingHelpButton {
+    width:21px;
+    height:21px;
+    min-width:21px;
+    min-height:21px;
+    font-size:11px;
+  }
+}
+
+/* HookChart settings: hide native number steppers in all browsers. Numeric
+   values remain editable as plain text with a decimal keyboard on mobile. */
+.hookchart-root .originalSettingsPanel input.numInput[type="number"] {
+  -moz-appearance:textfield;
+  appearance:textfield;
+}
+.hookchart-root .originalSettingsPanel input.numInput[type="number"]::-webkit-inner-spin-button,
+.hookchart-root .originalSettingsPanel input.numInput[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance:none;
+  appearance:none;
+  display:none;
+  margin:0;
+}
+
+/* Opt-in observed Liq heatmap in the collapsible tools strip.
+ * No heatmap UI/canvas styling is active when the user leaves it off. */
+.hookchart-root .liqHeatmapTools {
+  display:flex;
+  align-items:center;
+  flex:0 0 auto;
+  gap:3px;
+  padding:0 3px;
+  border-inline:1px solid #26394a;
+}
+.hookchart-root .hookchart-toolbar .liqHeatmapTools button.liqHeatmapSwitch {
+  display:inline-flex;
+  flex:0 0 30px;
+  width:30px;
+  min-width:30px;
+  height:27px;
+  min-height:27px;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  border:1px solid #304457;
+  border-radius:6px;
+  color:#aabace;
+  background:#101d2b;
+}
+.hookchart-root .hookchart-toolbar .liqHeatmapTools button.liqHeatmapSwitch svg {
+  display:block;
+  width:15px;
+  height:15px;
+  flex-shrink:0;
+}
+.hookchart-root .hookchart-toolbar .liqHeatmapTools button.liqHeatmapSwitch.active {
+  border-color:#c45153;
+  background:#39252f;
+  color:#ffc3a1;
+}
+.hookchart-root .hookchart-toolbar .liqHeatmapTools button.liqHeatmapPeriod {
+  width:28px;
+  min-width:28px;
+  height:25px;
+  min-height:25px;
+  font-size:9px;
+  color:#97a8ba;
+  border:1px solid #293747;
+}
+.hookchart-root .hookchart-toolbar .liqHeatmapTools button.liqHeatmapPeriod.active {
+  color:#d8f2ff;
+  background:#193950;
+  border-color:#35759b;
+}
+/* Pin Liq map immediately before the settings gear, not inside the
+ * horizontally scrolling additional tools. Terminal's old 28px fixed
+ * toolbarRight width must grow when the optional map icon is present. */
+.hookchart-root .hookchart-toolbar .toolbarRight.hasLiqMap {
+  display:flex;
+  align-items:center;
+  flex:0 0 auto;
+  min-width:max-content;
+}
+.hookchart-terminal .hookchart-terminal-toolbar .toolbarRight.hasLiqMap {
+  flex:0 0 auto;
+  min-width:max-content;
+}
+.hookchart-root .toolbarRight.hasLiqMap .liqHeatmapTools {
+  border-left:0;
+  border-right:0;
+  padding:0 2px 0 0;
+}
+
+
+/* The guide launch belongs to the collapsible drawing-tools rail.
+   It must never float over candles or reserve space beside the chart. */
+.hookchart-root:not(.hookchart-terminal) .floatingDrawTools > .hookchart-guide-entry {
+  color:#83d6ed;
+  border:1px solid #346780;
+  border-radius:50%;
+  background:rgba(14,25,39,.97);
+}
+.hookchart-root:not(.hookchart-terminal) .floatingDrawTools > .hookchart-guide-entry:hover,
+.hookchart-root:not(.hookchart-terminal) .floatingDrawTools > .hookchart-guide-entry:focus-visible {
+  color:#e0faff;
+  border-color:#60d9f3;
+  background:#17465f;
+}
+.hookchart-root:not(.hookchart-terminal) .floatingDrawTools > .hookchart-guide-entry:focus-visible {
+  outline:2px solid #60d9f3;
+  outline-offset:1px;
+}
+
+/* Formation scale dock must not resize the footer/canvas when expanded.
+   Keep the toggle in its fixed slot; float its tools over the scrolling stats. */
+.hookchart-root.hookchart-formations-quick .hookchart-footer{position:relative}
+.hookchart-root.hookchart-formations-quick .hookchart-footer>.marketStatsBar{padding-right:26px}
+.hookchart-root.hookchart-formations-quick .hookchart-footer-controls{
+  position:absolute;right:4px;top:0;width:24px;height:24px;
+  flex:none;margin:0;overflow:visible;z-index:36;
+}
+.hookchart-root.hookchart-formations-quick .chartScaleDock{
+  position:relative;width:24px;min-width:24px;height:24px;
+  padding:0!important;margin:0;flex:none;
+}
+.hookchart-root.hookchart-formations-quick .chartScaleDock .scaleTools{
+  position:absolute;right:100%;top:0;height:24px;
+  display:flex;align-items:center;white-space:nowrap;
+  padding:0 3px;border:1px solid #2a3749;border-radius:5px;
+  background:#131722;box-shadow:0 3px 12px rgba(0,0,0,.35);
+}
+
+/* Opt-in seven-day market recurrences: HTML overlay only, zero Canvas changes. */
+.hookchart-root .hookchart-market-recurrence-toggle.active { color:#73d5cf; background:#153b3f; }
+.hookchart-root .hookchart-market-recurrence-toggle:disabled { opacity:.4; cursor:not-allowed; }
+.hookchart-root .hookchart-market-recurrence-panel {
+  position:absolute; top:34px; right:8px; z-index:42;
+  width:min(320px,calc(100% - 16px)); max-height:min(420px,calc(100% - 46px));
+  overflow:auto; padding:10px; color:#d8e4ed; background:#111923f7;
+  border:1px solid #355164; border-radius:7px; box-shadow:0 12px 28px #0009;
+  font:500 11px/1.45 system-ui,sans-serif; pointer-events:auto;
+}
+.hookchart-root .hookchart-market-recurrence-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.hookchart-root .hookchart-market-recurrence-head b { color:#e7f5fa; font-size:12px; }
+.hookchart-root .hookchart-market-recurrence-head button {
+  display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;
+  border:1px solid #334555;border-radius:4px;background:#1d2936;color:#a4b6c6;cursor:pointer;
+}
+.hookchart-root .hookchart-market-recurrence-meta { color:#7db7c0;font-size:10px;margin:4px 0 8px; }
+.hookchart-root .hookchart-market-recurrence-panel small { display:block;color:#97aaba;font-size:10px;line-height:1.5; }
+.hookchart-root .hookchart-market-recurrence-panel p { margin:8px 0;color:#b6c8d4; }
+.hookchart-root .hookchart-market-recurrence-item { display:grid;gap:3px;padding:8px 0;border-bottom:1px solid #2a3a48; }
+.hookchart-root .hookchart-market-recurrence-item strong {font-size:11px;font-weight:650;color:#def5f2;}
+.hookchart-root .hookchart-market-recurrence-item span {font-size:10px;color:#8accc5;}
+.hookchart-root .hookchart-market-recurrence-panel .hookchart-market-recurrence-warning {
+  margin-top:9px;color:#9cabb8;font-size:9px;
+}
+@media(max-width:620px){
+  .hookchart-root .hookchart-market-recurrence-panel {max-height: min(300px,calc(100% - 42px));}
+}
+
+/* Compact default: avoid covering candles until the user opens statistics. */
+.hookchart-root .hookchart-market-recurrence-panel { max-height:min(320px,calc(100% - 46px)); }
+.hookchart-root .hookchart-market-recurrence-summary {
+  display:flex;gap:7px;align-items:center;justify-content:space-between;
+  padding:5px 0 2px;border-top:1px solid #273d49;
+}
+.hookchart-root .hookchart-market-recurrence-summary span {
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:600 10px/1.5 system-ui,sans-serif;color:#b7e4e3;
+}
+.hookchart-root .hookchart-market-recurrence-summary button {
+  display:grid;place-items:center;flex:none;width:24px;height:24px;
+  border:1px solid #2b4552;border-radius:4px;
+  background:#162936;color:#b3d1da;cursor:pointer;
+}

@@ -1,0 +1,69 @@
+/* h00k Visual Quality III: modal chrome and form detail.
+ * Scoped to existing dark themes and explicitly marked UI regions.
+ * No new fonts, geometry, GPU filters, animations, chart drawing, API calls or JS.
+ * Pastel themes and selected exchange/market semantic colors are unchanged.
+ */
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-shell {
+  border-color: var(--color-slate-700);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-header {
+  border-bottom-color: var(--color-slate-700);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-header :is(h2, h3) {
+  color: var(--color-slate-50);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-header p {
+  color: var(--color-slate-300);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-header button:focus-visible {
+  outline: 2px solid var(--color-cyan-400);
+  outline-offset: 2px;
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls [role="tab"][aria-selected="true"] {
+  outline: 1px solid var(--color-cyan-400);
+  outline-offset: -1px;
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls [role="tab"]:not([aria-selected="true"]) {
+  color: var(--color-slate-200);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls [role="tab"]:not([aria-selected="true"]):hover {
+  color: var(--color-slate-50);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls :is(button, select):focus-visible {
+  outline: 2px solid var(--color-cyan-400);
+  outline-offset: 2px;
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls :is(input:not([type="checkbox"]), select, textarea) {
+  color: var(--color-slate-100);
+  caret-color: var(--color-cyan-300);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls input::placeholder {
+  color: var(--color-slate-500);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls input:not([type="checkbox"]):focus-visible {
+  border-color: var(--color-cyan-400);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls .vq-input-frame {
+  border-color: var(--color-slate-700);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls .vq-input-frame:focus-within {
+  border-color: var(--color-cyan-400);
+}
+
+:is(html[data-site-surface="classic"], html[data-site-surface="midnight"], html[data-site-surface="graphite"], html[data-site-surface="plum"]) .vq-modal-controls select {
+  border-color: var(--color-slate-700);
+}

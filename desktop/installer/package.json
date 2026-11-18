@@ -1,0 +1,61 @@
+{
+  "name": "h00k-setup",
+  "version": "0.1.12",
+  "description": "Animated setup launcher for h00k Desktop",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --check main.cjs && node --check preload.cjs && node --test test/*.test.cjs",
+    "dist": "electron-builder --win portable --x64 --publish never",
+    "bundle-payload": "node prepare.cjs"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "top.h00k.setup",
+    "productName": "h00k Setup",
+    "directories": {
+      "output": "dist",
+      "buildResources": "../build"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "install-core.cjs",
+      "ui.html",
+      "ui.css",
+      "ui.js",
+      "guide.html",
+      "guide.js",
+      "locales.json",
+      "guide.css",
+      "!node_modules/**"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "installer-assets"
+      }
+    ],
+    "win": {
+      "icon": "../build/h00k-installer.ico",
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "h00k Setup ${version}.${ext}"
+    },
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "pl",
+      "ru",
+      "uk"
+    ],
+    "asar": true
+  }
+}

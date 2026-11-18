@@ -1,0 +1,24 @@
+/* Favorite coins drawer: independent of chart/page stacking and zoom contexts. */
+.watchlist-drawer {
+  box-sizing: border-box;
+  width: min(100%, 28rem);
+  height: 100vh;
+  max-height: 100vh;
+}
+.watchlist-drawer-list {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+}
+@supports (height: 100dvh) {
+  .watchlist-drawer {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+/* iOS Safari auto-zooms when any focused input/select uses less than 16px. */
+@media (max-width: 639px) {
+  .watchlist-drawer input,
+  .watchlist-drawer select {
+    font-size: 16px;
+  }
+}

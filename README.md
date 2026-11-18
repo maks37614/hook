@@ -1,9 +1,5 @@
-# h00k — Linux reinstall source backup
+# h00k
 
-This repository is intended to contain the public, versioned source code of h00k.top and h00k Desktop, not production data.
+Сайт https://h00k.top працює на VPS із Docker Compose. Збірка та запуск сервісу `app` налаштовані у `Dockerfile` і `compose.yaml`.
 
-**Do not commit:** `.env`, credentials, database dumps, user profiles, Telegram tokens or other secrets.
-
-Source: https://github.com/maks37614/h00k
-
-The code snapshot and restoration checklist will be added separately. This bootstrap commit is not a complete backup.
+Локальні перевірки: `npm ci`, `npm run lint`, `npm test`, `npm run build`.

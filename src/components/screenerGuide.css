@@ -1,0 +1,112 @@
+/* Screener tour is a lazy-loaded, pointer-transparent overlay. */
+.screener-tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483200;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+}
+.screener-tour-spotlight {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 2px solid #4ed6ee;
+  border-radius: 9px;
+  background: rgba(29, 98, 119, .035);
+  box-shadow: 0 0 0 100vmax rgba(3, 9, 20, .76), 0 0 20px #38bfe85c;
+  pointer-events: none;
+  transition: top .28s ease, left .28s ease, width .28s ease, height .28s ease;
+}
+.screener-tour-card {
+  position: absolute;
+  z-index: 2;
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: min(350px, calc(100% - 20px));
+  max-height: min(360px, calc(100dvh - 16px));
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #35758d;
+  border-radius: 12px;
+  color: #e5eef8;
+  background: #0f1b2b;
+  box-shadow: 0 14px 36px #000b;
+  font: 12px/1.5 system-ui, sans-serif;
+  outline: none;
+  transition: top .28s ease, left .28s ease;
+}
+.screener-tour-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #7bdfed;
+  font-size: 11px;
+  font-weight: 700;
+}
+.screener-tour-top button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b6c5d5;
+  cursor: pointer;
+}
+.screener-tour-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 9px;
+}
+.screener-tour-chapters button {
+  padding: 4px 7px;
+  border: 1px solid #3c536a;
+  border-radius: 6px;
+  color: #b9cada;
+  background: #152639;
+  font: 600 11px/1.3 system-ui, sans-serif;
+  cursor: pointer;
+}
+.screener-tour-chapters button.selected {
+  color: #eaffff;
+  border-color: #50c8df;
+  background: #18445e;
+}
+.screener-tour-card strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 750;
+}
+.screener-tour-card p { margin: 6px 0 8px; color: #d0deeb; }
+.screener-tour-card small { display: block; color: #93acc0; font-size: 10px; }
+.screener-tour-footer { display: grid; gap: 10px; margin-top: 12px; }
+.screener-tour-progress { display: flex; flex-wrap: wrap; gap: 4px; }
+.screener-tour-progress span { width: 6px; height: 6px; border-radius: 9px; background: #3a5369; }
+.screener-tour-progress span.active { width: 17px; background: #55d8ec; }
+.screener-tour-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.screener-tour-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #35566c;
+  border-radius: 8px;
+  color: #e4f1fc;
+  background: #172a3d;
+  cursor: pointer;
+  font-size: 11px;
+}
+.screener-tour-buttons .primary { background: #145575; border-color: #2a8cb4; }
+.screener-tour-buttons button:disabled { opacity: .35; cursor: default; }
+.screener-tour-card button:focus-visible { outline: 2px solid #69d9f2; outline-offset: 2px; }
+@media (max-width: 480px) {
+  .screener-tour-card { max-height: min(370px, calc(100dvh - 16px)); padding: 10px; }
+  .screener-tour-chapters button { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screener-tour-card, .screener-tour-spotlight { transition: none; }
+}

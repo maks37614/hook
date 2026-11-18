@@ -1,0 +1,122 @@
+/* Guided, opt-in HookChart walkthrough. No overlay is mounted when closed. */
+.hookchart-root .floatingDrawTools .hookchart-guide-launch {
+  color: #73c7e8;
+  border-radius: 6px;
+}
+.hookchart-root .floatingDrawTools .hookchart-guide-launch:hover,
+.hookchart-root .floatingDrawTools .hookchart-guide-launch:focus-visible {
+  color: #e5f8ff;
+  background: #143647;
+}
+ .hookchart-guide-overlay {
+  position: fixed;
+  z-index: 2147483300;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+}
+.hookchart-guide-spotlight {
+  position: absolute;
+  z-index: 1;
+  border: 2px solid #55d9ed;
+  border-radius: 9px;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 100vmax rgba(3, 8, 17, .77), 0 0 18px #31c7ed66;
+  pointer-events: none;
+  transition: left .3s ease, top .3s ease, width .3s ease, height .3s ease;
+}
+.hookchart-guide-card {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  width: min(310px, calc(100% - 20px));
+  max-height: min(340px, calc(100% - 16px));
+  overflow: auto;
+  padding: 12px;
+  pointer-events: auto;
+  border: 1px solid #39738a;
+  border-radius: 11px;
+  color: #e5eef6;
+  background: #101b2a;
+  box-shadow: 0 14px 38px #000b;
+  font: 12px/1.45 system-ui, sans-serif;
+  transition: left .3s ease, top .3s ease;
+  outline: none;
+}
+.hookchart-guide-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #7ce4f2;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.hookchart-guide-heading button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #a4b5c6;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.hookchart-guide-heading button:hover { background: #25394e; color: white; }
+.hookchart-guide-card strong { display: block; font-size: 15px; }
+.hookchart-guide-card p { margin: 7px 0; color: #d0dce8; }
+.hookchart-guide-card small { display: block; font-size: 10px; color: #8da3b8; }
+.hookchart-guide-footer { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.hookchart-guide-progress { display: flex; flex-wrap: wrap; gap: 4px; }
+.hookchart-guide-progress i { width: 6px; height: 6px; background: #395267; border-radius: 6px; }
+.hookchart-guide-progress i.current { width: 17px; background: #49d6ef; }
+.hookchart-guide-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.hookchart-guide-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #35506a;
+  border-radius: 7px;
+  background: #172638;
+  color: #e2edf6;
+  font-size: 11px;
+  cursor: pointer;
+}
+.hookchart-guide-actions button.primary { border-color: #28799a; background: #14557a; }
+.hookchart-guide-actions button:disabled { opacity: .35; cursor: default; }
+.hookchart-guide-actions button:focus-visible,
+.hookchart-guide-heading button:focus-visible { outline: 2px solid #60d7e8; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .hookchart-guide-spotlight, .hookchart-guide-card { transition: none; }
+}
+
+.hookchart-guide-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 10px;
+}
+.hookchart-guide-chapters button {
+  border: 1px solid #35495a;
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: #162738;
+  color: #acbece;
+  font: 600 10px system-ui, sans-serif;
+  cursor: pointer;
+}
+.hookchart-guide-chapters button.selected {
+  border-color: #4aa4b7;
+  background: #17465e;
+  color: #e4faff;
+}
+.hookchart-guide-chapters button:focus-visible { outline: 2px solid #64d8ee; outline-offset: 2px; }
+@media (max-width: 450px) {
+  .hookchart-guide-card { padding: 10px; font-size: 11px; }
+  .hookchart-guide-card strong { font-size: 13px; }
+  .hookchart-guide-chapters button { font-size: 9px; }
+}

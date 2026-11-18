@@ -1,0 +1,30 @@
+# Local development dependencies and generated build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Credentials and secrets (keep examples versioned)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+
+# Runtime user state, local backups and logs
+server/data/
+*.dump
+*.backup
+*.bak
+backup*.zip
+h00k-main*.zip
+*.log
+npm-debug.log*
+.DS_Store
+
+# Local editor leftovers and retired AI Studio project metadata.
+*.save
+metadata.json

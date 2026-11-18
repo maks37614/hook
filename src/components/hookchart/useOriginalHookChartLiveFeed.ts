@@ -1,0 +1,330 @@
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import type { ExchangeId, HookChartPreferences, MarketType } from '../../types';
+import { atr, type MarketPrint } from './marketAnalytics';
+import { getSharedMarketPrints, subscribeMarketTrades } from './marketTradeStream';
+import { EMPTY_FUNDING, subscribeSharedHookChartFunding, type FundingSnapshot } from './sharedFundingStream';
+import { calcCascadeRisk, type Candle, type Density, type Liquidation } from './engine';
+import { normalizeExchangeSymbol } from '../../utils/marketSymbols';
+import type { ChartDepthStatus } from '../../utils/hookChartDepthProtocol';
+import { connectSharedHookChartDepth } from './sharedDepthStream';
+import { sharedChartClock } from './sharedChartClock';
+import { sharedLiquidationViews } from './sharedLiquidationView';
+import { HookChartDensityBook, type DensityAutoStats } from './densityBook';
+import { EMPTY_SESSION_LIQUIDATIONS, getSessionLiquidationTotals, sessionLiquidationScope, subscribeSessionLiquidations } from './liquidationSession';
+import { filterVisibleLiquidations } from './liquidationDisplay';
+import { equalDepthAutoStats, shouldPublishDepthView } from './feedPublishPolicy';
+
+type BookLevel = { p: number; q: number };
+
+type LiveFeedArgs = {
+  exchange: ExchangeId;
+  marketType: MarketType;
+  symbol: string;
+  settings: HookChartPreferences;
+  candles: Candle[];
+  replay?: boolean;
+  needsFunding: boolean;
+  /** Disable auxiliary Terminal feeds while keeping candles connected upstream. */
+  lightweight?: boolean;
+};
+
+const EMPTY_DEPTH_BOOK: { b: BookLevel[]; a: BookLevel[] } = { b: [], a: [] };
+const EMPTY_DENSITIES: Density[] = [];
+const EMPTY_MARKET_PRINTS: MarketPrint[] = [];
+const EMPTY_LIQUIDATIONS: Liquidation[] = [];
+const EMPTY_CASCADE_RISK = calcCascadeRisk(EMPTY_LIQUIDATIONS, 0, 0, 0);
+const EMPTY_AUTO_STATS: DensityAutoStats = {
+  baseline: 0, bidCut: 0, askCut: 0, buy5m: 0, sell5m: 0,
+};
+
+export function useOriginalHookChartLiveFeed({
+  exchange,
+  marketType,
+  symbol: rawSymbol,
+  settings,
+  candles,
+  replay = false,
+  needsFunding,
+  lightweight = false,
+}: LiveFeedArgs) {
+  const symbol = normalizeExchangeSymbol(rawSymbol);
+  // Key deliberately excludes candle timeframe and display threshold.
+  const liquidationScope = sessionLiquidationScope(exchange, marketType, symbol);
+  const sessionSubscription = useMemo(() => (replay || lightweight)
+    ? ({
+      // Replay is historical-only: no live liquidation session subscription,
+      // even when another live HookChart tracks the same exchange and symbol.
+      subscribe: (_notify: () => void) => () => {},
+      snapshot: () => EMPTY_SESSION_LIQUIDATIONS,
+    })
+    : ({
+      subscribe: (notify: () => void) => subscribeSessionLiquidations(liquidationScope, notify),
+      snapshot: () => getSessionLiquidationTotals(liquidationScope),
+    }), [liquidationScope, replay, lightweight]);
+  const sessionTotals = useSyncExternalStore(sessionSubscription.subscribe, sessionSubscription.snapshot, () => EMPTY_SESSION_LIQUIDATIONS);
+  const [densities, setDensities] = useState<Density[]>(EMPTY_DENSITIES);
+  const [marketPrints, setMarketPrints] = useState<MarketPrint[]>(EMPTY_MARKET_PRINTS);
+  const [tradeIntegrity, setTradeIntegrity] = useState<'verified' | 'recovering' | 'incomplete'>('verified');
+  const [liquidations, setLiquidations] = useState<Liquidation[]>(EMPTY_LIQUIDATIONS);
+  const [cascadeClock, setCascadeClock] = useState(() => Date.now());
+  const [liquidationCut, setLiquidationCut] = useState(0);
+  const [liquidationStreamLive, setLiquidationStreamLive] = useState(false);
+  const [liquidationLastEventAt, setLiquidationLastEventAt] = useState<number | null>(null);
+  const [densityCut, setDensityCut] = useState(0);
+  const [densityAutoStats, setDensityAutoStats] = useState<DensityAutoStats>(EMPTY_AUTO_STATS);
+  const [book, setBook] = useState<{ b: BookLevel[]; a: BookLevel[] }>(EMPTY_DEPTH_BOOK);
+  const [funding, setFunding] = useState<FundingSnapshot>(EMPTY_FUNDING);
+  const [depthReady, setDepthReady] = useState(false);
+  const [depthStatus, setDepthStatus] = useState<ChartDepthStatus>('connecting');
+  const depthScopeRef = useRef('');
+  const depthScope = `${exchange}:${marketType}:${symbol}:${replay}`;
+  const priceRef = useRef(0);
+  const atrRef = useRef(0);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const applyBookRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    // ECO has no depth book: skip the per-tick ATR calculation entirely.
+    if (lightweight) { atrRef.current = 0; return; }
+    const last = candles.at(-1);
+    if (last?.c) priceRef.current = last.c;
+    atrRef.current = atr(candles, 50);
+  }, [candles, lightweight]);
+
+  useEffect(() => {
+    const exchangeSymbol = /^[\p{L}\p{M}\p{N}]+$/u.test(symbol);
+    if (replay || lightweight || !exchangeSymbol) {
+      depthScopeRef.current = '';
+      setDepthStatus(replay || lightweight ? 'disabled' : 'unavailable');
+      setDensities([]);
+      setMarketPrints([]);
+      setTradeIntegrity('verified');
+      setBook({ b: [], a: [] });
+      setDepthReady(false);
+      setDensityCut(0);
+      setDensityAutoStats({ baseline: 0, bidCut: 0, askCut: 0, buy5m: 0, sell5m: 0 });
+      return;
+    }
+
+    let dead = false;
+    const depthBook = new HookChartDensityBook();
+    let depthPublishTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopDepthHoldClockSubscription: (() => void) | null = null;
+    let lastDepthPublishAt = 0;
+    const stopDepthHoldClock = () => {
+      stopDepthHoldClockSubscription?.();
+      stopDepthHoldClockSubscription = null;
+    };
+    const clearDepth = () => {
+      stopDepthHoldClock();
+      if (depthPublishTimer !== null) {
+        clearTimeout(depthPublishTimer);
+        depthPublishTimer = null;
+      }
+      depthScopeRef.current = '';
+      depthBook.clear();
+      setDepthReady(false);
+      setDensities([]);
+      setBook({ b: [], a: [] });
+      setDensityCut(0);
+      setDensityAutoStats({ baseline: 0, bidCut: 0, askCut: 0, buy5m: 0, sell5m: 0 });
+    };
+    const applyBook = () => {
+      if (dead) return false;
+      const next = depthBook.read(settingsRef.current, atrRef.current);
+      // Holding-time and reaction scores need a periodic refresh only while
+      // a complete, fresh book exists. Otherwise an empty Terminal chart
+      // would run an unnecessary per-second JS timer indefinitely.
+      if (next.depthReady) {
+        if (stopDepthHoldClockSubscription === null) {
+          stopDepthHoldClockSubscription = sharedChartClock.subscribe(() => { applyBook(); });
+        }
+      } else stopDepthHoldClock();
+      const wasReady = depthScopeRef.current === depthScope;
+      if (!shouldPublishDepthView(next.depthReady, wasReady)) {
+        // We must still withdraw LIVE transport status if a snapshot was
+        // never accepted, without forcing new empty arrays each second.
+        setDepthStatus(current => current === 'live' ? 'reconnecting' : current);
+        return false;
+      }
+      depthScopeRef.current = next.depthReady ? depthScope : '';
+      if (next.price) priceRef.current = next.price;
+      // Empty books and identical counters should not invalidate every
+      // Terminal chart's React tree on each hold-time clock tick.
+      setDensities(current => !current.length && !next.densities.length ? current : next.densities);
+      // densityBook memoizes its levelView.book until the exchange depth
+      // sequence changes; keep the same React object across 1s hold clocks.
+      setBook(current => current === next.book ? current : next.book);
+      setDensityCut(next.densityCut);
+      setDensityAutoStats(current => equalDepthAutoStats(current, next.autoStats) ? current : next.autoStats);
+      setDepthReady(next.depthReady);
+      if (!next.depthReady) setDepthStatus(current => current === 'live' ? 'reconnecting' : current);
+      return next.depthReady;
+    };
+    // Apply every depth delta to each chart's exact local order book, but
+    // throttle only expensive derived-density rendering (at most 5 per second).
+    // Never throttle or drop a deletion/sequence update itself.
+    const queueDepthPublish = () => {
+      if (depthPublishTimer !== null || dead) return;
+      const remaining = 200 - (Date.now() - lastDepthPublishAt);
+      if (remaining <= 0) {
+        lastDepthPublishAt = Date.now();
+        applyBook();
+      } else {
+        depthPublishTimer = setTimeout(() => {
+          depthPublishTimer = null;
+          if (!dead) {
+            lastDepthPublishAt = Date.now();
+            applyBook();
+          }
+        }, remaining);
+      }
+    };
+    applyBookRef.current = applyBook;
+    clearDepth();
+    const stopDepth = connectSharedHookChartDepth({
+      exchange, marketType, symbol,
+      onBook: update => {
+        if (dead || !depthBook.apply(update)) return false;
+        queueDepthPublish();
+        return true;
+      },
+      onStatus: status => {
+        if (dead) return;
+        setDepthStatus(status);
+        if (status !== 'live') clearDepth();
+      },
+    });
+    // The holding-time clock starts upon the first valid book snapshot;
+    // it stops immediately on disconnect, invalid data or final unmount.
+
+    // All charts of the same exchange/market/symbol share one REST seed,
+    // WebSocket and adaptive threshold. Each chart still gets trade evidence
+    // for its own depth/absorption analysis.
+    setMarketPrints([]);
+    const stopTrades = subscribeMarketTrades(
+      { exchange, marketType, symbol },
+      {
+        onTrade: trade => {
+          if (!dead) depthBook.recordAggressiveTrade(trade);
+        },
+        onPrints: prints => {
+          if (!dead && settingsRef.current.showMarketPrintSums === true)
+            setMarketPrints(prints);
+        },
+        wantsPrints: () => settingsRef.current.showMarketPrintSums === true,
+        onIntegrity: status => {
+          if (dead) return;
+          setTradeIntegrity(status);
+          if (status === 'incomplete') {
+            depthBook.clearTradeEvidence();
+            setMarketPrints(EMPTY_MARKET_PRINTS);
+            queueDepthPublish();
+          }
+        },
+      },
+    );
+
+    return () => {
+      dead = true;
+      if (applyBookRef.current === applyBook) applyBookRef.current = null;
+      stopTrades();
+      stopDepth();
+      stopDepthHoldClock();
+      if (depthPublishTimer !== null) clearTimeout(depthPublishTimer);
+      depthBook.clear();
+    };
+  }, [
+    exchange, marketType, symbol, replay, lightweight,
+  ]);
+
+  // The drawing toggle does not reopen the exchange connection. Hide print
+  // updates entirely while disabled, but restore the shared snapshot on enable.
+  useEffect(() => {
+    setMarketPrints(settings.showMarketPrintSums === true && !replay
+      ? getSharedMarketPrints({ exchange, marketType, symbol }) : []);
+  }, [settings.showMarketPrintSums, exchange, marketType, symbol, replay]);
+
+  useEffect(() => {
+    applyBookRef.current?.();
+  }, [settings.densityAnalysis, settings.densityDiffPct, settings.densityAutoMultiplier,
+    settings.densityMode, settings.densityThreshold, settings.densityTimeoutMin]);
+
+  useEffect(() => {
+    const exchangeSymbol = /^[\p{L}\p{M}\p{N}]+$/u.test(symbol);
+    if (replay || lightweight || !exchangeSymbol || marketType !== 'futures') {
+      setLiquidations([]);
+      setLiquidationCut(0);
+      setLiquidationStreamLive(false);
+      setLiquidationLastEventAt(null);
+      return;
+    }
+
+    // The shared market view owns ONE Liq buffer, adaptive cutoff calculation
+    // and 2s expiry clock per exchange/symbol. Each chart only retains its
+    // personal Long/Short display filters and chart-specific risk price.
+    setLiquidations(EMPTY_LIQUIDATIONS);
+    setLiquidationCut(0);
+    setLiquidationLastEventAt(null);
+    return sharedLiquidationViews.subscribe({
+      exchange, symbol,
+      onView: view => {
+        setLiquidations(view.rows);
+        setLiquidationCut(view.automaticCut);
+        setCascadeClock(view.cascadeClock);
+        setLiquidationLastEventAt(view.lastEventAt);
+      },
+      onStatus: setLiquidationStreamLive,
+    });
+  }, [exchange, marketType, symbol, replay, lightweight]);
+
+  // Funding has one exchange/symbol timer and parsed snapshot per tab,
+  // regardless of the number of HookCharts watching the same instrument.
+  useEffect(() => {
+    const exchangeSymbol = /^[\p{L}\p{M}\p{N}]+$/u.test(symbol);
+    if (replay || lightweight || !exchangeSymbol || marketType !== 'futures' || !needsFunding) {
+      setFunding(EMPTY_FUNDING);
+      return;
+    }
+    return subscribeSharedHookChartFunding(exchange, symbol, setFunding);
+  }, [exchange, marketType, symbol, replay, lightweight, needsFunding]);
+
+  // Display thresholds never mutate the incoming events or the session totals.
+  const visibleLiquidations = useMemo(() => lightweight ? EMPTY_LIQUIDATIONS : filterVisibleLiquidations(liquidations, liquidationCut, settings),
+    [lightweight, liquidations, liquidationCut, settings.showLiquidationLong,
+      settings.showLiquidationShort, settings.liquidationLongMinUsd, settings.liquidationShortMinUsd]);
+  const risk = useMemo(
+    // The clock state invalidates this memo at 1m/5m event boundaries.
+    // On price/cut changes use real wall-clock time too, never a stale tick.
+    () => lightweight ? EMPTY_CASCADE_RISK : calcCascadeRisk(liquidations, liquidationCut, candles.at(-1)?.c || 0),
+    [lightweight, liquidations, liquidationCut, candles.at(-1)?.c, cascadeClock],
+  );
+  const liquidationSource = marketType === 'futures'
+    ? (exchange === 'binance' ? 'BIN forceOrder' : 'BYB allLiq')
+    : '';
+
+  const currentDepth = depthScopeRef.current === depthScope && depthReady;
+  return {
+    densities: !lightweight && currentDepth ? densities : EMPTY_DENSITIES,
+    marketPrints: lightweight || tradeIntegrity !== 'verified' ? EMPTY_MARKET_PRINTS : marketPrints,
+    tradeIntegrity: lightweight ? 'verified' as const : tradeIntegrity,
+    liquidations: visibleLiquidations,
+    allLiquidations: lightweight ? EMPTY_LIQUIDATIONS : liquidations,
+    sessionLiquidationsUsd: lightweight ? 0 : sessionTotals.totalUsd,
+    sessionLiquidationsLongUsd: lightweight ? 0 : sessionTotals.longUsd,
+    sessionLiquidationsShortUsd: lightweight ? 0 : sessionTotals.shortUsd,
+    liquidationCut: lightweight ? 0 : liquidationCut,
+    liquidationStreamLive: !lightweight && liquidationStreamLive,
+    liquidationLastEventAt: lightweight ? null : liquidationLastEventAt,
+    liquidationSource,
+    cascadeRisk: risk,
+    densityCut: !lightweight && currentDepth ? densityCut : 0,
+    densityAutoStats: !lightweight && currentDepth ? densityAutoStats : EMPTY_AUTO_STATS,
+    book: !lightweight && currentDepth ? book : EMPTY_DEPTH_BOOK,
+    fundingRate: lightweight ? EMPTY_FUNDING.rate : funding.rate,
+    fundingHistory: lightweight ? EMPTY_FUNDING.history : funding.history,
+    depthReady: !lightweight && currentDepth,
+    depthStatus: lightweight ? 'disabled' as ChartDepthStatus : depthStatus,
+  };
+}
