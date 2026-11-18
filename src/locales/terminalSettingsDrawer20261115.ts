@@ -129,10 +129,10 @@ export const terminalSettingsDrawerRows = [
   ],
   [
     "chartsPerPageHelp",
-    "Діє для всіх графіків і пресетів. Наприклад, 30 монет при виборі 10 показуються на 3 сторінках — жодна монета не видаляється.",
-    "Applies to all charts and presets. With 30 coins and a limit of 10, you get 3 pages; no coins are deleted.",
-    "Действует для всех графиков и пресетов. При 30 монетах и лимите 10 будет 3 страницы — монеты не удаляются.",
-    "Dotyczy wszystkich wykresów i presetów. Przy 30 monetach i limicie 10 otrzymasz 3 strony; żadna moneta nie zostanie usunięta."
+    "Обмежує сторінки автоматичних пресетів. Монети, додані вручну через +, відображаються разом: після 4 можна додати 5-ту або видалити будь-яку, не змінюючи решту.",
+    "Limits automatic preset pages only. Manually added charts stay together: after 4, add a fifth or remove any chart without changing the others.",
+    "Ограничивает страницы автоматических пресетов. Добавленные вручную графики остаются вместе: после 4 можно добавить пятый или удалить любой, не меняя остальные.",
+    "Ogranicza tylko strony automatycznych presetów. Ręcznie dodane wykresy pozostają razem: po 4 można dodać piąty lub usunąć dowolny bez zmiany pozostałych."
   ],
   [
     "gridPresets",

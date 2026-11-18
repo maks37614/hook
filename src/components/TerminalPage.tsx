@@ -57,7 +57,7 @@ import { terminalArchiveFormation } from '../utils/terminalArchiveFormation';
 import { useLanguage } from '../context/LanguageContext';
 import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
-import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize } from '../utils/terminalPresetPaging';
+import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
 import { terminalResponsiveAutoHeights } from '../utils/terminalResponsiveGrid';
 import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
@@ -162,11 +162,15 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const marketSnapshotLoadedRef = useRef(false);
   const [marketError, setMarketError] = useState<string | null>(null);
   const marketCoins = marketSnapshot.coins;
-  // "Charts per page" applies to ALL Terminal workspaces, including manual
-  // charts and saved personal presets. Never delete hidden pages or change
-  // their instrument/timeframe identities when the visible page size changes.
-  // The 50-chart safety cap still applies to adding new charts separately.
-  const workspacePageSize = resolveTerminalPresetPageSize(config.coinPresetLimit);
+  // Preset pagination must never hide a chart the trader added manually:
+  // choosing 4 preset charts, then pressing +, shows five live chart blocks.
+  // Removing any block immediately shows the remaining ones without refill.
+  // Automatic market presets retain their configured pagination; imported
+  // legacy workspaces above 50 charts retain the 50-chart safety page cap.
+  const isAutomaticMarketSelection = Boolean(activeMarketPreset && presetMatches.length > 0);
+  const workspacePageSize = resolveTerminalWorkspacePageSize(
+    config.coinPresetLimit, blocks.length, isAutomaticMarketSelection,
+  );
   const [workspacePage, setWorkspacePage] = useState(0);
   const workspacePageCount = Math.max(1, Math.ceil(blocks.length / workspacePageSize));
   const visibleWorkspacePage = Math.max(0, Math.min(workspacePage, workspacePageCount - 1));
@@ -821,8 +825,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     const nextLimit = resolveTerminalPresetPageSize(updated.coinPresetLimit);
     const nextPage = pageAfterLimitChange(presetPageRef.current, coinPresetLimit, nextLimit);
     presetPageRef.current = nextPage;
-    // Manual and personal presets keep their entire saved block list; only the
-    // visible slice changes. Keep the previous first visible coin in range.
+    // Manual and personal presets keep all their charts visible up to 50.
+    // Automatic presets and older oversized imports retain pagination.
     setWorkspacePage(current => pageAfterLimitChange(current, workspacePageSize, nextLimit));
     setMaximizedBlockId(null);
     if (activeMarketPreset && presetMatches.length) {
@@ -1058,9 +1062,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const formation = activeCoin.formations?.[0] || null;
   const isBullish = formation?.bias === 'bullish';
   const isBearish = formation?.bias === 'bearish';
-  // A market preset pages through matches. Legacy workspaces (>50 saved charts)
-  // use their own pager; never render two competing navigation blocks.
-  const isPresetPaged = Boolean(activeMarketPreset && presetMatches.length > 0);
+  // Only automatic market presets and legacy imports above 50 need paging.
+  const isPresetPaged = isAutomaticMarketSelection;
   const hasTerminalPages = isPresetPaged
     ? visiblePresetPage.pageCount > 1
     : workspacePageCount > 1;

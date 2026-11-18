@@ -14,6 +14,22 @@ export function getTerminalPresetPage<T>(items: readonly T[], requestedPage: num
   return { page, pageCount, start, end, coins: items.slice(start, end) };
 }
 
+/**
+ * The selector controls automatic market-preset pages, not how many charts a
+ * trader can add or remove manually. Keep the entire manually edited grid
+ * visible up to the existing 50-chart per-page safety limit. Older imported
+ * workspaces with more than 50 charts remain paged rather than mounting all
+ * their live feeds at once.
+ */
+export function resolveTerminalWorkspacePageSize(
+  configuredLimit: unknown, blockCount: number, automaticMarketPreset: boolean,
+): number {
+  const presetSize = resolveTerminalPresetPageSize(configuredLimit);
+  if (automaticMarketPreset) return presetSize;
+  const manualCount = Number.isFinite(blockCount) ? Math.max(0, Math.trunc(blockCount)) : 0;
+  return Math.min(50, Math.max(presetSize, manualCount));
+}
+
 /** Keep the first visible coin in view when the user changes page size. */
 export function pageAfterLimitChange(page: number, oldSize: number, newSize: number): number {
   return Math.floor(Math.max(0, page) * resolveTerminalPresetPageSize(oldSize) / resolveTerminalPresetPageSize(newSize));

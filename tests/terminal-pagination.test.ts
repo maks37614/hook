@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, TERMINAL_PRESET_PAGE_SIZES } from '../src/utils/terminalPresetPaging';
+import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize, TERMINAL_PRESET_PAGE_SIZES } from '../src/utils/terminalPresetPaging';
 import { blocksForMarketPreset, normalizeTerminalPresets } from '../src/utils/terminalPresets';
 import type { MarketCoin } from '../src/types';
 
@@ -52,28 +52,45 @@ test('changing page size preserves the first visible coin and produces 50 distin
   assert.equal(saved[0].blocks.at(-1)?.symbol, 'C49USDT');
 });
 
-test('30 saved manual charts show exactly 10 per page without losing block identities or settings', () => {
-  const blocks = Array.from({ length: 30 }, (_, index) => ({
+test('manual Terminal additions and removals ignore automatic preset page size', () => {
+  const four = Array.from({ length: 4 }, (_, index) => ({
     id: `chart-${index}`, symbol: `C${index}USDT`, baseAsset: `C${index}`,
     quoteAsset: 'USDT', exchange: index % 2 ? 'bybit' : 'binance',
-    marketType: index % 3 ? 'futures' : 'spot', timeframe: index % 2 ? '1m' : '15m',
-    colSpan: 1,
+    marketType: 'futures', timeframe: '15m', colSpan: 1,
   }));
-  const slices = [0, 1, 2].map(page => getTerminalPresetPage(blocks, page, 10));
-  assert.deepEqual(slices.map(page => page.coins.length), [10, 10, 10]);
-  assert.deepEqual(slices.map(page => page.pageCount), [3, 3, 3]);
-  assert.deepEqual(slices.flatMap(page => page.coins), blocks);
-  assert.deepEqual(getTerminalPresetPage(blocks, 0, 30).coins, blocks);
-  assert.equal(pageAfterLimitChange(2, 10, 12), 1, 'keep the first formerly visible coin nearby');
+  const visible = <T>(items: T[], presetSize = 4, automatic = false) =>
+    getTerminalPresetPage(items, 0, resolveTerminalWorkspacePageSize(presetSize, items.length, automatic));
+
+  assert.equal(visible(four).coins.length, 4);
+  const five = [...four, { ...four[0], id: 'chart-4', symbol: 'C4USDT', baseAsset: 'C4' }];
+  assert.deepEqual(visible(five).coins.map(item => item.id), five.map(item => item.id),
+    'the fifth manually added chart must be visible on the same page');
+  const remaining = five.filter(item => item.id !== 'chart-1');
+  assert.deepEqual(visible(remaining).coins, remaining,
+    'removing a middle chart must not replace or hide the remaining charts');
+  const three = remaining.filter(item => item.id !== 'chart-4');
+  assert.deepEqual(visible(three).coins, three,
+    'removing below the configured count must not refill deleted charts');
+  assert.equal(visible(five).pageCount, 1);
+
+  const thirty = Array.from({ length: 30 }, (_, index) => ({
+    ...four[0], id: `saved-${index}`, symbol: `S${index}USDT`,
+  }));
+  assert.deepEqual(visible(thirty, 10).coins, thirty);
+  assert.equal(visible(thirty, 10).pageCount, 1);
+  assert.equal(visible(five, 4, true).coins.length, 4,
+    'automatic market presets must still respect the selected page size');
+  assert.equal(visible(five, 4, true).pageCount, 2);
+  assert.equal(resolveTerminalWorkspacePageSize(4, 80, false), 50,
+    'old oversized workspaces must not mount more than 50 live charts per page');
+
   const component = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
-  assert.match(component, /const workspacePageSize = resolveTerminalPresetPageSize\(config\.coinPresetLimit\)/);
+  assert.match(component, /const workspacePageSize = resolveTerminalWorkspacePageSize\(/);
+  assert.match(component, /config\.coinPresetLimit, blocks\.length, isAutomaticMarketSelection/);
   assert.match(component, /Math\.ceil\(blocks\.length \/ workspacePageSize\)/);
-  assert.match(component, /visibleWorkspacePage \* workspacePageSize/);
   assert.match(component, /blocks\.slice\(\s*visibleWorkspaceStart, visibleWorkspaceStart \+ workspacePageSize/);
-  assert.match(component, /setWorkspacePage\(current => pageAfterLimitChange\(current, workspacePageSize, nextLimit\)\)/);
   assert.match(component, /terminalAnalysisAllowed\(terminalAnalysisLimit, visibleWorkspaceBlocks\.length\)/);
   assert.match(component, /setMaximizedBlockId\(null\)/);
-  assert.doesNotMatch(component, /const workspacePageCount = Math\.max\(1, Math\.ceil\(blocks\.length \/ MAX_TERMINAL_CHARTS\)\)/);
 });
 
 test('changing Terminal timeframe keeps the selected automatic market preset and current page', () => {
