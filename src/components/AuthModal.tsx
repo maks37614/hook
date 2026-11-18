@@ -280,7 +280,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button type="submit" disabled={busy || (mode !== 'reset' && !captchaToken)}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-cyan-500 disabled:opacity-50">
               {mode === 'reset' ? <KeyRound size={17}/> : <ShieldCheck size={17}/>}
-              {busy ? 'Обробка…' : mode === 'signup' ? 'Зареєструватися безкоштовно' :
+              {busy ? 'Обробка…' : mode === 'signup' ? 'Реєстрація' :
                 mode === 'forgot' ? 'Надіслати посилання' : mode === 'reset' ? 'Змінити пароль' : 'Увійти'}
             </button>
           </form>
@@ -296,9 +296,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <ArrowLeft size={15}/> Повернутися до входу
             </button>
           )}
-          <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-500">
-            Безкоштовний акаунт · CAPTCHA · Захищені сесії · Підтвердження email
-          </p>
         </div>
       </div>
     </div>
