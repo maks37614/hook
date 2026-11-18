@@ -48,5 +48,5 @@ test('Terminal chart action names are localized with existing translation mechan
   assert.ok(header.includes('onUpdateBlock({'));
   assert.ok(header.includes('t("terminal.widget.metaScalp", { group: metaScalpBinding })'));
   assert.ok(terminal.includes('terminalMode={useIntegratedHookChartToolbar}'));
-  assert.ok(terminal.includes('historyLimit={isMaximized || isSingleBlock ? 1000 : 180}'));
+  assert.ok(terminal.includes('historyLimit={isMaximized || isSingleBlock || isOnlyChart ? 1000 : 180}'));
 });

@@ -161,7 +161,7 @@ test('maximizing one Terminal chart suspends other visible charts without changi
   const page = source('../src/components/TerminalPage.tsx');
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
   assert.match(page, /isSuspended=\{maximizedBlockId !== null && !isMaximized\}/);
-  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
   assert.doesNotMatch(widget, /new WebSocket\(/, 'HookChart already owns its quote stream');
   assert.match(widget, /onLivePriceUpdate=\{useIntegratedHookChartToolbar \? handleChartPrice : undefined\}/);
   assert.match(widget, /\{shouldLoadWidgets \? \(/);
@@ -202,7 +202,10 @@ test('Terminal header actions cannot target the wrong symbol in multi-chart mode
   const page = source('../src/components/TerminalPage.tsx');
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
   assert.match(page, /const hasHeaderTarget = blocks\.length === 1 && coinMarketKey\(activeCoin\) === coinMarketKey\(blocks\[0\]\)/);
-  assert.match(page, /onOpenTelegramAlerts && hasHeaderTarget/);
+  // The header's Telegram shortcut was replaced by workspace alerts.
+  // Per-chart Telegram actions remain scoped to the exact instrument.
+  assert.doesNotMatch(page, /onOpenTelegramAlerts && hasHeaderTarget/);
+  assert.match(page, /aria-pressed=\{terminalAlertsEnabled\}/);
   assert.match(page, /onSendMetaScalp && hasHeaderTarget/);
   assert.match(widget, /onSendMetaScalp\(coin\)/);
   assert.match(widget, /onOpenTelegramAlerts\(\{/);
@@ -225,7 +228,7 @@ test('1x–4x Terminal layout buttons never remove, replace or reorder existing 
   assert.doesNotMatch(layout, /setBlocks\(/, 'column selectors must not discard chart blocks');
   assert.doesNotMatch(layout, /handleApplyPreset\(/, 'column selectors must not replace selected coins');
   for (const columns of [1, 2, 3, 4]) {
-    assert.match(layout, new RegExp('columns: ' + columns + ', autoFitScreen: true'));
+    assert.match(layout, new RegExp('columns: ' + columns + ', freeLayoutAutoColumns: false, autoFitScreen: true'));
   }
   assert.match(layout, /config\.columns === 1/);
 });

@@ -27,7 +27,7 @@ test('fit-history request reaches every chart, including previously lazy-mounted
   const canvas = read('src/components/hookchart/HookChartCanvas.tsx');
   assert.match(grid, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(widget, /terminalFitAllRequest=\{useIntegratedHookChartToolbar \? terminalFitAllRequest : undefined\}/);
-  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
   assert.match(exchange, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(wrapper, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(canvas, /terminalFitAllRequest=\{terminalInitialViewTarget \? terminalFitAllRequest : undefined\}/);

@@ -42,5 +42,5 @@ test('Terminal menu scrollbar cannot affect HookChart canvases, feeds, or chart 
   assert.ok(begin >= 0 && end > begin);
   assert.doesNotMatch(css.slice(begin, end), /(?:canvas|\.hookchart-root|WebSocket|fetch\()/);
   assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
-  assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \? 1000 : 180\}/);
+  assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \|\| isOnlyChart \? 1000 : 180\}/);
 });
