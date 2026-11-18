@@ -90,3 +90,23 @@ test('hotkeys button and visible dialog labels are translated in four site langu
     assert.ok(dialog.includes(property), property);
   }
 });
+
+test('Terminal and HookChart shortcut tabs share the chart settings Hotkeys typography', () => {
+  const settingsStyles = readFileSync(new URL('../src/components/hookchart/integration.css', import.meta.url), 'utf8');
+  // Chart settings: 15px headings, 14px desktop / 13px mobile labels, 13px key bindings.
+  assert.match(settingsStyles, /\.hotkeySettings \.settingsSection>h3 \{[\s\S]*?font-size:15px/);
+  assert.match(settingsStyles, /\.hotkeySettings \.hotkeyRow \{[\s\S]*?font-size:14px/);
+  assert.match(settingsStyles, /\.hotkeySettings \.hotkeyRow>button \{[\s\S]*?font:600 13px/);
+  assert.match(settingsStyles, /@container \(max-width:620px\) \{[\s\S]*?\.hotkeySettings \.hotkeyRow \{[\s\S]*?font-size:13px/);
+
+  assert.equal((dialog.match(/py-2 text-\[15px\] leading-\[1\.4\] font-semibold/g) || []).length, 2,
+    'both tabs must use chart settings 15px group headings');
+  assert.equal((dialog.match(/flex-1 text-\[13px\] leading-\[1\.45\] sm:text-sm/g) || []).length, 2,
+    'both tabs must use 13px mobile / 14px desktop action labels');
+  assert.equal((dialog.match(/font-mono text-\[13px\] leading-\[1\.3\]/g) || []).length, 2,
+    'both tabs must use chart settings 13px key combinations');
+  assert.equal((dialog.match(/rounded-md px-3 py-1\.5 text-\[13px\] sm:text-sm/g) || []).length, 2,
+    'tab labels must use the chart settings responsive text scale');
+  assert.doesNotMatch(dialog, /font-mono text-\[11px\]/,
+    'tiny shortcut text must not be restored');
+});
