@@ -238,10 +238,11 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-sm shadow-amber-900/40 font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
-                title={tr("Market Replay: симулятор ринку та відтворення історії свічка за свічкою")}
+                title={!user ? tr("Відтворення (доступно після реєстрації)") : tr("Market Replay: симулятор ринку та відтворення історії свічка за свічкою")}
               >
                 <History className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <span className="text-[13px] sm:text-sm">{t('replay')}</span>
+                {!user && <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />}
                 <span className={`px-1 py-0.2 rounded text-[9px] font-mono font-extrabold ${
                   activePage === 'replay' ? 'bg-amber-950/30 text-amber-950' : 'bg-amber-500/20 text-amber-300'
                 }`}>
