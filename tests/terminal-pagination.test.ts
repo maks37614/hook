@@ -103,3 +103,15 @@ test('changing Terminal timeframe keeps the selected automatic market preset and
   assert.doesNotMatch(handler, /setBlocks\(/);
   assert.match(page, /const setBlocks: typeof updateBlocks = useCallback/);
 });
+
+test('automatic market presets do not override selected fixed grid or manual columns', () => {
+  const source = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const start = source.indexOf('const applyPresetPage = useCallback(');
+  const end = source.indexOf('const handleWorkspaceConfigUpdate =', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /if \(current\.layoutPreset !== 'custom' \|\| current\.freeLayoutAutoColumns === false\) return current/);
+  assert.match(handler, /return current\.columns === columns \? current : \{ \.\.\.current, columns \}/);
+  assert.doesNotMatch(handler, /layoutPreset: 'custom'/);
+  assert.match(handler, /blocksForMarketPreset\(current, pageCoins, timeframe\)/);
+});

@@ -80,3 +80,9 @@ test('Terminal grid keeps regular tile heights for one or many coins without add
   assert.match(css, /min-width: 1024px/);
   assert.match(css, /min-width: 1280px/);
 });
+
+test('manual and fixed grid choices survive automatic market preset refresh', () => {
+  const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /current\.layoutPreset !== 'custom' \|\| current\.freeLayoutAutoColumns === false/);
+  assert.match(page, /terminalGridColumnClasses\(/);
+});

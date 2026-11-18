@@ -801,10 +801,12 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     setPresetPage(page);
     updateBlocks(current => blocksForMarketPreset(current, pageCoins, timeframe));
     setConfig(current => {
+      // Market preset pagination changes coin membership, never a trader's
+      // explicitly selected grid or column count. Only adjust the fallback
+      // column preference while Free auto-layout is already selected.
+      if (current.layoutPreset !== 'custom' || current.freeLayoutAutoColumns === false) return current;
       const columns = pageCoins.length === 1 ? 1 : pageCoins.length <= 4 ? 2 : pageCoins.length <= 9 ? 3 : 4;
-      return current.columns === columns && current.layoutPreset === 'custom'
-        && current.freeLayoutAutoColumns === true ? current
-        : { ...current, columns, layoutPreset: 'custom', freeLayoutAutoColumns: true };
+      return current.columns === columns ? current : { ...current, columns };
     });
   }, [updateBlocks, setConfig, timeframe, coinPresetLimit]);
 
