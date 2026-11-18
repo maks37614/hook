@@ -30,7 +30,9 @@ test('signup and emailed password reset include matching password confirmation, 
     assert.match(markup, /maxLength="128"/, 'confirmed password stays within backend length limit');
   }
   assert.doesNotMatch(signin, /Повторіть пароль/);
-  assert.match(signup, /Зареєструватися безкоштовно/);
+  assert.match(signup, />Реєстрація<\/button>/, 'signup submit button has a concise label');
+  assert.doesNotMatch(signup, /Зареєструватися безкоштовно|Безкоштовний акаунт · CAPTCHA/,
+    'old submit text and footer caption must be removed');
   assert.match(reset, /Змінити пароль/);
   assert.doesNotMatch(reset, /Захист від ботів/, 'secure emailed reset tokens do not need a second CAPTCHA');
   assert.match(signin, /Захист від ботів/);
