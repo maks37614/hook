@@ -1,0 +1,33 @@
+name: Desktop WebSocket Load Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - 'server/hookChartDepth.ts'
+      - 'server/hookChartKlineRelay.ts'
+      - 'server/opsMetrics.ts'
+      - 'scripts/desktop-ws-load.ts'
+      - 'tests/desktop-ws-load.test.ts'
+      - 'tests/hookchart-depth-stream.test.ts'
+      - 'tests/hookchart-server-kline-relay.test.ts'
+      - 'tests/ops-metrics.test.ts'
+      - '.github/workflows/desktop-ws-load.yml'
+  workflow_dispatch:
+
+jobs:
+  metrics-and-streams:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: TypeScript and operator metrics type safety
+        run: npm run lint
+      - name: Safe WS metrics, real depth and kline transport regressions
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test --test-concurrency=1 tests/desktop-ws-load.test.ts tests/ops-metrics.test.ts tests/hookchart-depth-stream.test.ts tests/hookchart-server-kline-relay.test.ts
