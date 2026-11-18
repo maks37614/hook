@@ -57,9 +57,11 @@ test('Top coin counter equals mounted chart panels on the active workspace page'
 test('Footer stays below the same chart grid for one or multiple coins', () => {
   const source = terminal();
   const list = source.indexOf('{visibleWorkspaceBlocks.map((block, index)');
-  assert.ok(list >= 0 && source.indexOf('{terminalBelowCharts}', list) > list);
-  assert.equal((source.match(/\{terminalBelowCharts\}/g) ?? []).length, 1);
-  assert.doesNotMatch(source.slice(list, source.indexOf('{terminalBelowCharts}', list)), /min-h-\[320px\]/);
+  const footerPlacement = source.indexOf('{blocks.length !== 0 && terminalBelowCharts}', list);
+  assert.ok(list >= 0 && footerPlacement > list);
+  assert.equal((source.match(/\{terminalBelowCharts\}/g) ?? []).length, 1,
+    'shared controls are defined once, then rendered only for opened charts');
+  assert.doesNotMatch(source.slice(list, footerPlacement), /min-h-\[320px\]/);
   assert.doesNotMatch(source, /ref=\{chartListRef\} className="h-full w-full overflow-y-auto no-scrollbar"/);
   assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);
   assert.match(read('../src/components/SiteFooter.tsx'), /getLegalCopy\(language\)/);
