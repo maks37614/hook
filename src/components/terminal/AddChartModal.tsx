@@ -15,8 +15,12 @@ import {
   Zap,
   Globe,
   Loader2,
+  ArrowDownToLine,
+  ArrowUpToLine,
 } from 'lucide-react';
 import { FormationsIcon } from '../PageIcons';
+import { ScreenerVolumeDropdown } from '../ScreenerVolumeDropdown';
+import { isVolumeWithinCap, preferredVolumeSortOrder, type ScreenerVolumeMode } from '../../utils/screenerVolume';
 import { ScannedCoin, Timeframe, ExchangeId, MarketType, MarketCoin } from '../../types';
 import { formatVolume } from '../../utils/formatters';
 import { fetchDirectBinanceTickers, fetchDirectBybitTickers } from '../../utils/directExchangeClient';
@@ -69,13 +73,20 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   const [filterTab, setFilterTab] = useState<'all' | 'volume' | 'gainers' | 'losers' | 'formations' | 'watchlist'>('all');
   const [selectedExchange, setSelectedExchange] = useState<'all' | ExchangeId>('all');
   const [selectedMarket, setSelectedMarket] = useState<'all' | MarketType>('all');
-  const [selectedMinVolume, setSelectedMinVolume] = useState<number>(50_000); // Default $50k
+  // Exactly the same inclusive From/To volume selector used in the Screener.
+  // 0 = no extra filter within the existing $50k-$10B market catalog.
+  const [selectedVolumeCap, setSelectedVolumeCap] = useState<number>(0);
+  const [selectedVolumeMode, setSelectedVolumeMode] = useState<ScreenerVolumeMode>('to');
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>(initialTimeframe || '15m');
   const [marketCoins, setMarketCoins] = useState<MarketCoin[]>(() => globalMarketCoinsCache || []);
   // Prefer Terminal's existing quote snapshot over this dialog's fallback cache.
   const availableMarketCoins = terminalMarketCoins ?? marketCoins;
   const [isLoadingAllCoins, setIsLoadingAllCoins] = useState(false);
   const [displayCount, setDisplayCount] = useState<number>(80);
+  const [onDemandFormations, setOnDemandFormations] = useState<ScannedCoin[]>([]);
+  const [formationScanStatus, setFormationScanStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [formationScanError, setFormationScanError] = useState('');
+  const formationScanController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -159,23 +170,77 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     };
   }, [isOpen, terminalMarketCoins]);
 
-  // Create unified lookup map from ScannedCoins (contains detected formations)
+  // The Terminal does not launch foreground formation scans on page entry.
+  // Reuse previously scanned results; only a deliberate tap on this tab can
+  // request one bounded shared scan, never while the picker is closed.
+  const haveIncomingFormations = coins.some(coin => coin.formations?.length > 0);
+  const loadFormationsOnDemand = () => {
+    if (haveIncomingFormations || onDemandFormations.length || formationScanController.current
+      || formationScanStatus === 'ready') return;
+    const controller = new AbortController();
+    formationScanController.current = controller;
+    setFormationScanStatus('loading');
+    setFormationScanError('');
+    // Same public shared and rate-limited scan as the Formations page.
+    // No polling, websocket or new worker per opened Terminal chart.
+    void (async () => {
+      try {
+        const params = new URLSearchParams({
+          timeframe: selectedTimeframe, exchange: 'all', marketType: 'all', minVolume: '0',
+        });
+        const response = await fetch(`/api/screener/scan?${params.toString()}`, {
+          signal: controller.signal, cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(response.status === 503
+          ? 'Сканер зараз зайнятий. Повторіть пошук трохи пізніше.'
+          : 'Не вдалося отримати формації. Спробуйте ще раз.');
+        const result = await response.json();
+        if (!result?.success || !Array.isArray(result.data)) {
+          throw new Error('Сканер не повернув коректний список формацій.');
+        }
+        if (!controller.signal.aborted) {
+          setOnDemandFormations((result.data as ScannedCoin[]).filter(
+            c => c && Array.isArray(c.formations) && c.formations.length > 0,
+          ));
+          setFormationScanStatus('ready');
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setFormationScanError(error instanceof Error ? error.message : 'Не вдалося отримати формації.');
+          setFormationScanStatus('error');
+        }
+      } finally {
+        if (formationScanController.current === controller) formationScanController.current = null;
+      }
+    })();
+  };
+
+  useEffect(() => {
+    if (isOpen) return;
+    formationScanController.current?.abort();
+    formationScanController.current = null;
+    setFormationScanStatus(status => status === 'loading' ? 'idle' : status);
+  }, [isOpen]);
+
+  // Merge verified scanner formations by exchange + symbol + market, not just
+  // ticker (Binance/Bybit and Spot/Futures are distinct instruments).
   const formationsMap = useMemo(() => {
     const map = new Map<string, ScannedCoin>();
     if (!isOpen) return map;
-    for (const c of coins) {
+    for (const c of [...coins, ...onDemandFormations]) {
+      if (!c.formations?.length) continue;
       const key = `${c.exchange}_${c.symbol}_${c.marketType}`.toUpperCase();
       map.set(key, c);
     }
     return map;
-  }, [coins, isOpen]);
+  }, [coins, onDemandFormations, isOpen]);
 
   // Unified coins list: merges all market coins with formation metadata
   const unifiedCoins = useMemo(() => {
     if (!isOpen) return [];
     if (availableMarketCoins.length > 0) {
       // Keep the modal's existing $50k–$10B catalog constraint.
-      return availableMarketCoins.filter(mc => mc.volumeUsd >= 50_000 && mc.volumeUsd <= 10_000_000_000).map((mc) => {
+      const mapped = availableMarketCoins.filter(mc => mc.volumeUsd >= 50_000 && mc.volumeUsd <= 10_000_000_000).map((mc) => {
         const key = `${mc.exchange}_${mc.symbol}_${mc.marketType}`.toUpperCase();
         const scanned = formationsMap.get(key);
         return {
@@ -192,10 +257,29 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
           formations: scanned?.formations || [],
         };
       });
+      // An existing scanner result may not appear in the current quote snapshot.
+      // Keep real detected formations discoverable without inventing signals.
+      if (filterTab === 'formations') {
+        const present = new Set(mapped.map(c => `${c.exchange}_${c.symbol}_${c.marketType}`.toUpperCase()));
+        for (const scanned of formationsMap.values()) {
+          const key = `${scanned.exchange}_${scanned.symbol}_${scanned.marketType}`.toUpperCase();
+          const volume = scanned.volume24hUsd || 0;
+          if (present.has(key) || volume < 50_000 || volume > 10_000_000_000) continue;
+          present.add(key);
+          mapped.push({
+            symbol: scanned.symbol, baseAsset: scanned.baseAsset, quoteAsset: scanned.quoteAsset,
+            exchange: scanned.exchange, marketType: scanned.marketType,
+            currentPrice: scanned.currentPrice, priceChange24h: scanned.priceChange24h,
+            volume24hUsd: volume, highPrice24h: scanned.highPrice24h,
+            lowPrice24h: scanned.lowPrice24h, formations: scanned.formations,
+          });
+        }
+      }
+      return mapped;
     }
 
     // If marketCoins haven't loaded yet, fall back to initial scanned coins
-    return coins.map((c) => ({
+    return [...coins, ...onDemandFormations].map((c) => ({
       symbol: c.symbol,
       baseAsset: c.baseAsset,
       quoteAsset: c.quoteAsset,
@@ -208,7 +292,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
       lowPrice24h: c.lowPrice24h || c.currentPrice,
       formations: c.formations || [],
     }));
-  }, [availableMarketCoins, coins, formationsMap, isOpen]);
+  }, [availableMarketCoins, coins, onDemandFormations, formationsMap, filterTab, isOpen]);
 
   // Filter and sort coins
   const filteredCoins = useMemo(() => {
@@ -225,14 +309,16 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
       result = result.filter((c) => c.marketType === selectedMarket);
     }
 
-    // Min volume filter ($50k to $10B)
-    if (selectedMinVolume > 0) {
-      result = result.filter((c) => (c.volume24hUsd || 0) >= selectedMinVolume);
+    // Exact Screener semantics: selected threshold is an inclusive floor OR ceiling.
+    if (selectedVolumeCap > 0) {
+      result = result.filter(c =>
+        isVolumeWithinCap(c.volume24hUsd || 0, selectedVolumeCap, selectedVolumeMode));
     }
 
     // Tab category filter
     if (filterTab === 'formations') {
       result = result.filter((c) => c.formations && c.formations.length > 0);
+      result = [...result].sort((a, b) => b.volume24hUsd - a.volume24hUsd);
     } else if (filterTab === 'watchlist') {
       result = result.filter((c) => watchlist.includes(c.symbol));
     } else if (filterTab === 'gainers') {
@@ -240,7 +326,10 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     } else if (filterTab === 'losers') {
       result = [...result].sort((a, b) => a.priceChange24h - b.priceChange24h);
     } else if (filterTab === 'volume' || filterTab === 'all') {
-      result = [...result].sort((a, b) => (b.volume24hUsd || 0) - (a.volume24hUsd || 0));
+      const direction = preferredVolumeSortOrder(selectedVolumeMode);
+      result = [...result].sort((a, b) => direction === 'asc'
+        ? (a.volume24hUsd || 0) - (b.volume24hUsd || 0)
+        : (b.volume24hUsd || 0) - (a.volume24hUsd || 0));
     }
 
     // Text search query filter
@@ -252,13 +341,13 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
         return (
           sym.includes(q) ||
           base.includes(q) ||
-          c.formations?.some((f) => f.name.toLowerCase().includes(q) || f.nameEn.toLowerCase().includes(q))
+          c.formations?.some((f) => f.name?.toLowerCase().includes(q) || f.nameEn?.toLowerCase().includes(q))
         );
       });
     }
 
     return result;
-  }, [unifiedCoins, filterTab, selectedExchange, selectedMarket, selectedMinVolume, watchlist, search, isOpen]);
+  }, [unifiedCoins, filterTab, selectedExchange, selectedMarket, selectedVolumeCap, selectedVolumeMode, watchlist, search, isOpen]);
 
   // The modal is portaled to body, and the underlying Terminal should not scroll.
   useEffect(() => {
@@ -474,7 +563,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
             </button>
 
             <button
-              onClick={() => { setFilterTab('formations'); setDisplayCount(80); }}
+              onClick={() => { setFilterTab('formations'); setDisplayCount(80); loadFormationsOnDemand(); }}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer ${
                 filterTab === 'formations'
                   ? 'bg-purple-600 text-white font-bold'
@@ -552,56 +641,41 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
               </button>
             </div>
 
-            {/* Volume Range Selector ($50k - $10B) */}
-            <div className="flex min-w-0 max-w-full flex-wrap items-center rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] text-slate-300">
-              <span className="text-slate-500 mr-1.5 font-semibold">Обсяг 24h:</span>
-              <select
-                value={selectedMinVolume}
-                onChange={(e) => {
-                  setSelectedMinVolume(Number(e.target.value));
-                  setDisplayCount(80);
-                }}
-                className="min-w-0 max-w-full flex-1 cursor-pointer border-none bg-transparent font-medium text-slate-200 focus:outline-none"
+            {/* Same inclusive volume filter and direction switch as the main Screener. */}
+            <div data-terminal-filter="volume" className="flex min-h-9 w-full min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-xs sm:w-72">
+              <span id="terminal-volume-cap-label" className="shrink-0 whitespace-nowrap text-[11px] text-slate-500">{t('screenerVolume24h')}</span>
+              <ScreenerVolumeDropdown
+                id="terminal-volume-cap"
+                labelId="terminal-volume-cap-label"
+                value={selectedVolumeCap}
+                mode={selectedVolumeMode}
+                portalZIndex={280}
+                onChange={value => { setSelectedVolumeCap(value); setDisplayCount(80); }}
+              />
+              <button
+                type="button"
+                data-terminal-volume-direction
+                aria-label={t(selectedVolumeMode === 'to' ? 'screener.main.volumeSwitchFrom' : 'screener.main.volumeSwitchTo')}
+                aria-pressed={selectedVolumeMode === 'from'}
+                title={t(selectedVolumeMode === 'to' ? 'screener.main.volumeTooltipTo' : 'screener.main.volumeTooltipFrom')}
+                onClick={() => { setSelectedVolumeMode(mode => mode === 'to' ? 'from' : 'to'); setDisplayCount(80); }}
+                className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center bg-transparent text-cyan-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
               >
-                <option value={50000} className="bg-slate-900 text-white">Всі ($50K - $10B)</option>
-                <option value={100000} className="bg-slate-900 text-white">&gt; $100K</option>
-                <option value={500000} className="bg-slate-900 text-white">&gt; $500K</option>
-                <option value={1000000} className="bg-slate-900 text-white">&gt; $1M</option>
-                <option value={10000000} className="bg-slate-900 text-white">&gt; $10M</option>
-                <option value={50000000} className="bg-slate-900 text-white">&gt; $50M</option>
-                <option value={100000000} className="bg-slate-900 text-white">&gt; $100M</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Timeframe configuration */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60 text-xs">
-            {/* Timeframe Selector */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400 text-[11px] font-semibold">Таймфрейм:</span>
-              <div className="flex min-w-0 max-w-full flex-wrap items-center rounded-lg border border-slate-800 bg-slate-900 p-0.5 font-mono text-[11px]">
-                {(['30s', '1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
-                  <button
-                    key={tf}
-                    type="button"
-                    onClick={() => setSelectedTimeframe(tf)}
-                    className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                      selectedTimeframe === tf
-                        ? 'bg-cyan-600 text-white font-bold'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
-              </div>
+                {selectedVolumeMode === 'to' ? <ArrowDownToLine className="h-3.5 w-3.5" /> : <ArrowUpToLine className="h-3.5 w-3.5" />}
+              </button>
             </div>
           </div>
         </div>
 
         {/* Coins List (Virtualized / Paginated) */}
         <div className="terminal-add-chart-list min-h-0 min-w-0 flex-1 divide-y divide-slate-800/60 overflow-x-hidden overflow-y-auto overscroll-contain p-3 touch-scroll">
-          {isLoadingAllCoins && availableMarketCoins.length === 0 ? (
+          {filterTab === 'formations' && formationScanStatus === 'loading' && !haveIncomingFormations ? (
+            <div role="status" className="flex flex-col items-center gap-3 py-16 text-center text-slate-400">
+              <Loader2 className="h-7 w-7 animate-spin text-purple-300" />
+              <p className="text-xs font-semibold text-slate-200">Завантажуємо актуальні формації…</p>
+              <p className="max-w-sm text-[11px]">Використовується спільний обмежений сканер без додаткових постійних підключень.</p>
+            </div>
+          ) : isLoadingAllCoins && availableMarketCoins.length === 0 ? (
             <div className="py-16 text-center text-slate-400 space-y-3">
               <Loader2 className="w-8 h-8 mx-auto text-cyan-400 animate-spin" />
               <p className="text-xs font-semibold text-white">Завантаження повного списку монет з біржі ($50k - $10B)...</p>
@@ -611,13 +685,24 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
             <div className="py-16 text-center text-slate-400 space-y-2">
               <Activity className="w-8 h-8 mx-auto text-slate-600" />
               <p className="text-xs font-semibold text-white">За вашим фільтром монет не знайдено</p>
-              <p className="text-[11px] text-slate-500">Спробуйте змінити фільтр обсягу або введіть інший символ у пошук</p>
+              <p className="text-[11px] text-slate-500">{filterTab === 'formations'
+                ? formationScanStatus === 'error' ? formationScanError
+                  : 'Для цього набору фільтрів не знайдено підтверджених формацій. Спробуйте змінити фільтри.'
+                : 'Спробуйте змінити фільтр обсягу або введіть інший символ у пошук'}</p>
+              {filterTab === 'formations' && formationScanStatus === 'error' && (
+                <button type="button" onClick={loadFormationsOnDemand}
+                  className="rounded-lg border border-purple-600/40 px-3 py-2 text-xs text-purple-200 hover:bg-purple-950/40">
+                  Повторити пошук формацій
+                </button>
+              )}
             </div>
           ) : (
             <>
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-1 px-2 py-1 text-[11px] text-slate-500">
                 <span>{t("terminal.modal.foundCount", { count: formatCount(filteredCoins.length) })}</span>
-                <span>Діапазон обсягу: <strong className="text-cyan-400 font-mono">${(selectedMinVolume / 1000).toFixed(0)}K - $10B</strong></span>
+                <span>Обсяг 24г: <strong className="text-cyan-400 font-mono">{selectedVolumeCap > 0
+                  ? `${selectedVolumeMode === 'from' ? '≥' : '≤'} ${formatVolume(selectedVolumeCap)}`
+                  : t('screenerVolumeUnlimited')}</strong></span>
               </div>
 
               {filteredCoins.slice(0, displayCount).map((coin) => {
