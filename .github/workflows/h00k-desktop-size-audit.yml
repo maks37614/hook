@@ -1,0 +1,79 @@
+name: h00k Desktop installer size audit
+
+on:
+  pull_request:
+    paths:
+      - 'desktop/package.json'
+      - 'desktop/installer/package.json'
+      - 'desktop/installer/build-isolated.ps1'
+      - 'desktop/installer/prepare.cjs'
+      - 'desktop/scripts/package-size-audit.ps1'
+      - '.github/workflows/h00k-desktop-size-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  package-audit:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Desktop build dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify Desktop tests and locale dictionaries
+        run: npm test
+      - name: Verify compact installer tests
+        run: npm test --prefix installer
+      - name: Build full NSIS Windows installer
+        run: npm run dist
+      - name: Prepare signed-hash payload and first-run guidance
+        run: node installer/prepare.cjs
+      - name: Build isolated animated setup with embedded NSIS worker
+        shell: pwsh
+        run: ./installer/build-isolated.ps1
+      - name: Measure actual installer, installed footprint and locale inventory
+        shell: pwsh
+        run: ./scripts/package-size-audit.ps1
+      - name: Verify animated robot icon in final EXE
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem installer/dist -Filter 'h00k Setup*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Animated setup EXE not produced' }
+          & ./scripts/verify-installer-icon.ps1 -Installer $setup.FullName -RobotIcon ./build/h00k-installer.ico
+      - name: Verify animated EXE includes intact NSIS installation payload
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem installer/dist -Filter 'h00k Setup*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Animated setup EXE not produced' }
+          $proc = Start-Process -FilePath $setup.FullName -ArgumentList '--self-test' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Animated setup integrity test failed: $($proc.ExitCode)" }
+      - name: Compute SHA-256 hash for the finished animated EXE
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem installer/dist -Filter 'h00k Setup*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Animated setup EXE not produced' }
+          $hash = (Get-FileHash -LiteralPath $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($setup.Name)" | Set-Content -LiteralPath installer/dist/SHA256SUMS.txt -Encoding ascii
+          Write-Host "SHA256 $($setup.Name): $hash"
+      - name: Upload optimized animated setup EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: h00k-animated-setup-exe
+          path: |
+            desktop/installer/dist/h00k Setup*.exe
+            desktop/installer/dist/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+      - name: Upload compact package size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h00k-desktop-package-size-report
+          path: desktop/dist/package-size-report.json
+          if-no-files-found: error
