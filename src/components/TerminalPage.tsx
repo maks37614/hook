@@ -1724,9 +1724,12 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         {/* One or many coins share the same grid tiles, controls and live HookChart. */}
           <div ref={chartListRef} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar">
             {blocks.length === 0 ? (
-              <div data-testid="terminal-empty-workspace"
-                className="flex min-h-[min(48dvh,420px)] flex-col items-center justify-center px-4 py-8">
-                {terminalChartActions}
+              <div data-testid="terminal-empty-layout" className="flex min-h-full flex-col">
+                <div data-testid="terminal-empty-workspace"
+                  className="mx-auto flex w-full max-w-lg min-h-[240px] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 px-4 py-8 text-center">
+                  {terminalChartActions}
+                </div>
+                <SiteFooter />
               </div>
             ) : (
               <>
@@ -1777,8 +1780,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
               </div>
               </>
             )}
-            {blocks.length !== 0 && <>{terminalBelowCharts}</>}
-            {blocks.length === 0 && <SiteFooter />}
+            {blocks.length !== 0 && terminalBelowCharts}
           </div>
       </main>
 

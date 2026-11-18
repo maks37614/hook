@@ -85,11 +85,27 @@ test('empty Terminal moves the existing plus and live coin count into the worksp
   const empty = source.slice(start, grid);
   assert.match(empty, /data-testid="terminal-empty-workspace"/);
   assert.match(empty, /\{terminalChartActions\}/);
-  assert.doesNotMatch(empty, /Робоча область порожня|Додати перший графік|2,400\+|border-dashed/);
+  assert.doesNotMatch(empty, /Робоча область порожня|Додати перший графік|2,400\+/);
+  assert.match(empty, /border border-dashed border-slate-800/);
+  assert.match(empty, /\{terminalChartActions\}/);
   assert.equal((source.match(/\{terminalChartActions\}/g) ?? []).length, 2,
     'one shared element is reused, not duplicated');
-  assert.match(source, /\{blocks.length !== 0 && <>\{terminalBelowCharts\}<\/>\}/);
-  assert.match(source, /\{blocks.length === 0 && <SiteFooter \/>\}/);
+  assert.match(source, /\{blocks.length !== 0 && terminalBelowCharts\}/);
+  assert.match(empty, /<SiteFooter \/>/);
   assert.doesNotMatch(source, /Multi-chart Grid Layout/,
     'the old debug label must not appear in Terminal source or page');
+});
+
+test('empty grid stretches its bordered frame above the footer on short and tall screens', () => {
+  const source = terminal();
+  const start = source.indexOf('{blocks.length === 0 ? (');
+  const end = source.indexOf(') : (', start);
+  const empty = source.slice(start, end);
+  assert.match(empty, /data-testid="terminal-empty-layout" className="flex min-h-full flex-col"/);
+  assert.match(empty, /data-testid="terminal-empty-workspace"/);
+  assert.match(empty, /min-h-\[240px\] flex-1/);
+  assert.match(empty, /border border-dashed border-slate-800/);
+  assert.ok(empty.indexOf('{terminalChartActions}') < empty.indexOf('<SiteFooter />'));
+  assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/,
+    'the normal charts keep their original scrolling behavior');
 });
