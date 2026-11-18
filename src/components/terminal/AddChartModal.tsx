@@ -224,6 +224,14 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     })();
   };
 
+  // The selected tab survives dialog reopens. If it is still Formations,
+  // request results again only when no snapshot has been loaded yet.
+  useEffect(() => {
+    if (isOpen && filterTab === 'formations' && formationScanStatus === 'idle') {
+      loadFormationsOnDemand();
+    }
+  }, [isOpen, filterTab, formationScanStatus, selectedTimeframe]);
+
   useEffect(() => {
     if (lastFormationTimeframe.current === selectedTimeframe) return;
     lastFormationTimeframe.current = selectedTimeframe;
