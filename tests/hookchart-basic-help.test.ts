@@ -156,3 +156,13 @@ test('chart settings hide redundant explanations but retain accessible help and 
   assert.match(source, /mainSettingHelpText\(section, label\) \|\| help \|\| desc/,
     'the same explanations must remain available through the question mark');
 });
+test('profile timezone controls the chart instead of an obsolete chart preference', () => {
+  const canvas = code('../src/components/hookchart/HookChartCanvas.tsx');
+  assert.match(canvas, /const timezone = resolveTimeZone\(profile\?\.timeZone\);/);
+  assert.doesNotMatch(canvas, /resolveTimeZone\(settings\.timezone\)/,
+    'legacy saved timezone must not override changes made in the user profile');
+  const editor = code('../src/components/hookchart/OriginalHookChartSettings.tsx');
+  assert.doesNotMatch(editor, /set\('timezone', value\)/);
+  assert.equal(normalizeOriginalHookChartPreferences({ timezone: 'UTC' }).timezone, 'UTC',
+    'preserve legacy profile data without using it as an active override');
+});
