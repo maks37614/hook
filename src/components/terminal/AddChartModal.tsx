@@ -54,6 +54,44 @@ interface AddChartModalProps {
 let globalMarketCoinsCache: MarketCoin[] | null = null;
 let globalMarketCoinsTimestamp = 0;
 const CACHE_TTL = 30 * 1000; // 30s cache
+const FORMATION_FEEDBACK = {
+  uk: {
+    busy: 'Сканер зараз зайнятий. Повторіть пошук трохи пізніше.',
+    failed: 'Не вдалося отримати формації. Спробуйте ще раз.',
+    invalid: 'Сканер не повернув коректний список формацій.',
+    loading: 'Завантажуємо актуальні формації…',
+    info: 'Використовується спільний обмежений сканер без додаткових постійних підключень.',
+    empty: 'Для цього набору фільтрів не знайдено підтверджених формацій. Спробуйте змінити фільтри.',
+    retry: 'Повторити пошук формацій',
+  },
+  en: {
+    busy: 'The scanner is busy. Please try again shortly.',
+    failed: 'Could not load formations. Please try again.',
+    invalid: 'The scanner returned an invalid formation list.',
+    loading: 'Loading detected formations…',
+    info: 'Uses the existing shared, rate-limited scanner without new permanent connections.',
+    empty: 'No confirmed formations match these filters. Try adjusting the filters.',
+    retry: 'Retry formation scan',
+  },
+  pl: {
+    busy: 'Skaner jest zajęty. Spróbuj ponownie za chwilę.',
+    failed: 'Nie udało się pobrać formacji. Spróbuj ponownie.',
+    invalid: 'Skaner zwrócił nieprawidłową listę formacji.',
+    loading: 'Ładowanie wykrytych formacji…',
+    info: 'Używany jest współdzielony skaner z limitem żądań, bez nowych stałych połączeń.',
+    empty: 'Brak potwierdzonych formacji dla tych filtrów. Zmień filtry.',
+    retry: 'Ponów skanowanie formacji',
+  },
+  ru: {
+    busy: 'Сканер занят. Повторите попытку немного позже.',
+    failed: 'Не удалось загрузить формации. Повторите попытку.',
+    invalid: 'Сканер вернул некорректный список формаций.',
+    loading: 'Загрузка обнаруженных формаций…',
+    info: 'Используется общий сканер с ограничением запросов, без новых постоянных соединений.',
+    empty: 'Подтверждённых формаций по этим фильтрам не найдено. Измените фильтры.',
+    retry: 'Повторить поиск формаций',
+  },
+} as const;
 
 export const AddChartModal: React.FC<AddChartModalProps> = ({
   isOpen,
@@ -70,6 +108,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   onAddChart,
 }) => {
   const { language, t } = useLanguage();
+  const formationFeedback = FORMATION_FEEDBACK[language];
   const numberLocale = { uk: 'uk-UA', en: 'en-GB', pl: 'pl-PL', ru: 'ru-RU' }[language];
   const formatCount = (count: number) => count.toLocaleString(numberLocale);
   const [search, setSearch] = useState('');
@@ -201,11 +240,11 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
           signal: controller.signal, cache: 'no-store',
         });
         if (!response.ok) throw new Error(response.status === 503
-          ? 'Сканер зараз зайнятий. Повторіть пошук трохи пізніше.'
-          : 'Не вдалося отримати формації. Спробуйте ще раз.');
+          ? formationFeedback.busy
+          : formationFeedback.failed);
         const result = await response.json();
         if (!result?.success || !Array.isArray(result.data)) {
-          throw new Error('Сканер не повернув коректний список формацій.');
+          throw new Error(formationFeedback.invalid);
         }
         if (!controller.signal.aborted) {
           setOnDemandFormations((result.data as ScannedCoin[]).filter(
@@ -215,7 +254,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
         }
       } catch (error) {
         if (!controller.signal.aborted) {
-          setFormationScanError(error instanceof Error ? error.message : 'Не вдалося отримати формації.');
+          setFormationScanError(error instanceof Error ? error.message : formationFeedback.failed);
           setFormationScanStatus('error');
         }
       } finally {
@@ -698,8 +737,8 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
           {filterTab === 'formations' && formationScanStatus === 'loading' && !haveIncomingFormations ? (
             <div role="status" className="flex flex-col items-center gap-3 py-16 text-center text-slate-400">
               <Loader2 className="h-7 w-7 animate-spin text-purple-300" />
-              <p className="text-xs font-semibold text-slate-200">Завантажуємо актуальні формації…</p>
-              <p className="max-w-sm text-[11px]">Використовується спільний обмежений сканер без додаткових постійних підключень.</p>
+              <p className="text-xs font-semibold text-slate-200">{formationFeedback.loading}</p>
+              <p className="max-w-sm text-[11px]">{formationFeedback.info}</p>
             </div>
           ) : isLoadingAllCoins && availableMarketCoins.length === 0 ? (
             <div className="py-16 text-center text-slate-400 space-y-3">
@@ -713,12 +752,12 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
               <p className="text-xs font-semibold text-white">За вашим фільтром монет не знайдено</p>
               <p className="text-[11px] text-slate-500">{filterTab === 'formations'
                 ? formationScanStatus === 'error' ? formationScanError
-                  : 'Для цього набору фільтрів не знайдено підтверджених формацій. Спробуйте змінити фільтри.'
+                  : formationFeedback.empty
                 : 'Спробуйте змінити фільтр обсягу або введіть інший символ у пошук'}</p>
               {filterTab === 'formations' && formationScanStatus === 'error' && (
                 <button type="button" onClick={loadFormationsOnDemand}
                   className="rounded-lg border border-purple-600/40 px-3 py-2 text-xs text-purple-200 hover:bg-purple-950/40">
-                  Повторити пошук формацій
+                  {formationFeedback.retry}
                 </button>
               )}
             </div>
