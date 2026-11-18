@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           git -C source archive HEAD | tar -x -C target
-          rm -f target/.github/workflows/import-h00k-once.yml
+          find target/.github/workflows -type f ! -name import-h00k-once.yml -delete
           test ! -f target/.env
           test ! -d target/node_modules
           cat > target/CLEAN_LINUX_RESTORE_UA.md <<'EOF'
