@@ -59,14 +59,17 @@ test('on wide screens autoscale comes before 1x–4x on the left, presets and pl
 test('top-right shortcuts are anchored to the right and bordered on desktop', () => {
   assert.match(header, /col-start-3 row-start-1 flex shrink-0 items-center justify-self-end/);
   for (const label of [
-    'Створити сповіщення в Telegram',
     'На весь екран браузера', 'Закрити термінал',
   ]) assert.ok(header.includes(label));
+  assert.doesNotMatch(header, /Створити сповіщення в Telegram|<Send\b/,
+    'Telegram shortcut is replaced, not added as an extra top-row button');
+  assert.equal((header.match(/aria-pressed=\{terminalAlertsEnabled\}/g) ?? []).length, 1,
+    'workspace notifications have a single header control');
   assert.match(header, /t\('terminal\.drawer\.settingsTooltip'\)/,
     'settings tooltip must be localized');
   assert.match(header, /t\('terminal\.page\.metaScalpGroup'/);
   assert.equal((header.match(/lg:h-8 lg:w-8 lg:rounded-lg lg:border/g) ?? []).length, 5);
-  assert.match(header, /lg:border-sky-500\/35/);
+  assert.match(header, /lg:border-cyan-400\/60/);
   assert.match(header, /lg:border-amber-500\/35/);
 });
 
@@ -83,19 +86,21 @@ test('smaller screens keep the original positions and all actions remain connect
   assert.match(header, /onClick=\{onReturnToPatterns\}/);
 });
 
-test('narrow mobile chart-alert action stays clear of the clock without hiding controls', () => {
-  // Below 520px the top toolbar gets fixed-size action columns on either side
-  // of the centered clock instead of letting the two button strips overflow it.
-  assert.match(header, /max-\[519px\]:grid-cols-\[auto_minmax\(0,1fr\)_auto\]/);
-  assert.match(header, /justify-self-start min-\[720px\]:hidden max-\[519px\]:grid max-\[519px\]:grid-cols-2/);
-  assert.match(header, /col-start-3 row-start-1 flex shrink-0 items-center justify-self-end[^"]*max-\[519px\]:grid max-\[519px\]:grid-cols-3/);
-  assert.match(header, /max-\[519px\]:\[&>button\]:h-7 max-\[519px\]:\[&>button\]:w-7/);
+test('mobile header keeps its original single-row positions with alerts in the Telegram slot', () => {
+  assert.doesNotMatch(header, /max-\[519px\]:grid|max-\[519px\]:\[&>button\]/,
+    'reverted two-tier layout must not return');
+  assert.match(header, /grid w-full min-w-0 grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\] items-center sm:gap-2 min-\[720px\]:contents/);
+  assert.match(header, /flex items-center gap-1 justify-self-start min-\[720px\]:hidden/);
+  assert.match(header, /col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-0 min-\[375px\]:gap-0\.5 sm:gap-2/);
   assert.match(header, /<TerminalClock timeZone=\{profile\?\.timeZone\}/);
-  for (const button of [
-    'ChartNoAxesCombined', 'BellRing', 'Send', 'Zap',
-    'SlidersHorizontal', 'Maximize2', 'Minimize2',
-  ]) {
-    assert.ok(header.includes('<' + button), 'mobile control is missing: ' + button);
+
+  const alertIndex = header.indexOf('aria-pressed={terminalAlertsEnabled}');
+  const metaScalpIndex = header.indexOf('{/* MetaScalp shortcut */}');
+  const settingsIndex = header.indexOf('{/* Settings Drawer */}');
+  assert.ok(alertIndex >= 0 && alertIndex < metaScalpIndex && metaScalpIndex < settingsIndex);
+  assert.match(header, /h-7 w-6 shrink-0 items-center justify-center rounded-xl border-0 p-0/);
+  for (const button of ['ChartNoAxesCombined', 'BellRing', 'Zap', 'SlidersHorizontal', 'Maximize2', 'Minimize2']) {
+    assert.ok(header.includes('<' + button), 'mobile control missing: ' + button);
   }
   assert.match(header, /onClick=\{\(\) => setConfig\(current => \(\{ \.\.\.current, terminalMarketAlerts:/);
   assert.match(header, /onClick=\{\(\) => setIsSettingsOpen\(true\)\}/);
