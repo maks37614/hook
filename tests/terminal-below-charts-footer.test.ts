@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const terminal = () => read('../src/components/TerminalPage.tsx');
 const controls = () => {
   const source = terminal();
-  const start = source.indexOf('const terminalBelowCharts = (');
+  const start = source.indexOf('const terminalChartActions = (');
   const end = source.indexOf('// One autoscale action', start);
   assert.ok(start >= 0 && end > start, 'the Terminal bottom controls exist');
   return source.slice(start, end);
@@ -75,4 +75,22 @@ test('Centered controls provide translations in all four site languages', () => 
     'Найдено {{count}} монет', 'Znaleziono {{count}} monet',
     'Назад', 'Previous', 'Далее', 'Dalej',
   ]) assert.ok(translations.includes(text), text);
+});
+
+test('empty Terminal moves the existing plus and live coin count into the workspace', () => {
+  const source = terminal();
+  const start = source.indexOf('{blocks.length === 0 ? (');
+  const grid = source.indexOf('<div className={`terminal-workspace-grid', start);
+  assert.ok(start >= 0 && grid > start, 'empty branch must precede the regular grid');
+  const empty = source.slice(start, grid);
+  assert.match(empty, /data-testid="terminal-empty-workspace"/);
+  assert.match(empty, /\{terminalChartActions\}/);
+  assert.doesNotMatch(empty, /Робоча область порожня|Додати перший графік|2,400\+|border-dashed/);
+  assert.equal((source.match(/\{terminalChartActions\}/g) ?? []).length, 2,
+    'one shared element is reused, not duplicated');
+  assert.match(source, /\{blocks.length !== 0 && <>\{terminalBelowCharts\}<\/>\}/);
+  assert.match(source, /\{blocks.length === 0 && <SiteFooter \/>\}/);
+  assert.doesNotMatch(source, /^\s*\/\* Multi-chart Grid Layout \*\//m,
+    'a source-code comment must not be rendered in the Terminal');
+  assert.match(source, /\{\/\* Multi-chart Grid Layout \*\/\}/);
 });
