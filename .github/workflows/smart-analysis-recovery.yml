@@ -1,0 +1,49 @@
+name: Smart Analysis Recovery Checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/smartAnalysisService.ts'
+      - 'server/verifiedBtcContext.ts'
+      - 'server/estimatedPoc.ts'
+      - 'tests/verified-btc-context.test.ts'
+      - 'tests/smart-analysis-poc.test.ts tests/smart-analysis-visibility.test.ts tests/formation-ai-score-layout.test.ts'
+      - 'server.ts'
+      - 'src/components/SmartAnalysisBlock.tsx'
+      - 'src/types.ts'
+      - 'tests/smart-analysis-trust.test.ts'
+      - 'tests/smart-analysis-visibility.test.ts'
+      - 'src/utils/smartAnalysisVisibility.ts'
+      - '.github/workflows/smart-analysis-recovery.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/smartAnalysisService.ts'
+      - 'server/verifiedBtcContext.ts'
+      - 'server/estimatedPoc.ts'
+      - 'tests/verified-btc-context.test.ts'
+      - 'tests/smart-analysis-poc.test.ts'
+      - 'server.ts'
+      - 'src/components/SmartAnalysisBlock.tsx'
+      - 'src/types.ts'
+      - 'tests/smart-analysis-trust.test.ts'
+      - 'tests/smart-analysis-visibility.test.ts'
+      - 'src/utils/smartAnalysisVisibility.ts'
+      - '.github/workflows/smart-analysis-recovery.yml'
+
+jobs:
+  smart-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Smart Analysis data integrity tests
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/smart-analysis-trust.test.ts tests/coingecko-holders.test.ts tests/verified-btc-context.test.ts tests/smart-analysis-poc.test.ts
