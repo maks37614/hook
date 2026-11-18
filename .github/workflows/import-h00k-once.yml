@@ -73,7 +73,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --check
           git commit -m "backup: complete h00k + desktop source at 89e6c3e8"
           git push origin HEAD:main
           echo "Clean source snapshot uploaded successfully."
