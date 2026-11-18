@@ -57,7 +57,7 @@ test('auth input icons stay vertically centered when mobile font sizes change', 
   const signup = view('signup');
   const signin = view('signin');
   const reset = view('signin', 'valid-reset-token-is-provided-by-email');
-  const leftIcon = /class="pointer-events-none absolute left-3 top-1\/2 -translate-y-1\/2 text-slate-500"/g;
+  const leftIcon = /class="[^"]*\bpointer-events-none absolute left-3 top-1\/2 -translate-y-1\/2 text-slate-500\b[^"]*"/g;
 
   assert.equal((signup.match(leftIcon) || []).length, 4, 'all signup field icons must be centered');
   assert.equal((signin.match(leftIcon) || []).length, 2, 'email and password icons must be centered');
