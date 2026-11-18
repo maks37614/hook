@@ -1,0 +1,75 @@
+name: Match site favicon to h00k Desktop installer
+
+# A single source of truth: the existing Desktop robot icon generator.
+# Run only for first-party PRs; do not give untrusted fork PRs write access.
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'public/h00k-robot-logo.svg'
+      - 'desktop/scripts/generate-installer-assets.cjs'
+      - '.github/workflows/h00k-favicon-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  favicon:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the same Sharp version used to build Windows installer icons
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/h00k-icon-tools" --no-audit --no-fund --ignore-scripts --no-save sharp@0.34.5
+      - name: Recreate original Windows installer robot icon
+        shell: bash
+        run: |
+          export NODE_PATH="$RUNNER_TEMP/h00k-icon-tools/node_modules"
+          node desktop/scripts/generate-installer-assets.cjs
+          cp desktop/build/h00k-installer.ico public/favicon.ico
+          cp desktop/build/h00k-robot-preview.png public/favicon.png
+          cp desktop/build/h00k-robot-preview.png favicon.png
+      - name: Verify website favicon is the installer asset, including valid ICO PNG frames
+        shell: bash
+        run: |
+          cmp desktop/build/h00k-installer.ico public/favicon.ico
+          cmp desktop/build/h00k-robot-preview.png public/favicon.png
+          cmp public/favicon.png favicon.png
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const ico=fs.readFileSync('public/favicon.ico');
+          const png=fs.readFileSync('public/favicon.png');
+          if(ico.readUInt16LE(0)!==0 || ico.readUInt16LE(2)!==1 || ico.readUInt16LE(4)!==7)
+            throw Error('Expected a 7-frame Windows icon: 16, 24, 32, 48, 64, 128, 256');
+          for(let i=0;i<7;i++){
+            const p=6+i*16, len=ico.readUInt32LE(p+8), offset=ico.readUInt32LE(p+12);
+            if(!ico.subarray(offset,offset+8).equals(Buffer.from('89504e470d0a1a0a','hex')))
+              throw Error('ICO contains invalid PNG frame '+i);
+            if(offset+len>ico.length) throw Error('ICO frame out of bounds '+i);
+          }
+          if(!png.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))
+            throw Error('Invalid favicon PNG');
+          if(png.readUInt32BE(16)!==256||png.readUInt32BE(20)!==256)
+            throw Error('Website favicon PNG must be 256x256');
+          console.log('PASS: Website ICO equals installer ICO, seven frames, browser PNG equals robot preview');
+          NODE
+      - name: Commit identical favicon assets to PR branch
+        shell: bash
+        run: |
+          git add public/favicon.ico public/favicon.png favicon.png
+          if git diff --cached --quiet; then
+            echo 'Website favicon already matches Desktop installer'
+          else
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "assets(site): match favicon ICO and PNG to Windows installer robot"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
