@@ -241,9 +241,9 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
         </div>
         <div role="tablist" aria-label={copy.title} className="flex shrink-0 gap-2 border-b border-slate-800 px-4 py-2">
           <button type="button" role="tab" aria-selected={tab === 'page'} onClick={() => setTab('page')}
-            className={`rounded-md px-3 py-1.5 text-sm ${tab === 'page' ? 'bg-cyan-700/40 text-cyan-100' : 'text-slate-400 hover:text-white'}`}>{copy.page}</button>
+            className={`rounded-md px-3 py-1.5 text-[13px] sm:text-sm ${tab === 'page' ? 'bg-cyan-700/40 text-cyan-100' : 'text-slate-400 hover:text-white'}`}>{copy.page}</button>
           <button type="button" role="tab" aria-selected={tab === 'chart'} onClick={() => setTab('chart')}
-            className={`rounded-md px-3 py-1.5 text-sm ${tab === 'chart' ? 'bg-cyan-700/40 text-cyan-100' : 'text-slate-400 hover:text-white'}`}>{copy.chart}</button>
+            className={`rounded-md px-3 py-1.5 text-[13px] sm:text-sm ${tab === 'chart' ? 'bg-cyan-700/40 text-cyan-100' : 'text-slate-400 hover:text-white'}`}>{copy.chart}</button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4" role="tabpanel">
           {conflict && <p role="alert" className="mb-2 rounded border border-amber-700/60 p-2 text-xs text-amber-300">{copy.conflict}</p>}
@@ -256,14 +256,14 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
               </button>
             </div>
             {GROUPS.map(group => <section key={group} className="mb-3 overflow-hidden rounded-lg border border-slate-700/70">
-              <h3 className="border-b border-slate-700 bg-slate-800/50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">{groupTitles[group]}</h3>
+              <h3 className="border-b border-slate-700 bg-slate-800/50 px-3 py-2 text-[15px] leading-[1.4] font-semibold uppercase tracking-wide text-cyan-300">{groupTitles[group]}</h3>
               {TERMINAL_SHORTCUTS.filter(item => item.group === group).map(item =>
-                <div key={item.id} className="flex min-h-10 items-center justify-between gap-3 border-b border-slate-800 px-3 py-2 last:border-0">
-                  <span className="flex-1 text-xs sm:text-sm">{PAGE_LABELS[language][item.id]}</span>
+                <div key={item.id} className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 last:border-0">
+                  <span className="min-w-[120px] flex-1 text-[13px] leading-[1.45] sm:text-sm">{PAGE_LABELS[language][item.id]}</span>
                   <div className="flex shrink-0 items-center gap-1">
                     <button type="button" aria-label={PAGE_LABELS[language][item.id]} aria-pressed={editingPage === item.id}
                       onClick={() => { setEditing(null); setConflict(false); setEditingPage(item.id); }}
-                      className={`min-w-28 rounded-md border px-2 py-1 font-mono text-[11px] ${editingPage === item.id ? 'border-amber-500 text-amber-300' : 'border-slate-600 bg-slate-900 text-cyan-200'}`}>
+                      className={`min-w-28 rounded-md border px-2 py-1 font-mono text-[13px] leading-[1.3] whitespace-normal break-words text-center ${editingPage === item.id ? 'border-amber-500 text-amber-300' : 'border-slate-600 bg-slate-900 text-cyan-200'}`}>
                       {editingPage === item.id ? copy.record : (pageHotkeys[item.id] ? displayTerminalShortcut(pageHotkeys[item.id]) : copy.unassigned)}
                     </button>
                     <button type="button" title={copy.clear} aria-label={copy.clear + ': ' + PAGE_LABELS[language][item.id]}
@@ -290,16 +290,16 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
               </button>
             </div>}
             {HOTKEY_GROUPS.map(group => <section key={group.title} className="mb-3 overflow-hidden rounded-lg border border-slate-700/70">
-              <h3 className="border-b border-slate-700 bg-slate-800/50 px-3 py-2 text-xs font-semibold text-cyan-300">
+              <h3 className="border-b border-slate-700 bg-slate-800/50 px-3 py-2 text-[15px] leading-[1.4] font-semibold text-cyan-300">
                 {hotkeyGroupLabel(language, group.title)}
               </h3>
               {group.rows.map(row => <div key={row.id} className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-3 py-2 last:border-0">
-                <span className="min-w-[130px] flex-1 text-xs sm:text-sm">{hotkeyActionLabel(language, row.id, row.label)}</span>
+                <span className="min-w-[130px] flex-1 text-[13px] leading-[1.45] sm:text-sm">{hotkeyActionLabel(language, row.id, row.label)}</span>
                 <div className="flex items-center gap-1">
                   <button type="button" disabled={!onSaveChartHotkeys} aria-label={`${hotkeyActionLabel(language, row.id, row.label)}: ${editing === row.id ? copy.record : draft[row.id] ? hotkeyDisplay(draft[row.id]) : copy.unassigned}`}
                     aria-pressed={editing === row.id}
                     onClick={() => setEditing(row.id)}
-                    className={`min-w-28 max-w-40 rounded-md border px-2 py-1.5 font-mono text-[11px] disabled:cursor-default disabled:opacity-70 ${editing === row.id ? 'border-amber-500 bg-amber-900/30 text-amber-200' : 'border-slate-600 bg-slate-900 text-cyan-200'}`}>
+                    className={`min-w-28 max-w-40 rounded-md border px-2 py-1.5 font-mono text-[13px] leading-[1.3] whitespace-normal break-words text-center disabled:cursor-default disabled:opacity-70 ${editing === row.id ? 'border-amber-500 bg-amber-900/30 text-amber-200' : 'border-slate-600 bg-slate-900 text-cyan-200'}`}>
                     {editing === row.id ? copy.record : draft[row.id] ? hotkeyDisplay(draft[row.id]) : copy.unassigned}
                   </button>
                   {onSaveChartHotkeys && <>
