@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { LegalPage } from './components/LegalPage';
+import { RegistrationConfirmationPage } from './components/RegistrationConfirmationPage';
 import './index.css';
 import './components/replay/replayCoinPicker.css';
 import './components/terminal/addChartModal.css';
@@ -28,6 +29,7 @@ initializeSiteAppearance();
 
 const legalPath = window.location.pathname.replace(/\/+$/, '');
 const publicLegalPage = legalPath === '/terms' ? 'terms' : legalPath === '/privacy' ? 'privacy' : null;
+const registrationConfirmationPage = legalPath === '/check-email';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -36,6 +38,11 @@ createRoot(document.getElementById('root')!).render(
         // Keep the account appearance without starting market or alert providers.
         <LanguageProvider>
           <LegalPage page={publicLegalPage} />
+        </LanguageProvider>
+      ) : registrationConfirmationPage ? (
+        // Email confirmation never mounts exchange, quote, or chart providers.
+        <LanguageProvider>
+          <RegistrationConfirmationPage />
         </LanguageProvider>
       ) : (
         <AlertsProvider>
