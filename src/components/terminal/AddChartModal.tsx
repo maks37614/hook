@@ -30,6 +30,8 @@ interface AddChartModalProps {
   isOpen: boolean;
   onClose: () => void;
   coins: ScannedCoin[];
+  /** Original scanner results preserve the detection timeframe for real formations. */
+  formationCoins?: ScannedCoin[];
   /** Already loaded by TerminalPage; avoids a duplicate full-market request. */
   terminalMarketCoins?: MarketCoin[];
   /** Existing workspaces are preserved, but new additions stop at the chart limit. */
@@ -57,6 +59,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   isOpen,
   onClose,
   coins,
+  formationCoins,
   terminalMarketCoins,
   atChartLimit = false,
   context = 'terminal',
@@ -87,6 +90,10 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   const [formationScanStatus, setFormationScanStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [formationScanError, setFormationScanError] = useState('');
   const formationScanController = useRef<AbortController | null>(null);
+  const lastFormationTimeframe = useRef(selectedTimeframe);
+  // 30s is not a formation-scan timeframe; use the closest supported 1m data
+  // without altering the selected chart's own timeframe.
+  const formationTimeframe = selectedTimeframe === '30s' ? '1m' : selectedTimeframe;
 
   useEffect(() => {
     if (isOpen) {
@@ -173,7 +180,9 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   // The Terminal does not launch foreground formation scans on page entry.
   // Reuse previously scanned results; only a deliberate tap on this tab can
   // request one bounded shared scan, never while the picker is closed.
-  const haveIncomingFormations = coins.some(coin => coin.formations?.length > 0);
+  const sourceFormations = formationCoins ?? coins;
+  const haveIncomingFormations = sourceFormations.some(coin =>
+    coin.timeframe === formationTimeframe && coin.formations?.length > 0);
   const loadFormationsOnDemand = () => {
     if (haveIncomingFormations || onDemandFormations.length || formationScanController.current
       || formationScanStatus === 'ready') return;
@@ -186,7 +195,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     void (async () => {
       try {
         const params = new URLSearchParams({
-          timeframe: selectedTimeframe, exchange: 'all', marketType: 'all', minVolume: '0',
+          timeframe: formationTimeframe, exchange: 'all', marketType: 'all', minVolume: '0',
         });
         const response = await fetch(`/api/screener/scan?${params.toString()}`, {
           signal: controller.signal, cache: 'no-store',
@@ -216,6 +225,15 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   };
 
   useEffect(() => {
+    if (lastFormationTimeframe.current === selectedTimeframe) return;
+    lastFormationTimeframe.current = selectedTimeframe;
+    formationScanController.current?.abort();
+    formationScanController.current = null;
+    setOnDemandFormations([]);
+    setFormationScanStatus('idle');
+  }, [selectedTimeframe]);
+
+  useEffect(() => {
     if (isOpen) return;
     formationScanController.current?.abort();
     formationScanController.current = null;
@@ -227,13 +245,13 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   const formationsMap = useMemo(() => {
     const map = new Map<string, ScannedCoin>();
     if (!isOpen) return map;
-    for (const c of [...coins, ...onDemandFormations]) {
-      if (!c.formations?.length) continue;
+    for (const c of [...sourceFormations, ...onDemandFormations]) {
+      if (c.timeframe !== formationTimeframe || !c.formations?.length) continue;
       const key = `${c.exchange}_${c.symbol}_${c.marketType}`.toUpperCase();
       map.set(key, c);
     }
     return map;
-  }, [coins, onDemandFormations, isOpen]);
+  }, [sourceFormations, formationTimeframe, onDemandFormations, isOpen]);
 
   // Unified coins list: merges all market coins with formation metadata
   const unifiedCoins = useMemo(() => {
@@ -290,7 +308,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
       volume24hUsd: c.volume24hUsd || 0,
       highPrice24h: c.highPrice24h || c.currentPrice,
       lowPrice24h: c.lowPrice24h || c.currentPrice,
-      formations: c.formations || [],
+      formations: formationsMap.get(`${c.exchange}_${c.symbol}_${c.marketType}`.toUpperCase())?.formations || [],
     }));
   }, [availableMarketCoins, coins, onDemandFormations, formationsMap, filterTab, isOpen]);
 
