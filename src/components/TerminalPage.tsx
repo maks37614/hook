@@ -1199,10 +1199,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       terminalHotkeys, user?.uid, profile?.terminalLinkSettings, updateProfileData,
       setConfig, changeTerminalPage, onReturnToPatterns]);
 
-  // Controls are intentionally centered, unboxed and always BELOW the charts.
-  // The number of matching instruments is independent from open chart blocks.
-  const terminalBelowCharts = (
-    <div className="pt-4" data-testid="terminal-below-charts">
+  // One shared set of add/pager/count actions: centered in an empty workspace
+  // or below the chart grid. Never mount both copies at the same time.
+  const terminalChartActions = (
       <div className="flex flex-col items-center justify-center gap-2 pb-4">
         <button
           type="button"
@@ -1239,6 +1238,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           {t('terminal.page.foundCoins', { count: foundCoinCount })}
         </p>
       </div>
+  );
+  const terminalBelowCharts = (
+    <div className="pt-4" data-testid="terminal-below-charts">
+      {terminalChartActions}
       <SiteFooter />
     </div>
   );
@@ -1719,26 +1722,12 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         </div>
 
         {/* One or many coins share the same grid tiles, controls and live HookChart. */}
-          /* Multi-chart Grid Layout */
+        {/* Multi-chart Grid Layout */}
           <div ref={chartListRef} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar">
             {blocks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 sm:p-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-950/40 my-8 max-w-lg mx-auto">
-                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 shadow-inner">
-                  <Plus className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1">Робоча область порожня</h3>
-                <p className="text-xs text-slate-400 mb-5 leading-relaxed">
-                  Додайте графік будь-якої монети з біржі Binance або Bybit. Доступно понад 2,400+ монет від $50k до $10B.
-                </p>
-                <button
-                  onClick={() => {
-                    setIsAddModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-cyan-950/50 transition-all active:scale-95 cursor-pointer border border-cyan-400/30"
-                >
-                  <Plus className="w-4 h-4" />
-                  + Додати перший графік
-                </button>
+              <div data-testid="terminal-empty-workspace"
+                className="flex min-h-[min(48dvh,420px)] flex-col items-center justify-center px-4 py-8">
+                {terminalChartActions}
               </div>
             ) : (
               <>
@@ -1789,7 +1778,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
               </div>
               </>
             )}
-            {terminalBelowCharts}
+            {blocks.length !== 0 && <>{terminalBelowCharts}</>}
+            {blocks.length === 0 && <SiteFooter />}
           </div>
       </main>
 
