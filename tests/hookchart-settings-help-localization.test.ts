@@ -65,5 +65,7 @@ test('large market trades and forced liquidations have explanatory descriptions 
   assert.match(settings, /label="Ліквідації на графіку"[^\n]*desc="Примусове закриття позицій через недостатню маржу"/);
   assert.match(settings, /const language = useContext\(ChartSettingsLanguageContext\)/);
   assert.match(settings, /<Setting label=\{label\} desc=\{desc\} help=\{help\}/);
-  assert.match(settings, /translateHookChartPhrase\(language, desc\)/);
+  assert.match(settings, /mainSettingHelpText\(section, label\) \|\| help \|\| desc/);
+  assert.doesNotMatch(settings, /<small>\{translateHookChartPhrase\(language, desc\)\}<\/small>/,
+    'translated explanations are available through help rather than repeated as inline text');
 });
