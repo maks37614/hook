@@ -56,7 +56,8 @@ test('both Terminal layouts feed one persisted choice through all chart layers',
   assert.match(terminal, /setConfig\(current => current\.terminalRefreshMs === value/);
   assert.doesNotMatch(terminal, /localStorage\.setItem\('terminal_chart_refresh_ms'/);
   assert.equal((terminal.match(/\{renderRefreshPicker\(\)\}/g) ?? []).length, 2);
-  assert.equal((terminal.match(/terminalRefreshMs=\{terminalRefreshMs\}/g) ?? []).length, 2);
+  assert.equal((terminal.match(/terminalRefreshMs=\{terminalRefreshMs\}/g) ?? []).length, 1,
+    'one shared grid renders both the sole chart and multiple charts');
   assert.match(widget, /terminalRefreshMs=\{terminalRefreshMs\}/);
   assert.match(grid, /terminalRefreshMs=\{terminalRefreshMs\}/);
   assert.match(exchange, /terminalRefreshMs=\{terminalRefreshMs\}/);

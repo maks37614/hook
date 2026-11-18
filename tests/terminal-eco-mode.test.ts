@@ -58,7 +58,8 @@ test('Terminal ECO reaches single and multi charts without touching account sett
   const hook = source('../src/components/hookchart/HookChartCanvas.tsx');
   assert.match(page, /onClick=\{\(\) => setTerminalEcoMode\(enabled => !enabled\)\}/);
   assert.match(page, /aria-pressed=\{terminalEcoMode\}/);
-  assert.equal((page.match(/terminalEcoMode=\{terminalEcoMode\}/g) || []).length, 2);
+  assert.equal((page.match(/terminalEcoMode=\{terminalEcoMode\}/g) || []).length, 1,
+    'ECO reaches all chart counts through the shared grid');
   assert.match(widget, /terminalEcoMode=\{terminalEcoMode\}/);
   assert.match(wrapper, /terminalEcoMode=\{terminalEcoMode\}/);
   assert.match(chart, /terminalEcoMode=\{terminalEcoMode\}/);

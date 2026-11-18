@@ -1777,6 +1777,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                       getAllCoins={getCoinsForPicker}
                       subscribeAllCoins={subscribeCoinsForPicker}
                       index={visibleWorkspaceStart + index}
+                      isOnlyChart={visibleWorkspaceBlocks.length === 1}
                       isMaximized={isMaximized}
                       isSuspended={maximizedBlockId !== null && !isMaximized}
                       terminalAutoScale={autoScaleCharts && chartProvider === 'hookchart'}

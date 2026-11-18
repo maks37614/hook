@@ -14,8 +14,8 @@ test('Separate fit-history action triggers one shared all-history request for ev
   assert.match(drawer, /applyTerminalInitialViewNow\(TERMINAL_FIT_HISTORY_PROFILE\);\s*(?:setHasUncommittedPreview\(true\);\s*)?setInitialApplied\(true\);\s*onApplyInitialFitAll\?\.\(\);/);
   assert.match(page, /const \[terminalFitAllRequest, setTerminalFitAllRequest\] = useState\(0\);/);
   assert.match(page, /onApplyInitialFitAll=\{\(\) => setTerminalFitAllRequest\(version => version \+ 1\)\}/);
-  assert.equal((page.match(/terminalFitAllRequest=\{terminalFitAllRequest\}/g) ?? []).length, 2,
-    'the single chart and every grid chart receive the command');
+  assert.equal((page.match(/terminalFitAllRequest=\{terminalFitAllRequest\}/g) ?? []).length, 1,
+    'single and multi-chart views share the same prop forwarding');
   assert.doesNotMatch(drawer, /new WebSocket|location\.reload\(|window\.location\.reload\(/);
 });
 

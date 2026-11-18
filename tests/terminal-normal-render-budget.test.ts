@@ -46,3 +46,15 @@ test('density book publishes stable references on its hold-time clock when depth
   assert.match(source, /stopDepthHoldClockSubscription = sharedChartClock\.subscribe\(/);
   assert.match(source, /if \(status !== 'live'\) clearDepth\(\)/);
 });
+
+test('Terminal keeps one live visual refresh path despite multiple coin blocks', () => {
+  const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const grid = readFileSync(new URL('../src/components/terminal/TerminalGridItem.tsx', import.meta.url), 'utf8');
+  const widget = readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx', import.meta.url), 'utf8');
+  assert.match(page, /isOnlyChart=\{visibleWorkspaceBlocks\.length === 1\}/);
+  assert.match(grid, /isSingleBlock=\{false\}/);
+  assert.match(grid, /isOnlyChart=\{isOnlyChart\}/);
+  assert.match(widget, /!isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \|\| isOnlyChart \? 1000 : 180\}/);
+  assert.doesNotMatch(page, /new WebSocket\(/);
+});

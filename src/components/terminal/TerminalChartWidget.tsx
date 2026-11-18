@@ -41,6 +41,8 @@ interface TerminalChartWidgetProps {
   getAllCoins?: () => ScannedCoin[];
   subscribeAllCoins?: (listener: () => void) => () => void;
   isSingleBlock: boolean;
+  /** The only visible Terminal tile loads immediately, without losing grid controls. */
+  isOnlyChart?: boolean;
   isMaximized: boolean;
   /** Pause charts obscured by a maximized Terminal chart. */
   isSuspended?: boolean;
@@ -81,6 +83,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   getAllCoins,
   subscribeAllCoins,
   isSingleBlock,
+  isOnlyChart = false,
   isMaximized,
   isSuspended = false,
   onToggleMaximize,
@@ -125,8 +128,10 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     onDrawingToolsOpenChange: setDrawingToolsOpen,
   }), [extraToolsOpen, drawingToolsOpen]);
   const blockRootRef = useRef<HTMLDivElement>(null);
-  const [isNearViewport, setIsNearViewport] = useState(isSingleBlock || isMaximized);
-  const shouldLoadWidgets = !isSuspended && (isSingleBlock || isMaximized || isNearViewport);
+  // The first chart must be interactive immediately. Keep isSingleBlock=false
+  // in the grid to preserve its drag/resize/remove controls.
+  const [isNearViewport, setIsNearViewport] = useState(isSingleBlock || isOnlyChart || isMaximized);
+  const shouldLoadWidgets = !isSuspended && (isSingleBlock || isOnlyChart || isMaximized || isNearViewport);
 
   // Defer charts, feeds, and order books until their block is near the viewport.
   useEffect(() => {
@@ -699,7 +704,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
                 exchange={block.exchange}
                 marketType={block.marketType}
                 timeframe={block.timeframe}
-                historyLimit={isMaximized || isSingleBlock ? 1000 : 180}
+                historyLimit={isMaximized || isSingleBlock || isOnlyChart ? 1000 : 180}
               />
               </TerminalRenderBoundary>
           </div>

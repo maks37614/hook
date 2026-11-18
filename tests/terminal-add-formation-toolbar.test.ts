@@ -43,7 +43,9 @@ test('Terminal saves the exact chart screenshot on click without subscribing to 
   assert.match(widget, /onAddToArchive=\{onSaveToArchive \? capture => onSaveToArchive\(/);
   assert.match(grid, /onSaveToArchive=\{onSaveToArchive\}/);
   assert.match(page, /onSaveToArchive=\{handleTerminalArchiveCapture\}/);
-  assert.match(page, /onAddToArchive=\{capture => \{/);
+  assert.match(page, /onSaveToArchive=\{handleTerminalArchiveCapture\}/);
+  assert.match(grid, /onSaveToArchive=\{onSaveToArchive\}/);
+  assert.match(widget, /onAddToArchive=\{onSaveToArchive \? capture => onSaveToArchive\(/);
   assert.match(page, /snapshot\.marketKey !== archiveVisualMarketKey\(/);
   assert.match(page, /<ArchiveEntryReasonDialog/);
   assert.match(page, /await saveToArchive\(pending\.coin, pending\.formation/);

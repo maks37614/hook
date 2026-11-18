@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
 const controls = source.slice(
   source.indexOf('{/* Transparent navigation is over the chart area'),
-  source.indexOf('{/* Workspace Display: If 1 block or maximized block'),
+  source.indexOf('{/* One or many coins share the same grid tiles'),
 );
 
 test('Terminal has three floating borderless controls with isolated chart gestures', () => {
