@@ -528,9 +528,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // Stable indicator IDs avoid redoing the SVG calculations for unrelated feed updates.
   const indicators = useMemo(() => (replay || archiveMode) ? replayIndicators : enabledIndicators(runtimeSettings, !!externalData, marketType),
     [replay, archiveMode, replayIndicators, runtimeSettings.indicators, !!externalData, marketType]);
-  // Explicit chart timezone wins; auto follows the user's profile (including device time zone).
-  const timezone = settings.timezone && settings.timezone !== 'auto'
-    ? resolveTimeZone(settings.timezone) : resolveTimeZone(profile?.timeZone);
+  // Chart time is owned by the user's profile. Ignore legacy per-chart
+  // timezone overrides so changing the profile updates every HookChart view.
+  const timezone = resolveTimeZone(profile?.timeZone);
   // Replay is intentionally independent from the live indicator data pipeline.
   const replayConversionRef = useRef<{ scope: string; input: readonly Kline[]; candles: Candle[] } | null>(null);
   // Live ticks normally replace just the last immutable candle. Keep the
