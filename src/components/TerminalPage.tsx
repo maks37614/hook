@@ -1817,6 +1817,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           ? blocks.find(block => block.id === replaceBlockId)?.timeframe
           : config.globalTimeframe || timeframe}
         coins={coins}
+        // Raw scanner data keeps the real formation timeframe (quotes do not).
+        formationCoins={formationCoins}
         terminalMarketCoins={marketCoins}
         atChartLimit={replaceBlockId === null && blocks.length >= MAX_TERMINAL_CHARTS}
         watchlist={localWatchlist}
