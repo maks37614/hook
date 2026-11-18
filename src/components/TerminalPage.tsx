@@ -2,7 +2,6 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useR
 import {
   ListChecks,
   ChevronDown,
-  Send,
   Zap,
   Star,
   Search,
@@ -1315,8 +1314,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     >
       {/* Under 720px controls use two rows; from 720px all groups share one compact row. */}
       <header className="z-20 flex shrink-0 flex-col gap-1.5 border-b border-slate-800 bg-slate-950/95 px-2 py-1.5 sm:px-3 min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] min-[720px]:items-center min-[1280px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[720px]:gap-x-1 min-[720px]:gap-y-0 lg:gap-x-2">
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center max-[519px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[519px]:gap-1 sm:gap-2 min-[720px]:contents">
-          <div className="flex items-center gap-1 justify-self-start min-[720px]:hidden max-[519px]:grid max-[519px]:grid-cols-2 max-[519px]:gap-0.5">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center sm:gap-2 min-[720px]:contents">
+          <div className="flex items-center gap-1 justify-self-start min-[720px]:hidden">
             {renderHotkeysButton()}
             {renderAutoScaleButton()}
             {renderEcoButton()}
@@ -1331,42 +1330,22 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             </div>
           )}
 
-          {/* Telegram, MetaScalp, Settings, Fullscreen */}
-          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-0 max-[519px]:grid max-[519px]:grid-cols-3 max-[519px]:gap-0.5 max-[519px]:[&>button]:h-7 max-[519px]:[&>button]:w-7 max-[519px]:[&>button]:p-1 min-[375px]:gap-0.5 sm:gap-2 min-[720px]:col-start-5 min-[720px]:row-start-1 min-[1280px]:col-start-3 min-[720px]:gap-1 min-[720px]:[&>button]:h-7 min-[720px]:[&>button]:w-7 min-[720px]:[&>button]:p-1 lg:[&>button]:h-8 lg:[&>button]:w-8 lg:[&>button]:p-2">
-            {/* Lightweight opt-in real-time analysis for the current workspace. */}
+          {/* Workspace alerts, MetaScalp, Settings, Fullscreen */}
+          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-0 min-[375px]:gap-0.5 sm:gap-2 min-[720px]:col-start-5 min-[720px]:row-start-1 min-[1280px]:col-start-3 min-[720px]:gap-1 min-[720px]:[&>button]:h-7 min-[720px]:[&>button]:w-7 min-[720px]:[&>button]:p-1 lg:[&>button]:h-8 lg:[&>button]:w-8 lg:[&>button]:p-2">
+            {/* Workspace alert control replaces the redundant Telegram shortcut.
+                 Preserve the original Telegram slot and adjacent button positions. */}
             <button type="button"
               disabled={!terminalAnalysisCanRun}
               onClick={() => setConfig(current => ({ ...current, terminalMarketAlerts: current.terminalMarketAlerts !== true }))}
               aria-pressed={terminalAlertsEnabled}
               aria-label={!terminalAnalysisCanRun ? terminalAlertCopy.limit : terminalAlertsEnabled ? terminalAlertCopy.on : terminalAlertCopy.off}
               title={!terminalAnalysisCanRun ? terminalAlertCopy.limit : terminalAlertsEnabled ? terminalAlertCopy.on : terminalAlertCopy.off}
-              className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border p-1 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 ${terminalAlertsEnabled
-                ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-300'
-                : 'border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-              <ChartNoAxesCombined className="h-4 w-4" aria-hidden="true" />
-              <BellRing className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 ${terminalAlertsEnabled ? 'text-amber-300' : 'text-slate-500'}`} aria-hidden="true" />
+              className={`relative flex h-7 w-6 shrink-0 items-center justify-center rounded-xl border-0 p-0 transition-colors active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:w-auto sm:p-2 lg:h-8 lg:w-8 lg:rounded-lg lg:border ${terminalAlertsEnabled
+                ? 'bg-cyan-500/20 text-cyan-300 lg:border-cyan-400/60'
+                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white lg:border-slate-700'}`}>
+              <ChartNoAxesCombined className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+              <BellRing className={`absolute bottom-0 right-0 h-2 w-2 ${terminalAlertsEnabled ? 'text-amber-300' : 'text-slate-500'}`} aria-hidden="true" />
             </button>
-
-            {/* Telegram Alert shortcut */}
-            {onOpenTelegramAlerts && hasHeaderTarget && (
-              <button
-                onClick={() =>
-                  onOpenTelegramAlerts({
-                    symbol: activeCoin.symbol,
-                    exchange: activeCoin.exchange,
-                    marketType: activeCoin.marketType,
-                    currentPrice: activeCoin.currentPrice,
-                    targetPrice: formation?.levels?.targetPrice,
-                    formationName: formation?.name,
-                  })
-                }
-                className="flex h-7 w-6 shrink-0 items-center justify-center p-0 sm:h-auto sm:w-auto sm:p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-0 lg:h-8 lg:w-8 lg:rounded-lg lg:border lg:border-sky-500/35 transition-all active:scale-95 cursor-pointer"
-                title="Створити сповіщення в Telegram"
-                aria-label="Створити сповіщення в Telegram"
-              >
-                <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />
-              </button>
-            )}
 
             {/* MetaScalp shortcut */}
             {onSendMetaScalp && hasHeaderTarget && (
