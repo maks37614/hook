@@ -203,7 +203,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <label className="block text-xs font-medium text-slate-300">
                 Ім'я або позивний
                 <span className="relative mt-1 block">
-                  <UserRound size={16} className="absolute left-3 top-2.5 text-slate-500"/>
+                  <UserRound size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/>
                   <input type="text" maxLength={80} autoComplete="nickname" value={displayName}
                     onChange={event => setDisplayName(event.target.value)} placeholder="Наприклад: Alex Scalper"
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-3 text-sm text-white outline-none focus:border-cyan-400"/>
@@ -214,7 +214,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <label className="block text-xs font-medium text-slate-300">
                 Електронна пошта
                 <span className="relative mt-1 block">
-                  <Mail size={16} className="absolute left-3 top-2.5 text-slate-500"/>
+                  <Mail size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/>
                   <input type="email" required autoComplete="email" maxLength={254} value={email}
                     onChange={event => setEmail(event.target.value)} placeholder="name@example.com"
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-3 text-sm text-white outline-none focus:border-cyan-400"/>
@@ -225,7 +225,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <label className="block text-xs font-medium text-slate-300">
                 {mode === 'reset' ? 'Новий пароль' : 'Пароль'}
                 <span className="relative mt-1 block">
-                  <Lock size={16} className="absolute left-3 top-2.5 text-slate-500"/>
+                  <Lock size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/>
                   <input type={showPassword ? 'text' : 'password'} required
                     minLength={mode === 'signin' ? 1 : 12} maxLength={128}
                     autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
@@ -234,7 +234,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-11 text-sm text-white outline-none focus:border-cyan-400"/>
                   <button type="button" aria-label={translatePhrase(language, showPassword ? 'Приховати пароль' : 'Показати пароль')} aria-pressed={showPassword}
                     onClick={() => setShowPassword(value => !value)}
-                    className="absolute right-2 top-1.5 rounded-lg p-1.5 text-slate-400 hover:text-white">
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:text-white">
                     {showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}
                   </button>
                 </span>
@@ -244,7 +244,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <label className="block text-xs font-medium text-slate-300">
                 Повторіть пароль
                 <span className="relative mt-1 block">
-                  <Lock size={16} className="absolute left-3 top-2.5 text-slate-500"/>
+                  <Lock size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/>
                   <input type={showPassword ? 'text' : 'password'} required
                     minLength={12} maxLength={128} autoComplete="new-password"
                     value={passwordConfirmation}
