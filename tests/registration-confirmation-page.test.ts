@@ -59,6 +59,6 @@ test('registration confirmation is a separate, noindex SPA page without trading 
   const html = renderToStaticMarkup(React.createElement(RegistrationConfirmationPage));
   assert.match(html, /Підтвердьте електронну пошту/);
   assert.match(html, /data-registration-confirmation-page/);
-  assert.match(html, /href="\/", /);
+  assert.match(html, /href="\/"/);
   assert.doesNotMatch(html, /mailto:/, 'A compose-mailto link is not a mailbox inbox');
 });
