@@ -454,9 +454,9 @@ export default function App() {
       const hash = window.location.hash;
       // The chart is its own route; do not reset the user's previous section.
       if (readChartPageHash(hash)) return;
-      if (hash === '#replay' || hash === '#pc') {
-        const page = hash === '#pc' ? 'pc' : 'replay';
-        setActivePage((prev) => (prev === page ? prev : page));
+      // The Desktop landing remains public; Replay requires a signed-in user.
+      if (hash === '#pc') {
+        setActivePage((prev) => (prev === 'pc' ? prev : 'pc'));
         return;
       }
       if (!user) {
@@ -487,7 +487,7 @@ export default function App() {
   }, [user?.uid, authLoading, handleOpenAuthModal]);
 
   const handlePageChange = (page: ActivePageType) => {
-    if (!user && page !== 'screener' && page !== 'replay' && page !== 'pc') {
+    if (!user && page !== 'screener' && page !== 'pc') {
       handleOpenAuthModal('signin', 'general');
       return;
     }
@@ -1725,10 +1725,25 @@ export default function App() {
           />
           </TerminalRenderBoundary>
         ) : activePage === 'replay' ? (
-          <ReplayPage
-            coins={coins}
-            onNavigateToScreener={() => handlePageChange('screener')}
-          />
+          user ? (
+            <ReplayPage
+              coins={coins}
+              onNavigateToScreener={() => handlePageChange('screener')}
+            />
+          ) : (
+            // Never mount Replay's history loaders, journal or simulator for guests,
+            // including a direct #replay link or a session that just signed out.
+            <section className="flex min-h-[55vh] flex-col items-center justify-center gap-3 px-4 text-center">
+              <Lock size={24} className="text-slate-500" aria-hidden="true" />
+              <p className="text-sm text-slate-300">
+                {tr('Увійдіть у свій акаунт, щоб відкрити сторінку «Відтворення».')}
+              </p>
+              <button type="button" onClick={() => handleOpenAuthModal('signin', 'general')}
+                className="rounded-xl border border-cyan-600 bg-cyan-950/60 px-4 py-2 text-sm font-semibold text-cyan-200">
+                {tr('Увійти')}
+              </button>
+            </section>
+          )
         ) : activePage === 'surveillance' ? (
           <SurveillancePage
             availableCoins={coins}
