@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ExternalLink, MailCheck } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MailCheck } from 'lucide-react';
 import { useLanguage, type SupportedLanguage } from '../context/LanguageContext';
 import { pendingRegistrationEmail, registrationMailbox } from '../utils/registrationConfirmation';
 
