@@ -4,6 +4,7 @@ import { X, LogIn, UserPlus, Mail, Lock, UserRound, Eye, EyeOff, AlertCircle, Ch
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
+import { rememberRegistrationEmail } from '../utils/registrationConfirmation';
 
 export type AuthPromptReason = 'chart' | 'alerts' | 'linking' | 'general' | null;
 interface AuthModalProps {
@@ -111,6 +112,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         await registerWithEmail(email.trim(), password, displayName, captchaToken || '');
         setPassword('');
         setPasswordConfirmation('');
+        // A successful registration request opens a dedicated, lightweight page.
+        // Keep the email only in tab-local storage, never in the address bar.
+        rememberRegistrationEmail(email.trim());
+        window.location.assign('/check-email');
       } else if (mode === 'forgot') {
         await requestPasswordReset(email.trim(), captchaToken || '');
       } else {
