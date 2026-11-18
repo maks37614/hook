@@ -399,8 +399,10 @@ function Setting({ label, desc, help, rowClassName, children }: { label: string;
   const mainSettings = useContext(MainSettingsHelpContext);
   const language = useContext(ChartSettingsLanguageContext);
   const section = useContext(SettingsSectionContext);
-  const explanation = mainSettings ? (mainSettingHelpText(section, label) || help || desc) : help;
-  return <div data-hookchart-guide-setting={label} className={'settingRow' + (rowClassName ? ' ' + rowClassName : '')}><div className="settingText"><b>{translateHookChartPhrase(language, label)}{mainSettings ? (explanation && <VisualSettingHelp label={label} text={explanation} compact />) : (help && <LiquidationHelp label={label} text={help} />)}</b>{desc && <small>{translateHookChartPhrase(language, desc)}</small>}</div><div className="settingControl">{children}</div></div>;
+  // Keep descriptions in contextual help only: a second paragraph under every
+  // control duplicates the ? tooltip and crowds phone-sized settings panels.
+  const explanation = mainSettings ? (mainSettingHelpText(section, label) || help || desc) : (help || desc);
+  return <div data-hookchart-guide-setting={label} className={'settingRow' + (rowClassName ? ' ' + rowClassName : '')}><div className="settingText"><b>{translateHookChartPhrase(language, label)}{mainSettings ? (explanation && <VisualSettingHelp label={label} text={explanation} compact />) : (help ? <LiquidationHelp label={label} text={help} /> : (desc && <VisualSettingHelp label={label} text={desc} />))}</b></div><div className="settingControl">{children}</div></div>;
 }
 function SwitchRow({ label, desc, help, rowClassName, value, onChange }: { label: string; desc?: string; help?: string; rowClassName?: string; value: boolean; onChange: (value: boolean) => void }) {
   // A user may select a chart language different from the site's language.
@@ -946,15 +948,12 @@ export function OriginalHookChartSettings({
         {tab === 'main' ? <MainSettingsHelpContext.Provider value={true}>
           <Section title="Застосунок">
             <Choice label="Мова" values={['uk', 'pl', 'ru', 'en']} labels={['Українська', 'Polski', 'Русский', 'English']} value={prefs.language} set={value => set('language', value)} />
-            <Choice label="Часовий пояс" values={['auto', 'Europe/Warsaw', 'UTC', 'Europe/Kyiv', 'America/New_York']} labels={['За профілем', 'Europe/Warsaw', 'UTC', 'Europe/Kyiv', 'America/New_York']} value={prefs.timezone} set={value => set('timezone', value)} />
             <SwitchRow label="Підказки" desc="Підказки в інтерфейсі під час наведення миші" value={prefs.tooltips !== false} onChange={value => set('tooltips', value)} />
           </Section>
 
           <Section title="Інтерфейс">
             <Setting label="Максимальна історія свічок" desc="Скільки свічок зберігати на графіку. Від 100 до 5000. Історія підвантажується частинами; на біржі може бути менше даних."><Num value={prefs.maxChartCandles ?? 1000} min={100} max={5000} step={100} set={value => set('maxChartCandles', Math.round(value))} /><b className="valueBadge">свічок</b></Setting>
-            {embedded ? <div className="settingsHint">
-              {translateHookChartPhrase(chartLanguage, 'Обсяг історії застосовується окремо до кожного графіка після відкриття. Фактична кількість свічок залежить від біржі.')}
-            </div> : <div className="settingsHint" role="status" aria-live="polite" aria-atomic="true">
+            {!embedded && <div className="settingsHint" role="status" aria-live="polite" aria-atomic="true">
               {translateHookChartPhrase(chartLanguage, 'Завантажено:')} <strong>{Math.max(0, loadedCandles).toLocaleString(candleCountLocale[chartLanguage])} / {clampHookChartHistory(prefs.maxChartCandles ?? 1000).toLocaleString(candleCountLocale[chartLanguage])}</strong> {translateHookChartPhrase(chartLanguage, 'свічок')}
               {historyStatus === 'loading' && <span> {translateHookChartPhrase(chartLanguage, '· Підвантаження старіших свічок…')}</span>}
               {historyStatus === 'limited' && <>
