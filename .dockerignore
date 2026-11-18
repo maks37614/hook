@@ -31,3 +31,9 @@ docs/
 tests/
 metadata.json
 *.save
+
+# Local VPS secret handoff files (never copy into build stages)
+bekenv
+bekenv.*
+**/bekenv
+**/bekenv.*
