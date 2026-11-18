@@ -1313,8 +1313,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     >
       {/* Under 720px controls use two rows; from 720px all groups share one compact row. */}
       <header className="z-20 flex shrink-0 flex-col gap-1.5 border-b border-slate-800 bg-slate-950/95 px-2 py-1.5 sm:px-3 min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] min-[720px]:items-center min-[1280px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[720px]:gap-x-1 min-[720px]:gap-y-0 lg:gap-x-2">
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center sm:gap-2 min-[720px]:contents">
-          <div className="flex items-center gap-1 justify-self-start min-[720px]:hidden">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center max-[519px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[519px]:gap-1 sm:gap-2 min-[720px]:contents">
+          <div className="flex items-center gap-1 justify-self-start min-[720px]:hidden max-[519px]:grid max-[519px]:grid-cols-2 max-[519px]:gap-0.5">
             {renderHotkeysButton()}
             {renderAutoScaleButton()}
             {renderEcoButton()}
@@ -1330,7 +1330,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           )}
 
           {/* Telegram, MetaScalp, Settings, Fullscreen */}
-          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-0 min-[375px]:gap-0.5 sm:gap-2 min-[720px]:col-start-5 min-[720px]:row-start-1 min-[1280px]:col-start-3 min-[720px]:gap-1 min-[720px]:[&>button]:h-7 min-[720px]:[&>button]:w-7 min-[720px]:[&>button]:p-1 lg:[&>button]:h-8 lg:[&>button]:w-8 lg:[&>button]:p-2">
+          <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-0 max-[519px]:grid max-[519px]:grid-cols-3 max-[519px]:gap-0.5 max-[519px]:[&>button]:h-7 max-[519px]:[&>button]:w-7 max-[519px]:[&>button]:p-1 min-[375px]:gap-0.5 sm:gap-2 min-[720px]:col-start-5 min-[720px]:row-start-1 min-[1280px]:col-start-3 min-[720px]:gap-1 min-[720px]:[&>button]:h-7 min-[720px]:[&>button]:w-7 min-[720px]:[&>button]:p-1 lg:[&>button]:h-8 lg:[&>button]:w-8 lg:[&>button]:p-2">
             {/* Lightweight opt-in real-time analysis for the current workspace. */}
             <button type="button"
               disabled={!terminalAnalysisCanRun}
