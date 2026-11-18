@@ -2,7 +2,7 @@ import express, { type Express } from 'express';
 import path from 'node:path';
 
 // Keep existing entry URLs for the hash-routed app and old bookmarks.
-const LEGACY_APP_PATHS = new Set(['/screener', '/patterns', '/terminal', '/replay', '/surveillance', '/pc', '/welcome']);
+const LEGACY_APP_PATHS = new Set(['/screener', '/patterns', '/terminal', '/replay', '/surveillance', '/pc', '/welcome', '/check-email']);
 const SEO_STATIC_FILE = /^(?:robots\.txt|sitemap\.xml|seo[/\\]landing\.css|(?:uk|en|pl|ru)[/\\][a-z0-9-]+\.html)$/;
 
 /** Hashed bundles are immutable. Missing bundles must never receive SPA HTML. */

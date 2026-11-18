@@ -325,7 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthError();
     try {
       await authRequest('/api/auth/register', { email, password: pass, displayName: name, captchaToken });
-      setAuthNotice('Якщо адресу можна зареєструвати, на неї буде надіслано лист підтвердження. Якщо акаунт уже існує, увійдіть або скористайтеся відновленням пароля.');
+      // Registration confirmation is rendered on /check-email, not inside this modal.
     } catch (error) { handleError(error); }
   };
   const resendVerification = async (email: string, captchaToken = '') => {
