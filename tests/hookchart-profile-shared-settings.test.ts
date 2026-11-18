@@ -30,7 +30,10 @@ test('one shared chart editor can render inside the profile without a nested dia
   assert.doesNotMatch(html, /Усі налаштування зберігаються автоматично/);
   assert.match(html, /Стратегії/);
   assert.match(html, /Гарячі клавіші/);
-  assert.match(html, /Фактична кількість свічок залежить від біржі/);
+  assert.match(html, /Максимальна історія свічок/);
+  assert.match(html, /aria-label="Пояснення: Максимальна історія свічок"/);
+  assert.doesNotMatch(html, /Фактична кількість свічок залежить від біржі/,
+    'inline duplicate descriptions were replaced with contextual ? help');
   assert.doesNotMatch(html, /Завантажено:.*0/);
 });
 

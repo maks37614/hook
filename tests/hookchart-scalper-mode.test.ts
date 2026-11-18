@@ -47,7 +47,11 @@ test('Scalper Mode help follows chart-specific EN/PL/RU locale even when site is
       onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
     }));
     assert.ok(html.includes(title), language + ' toggle label');
-    assert.ok(html.includes(description), language + ' explanatory description');
+    const sourceDescription = 'Автоматично показує на живому графіку підтверджені дотиками діапазони, трикутники, клини, похилі лінії та подвійні вершини/дна. Можливий пробій не є підтвердженим до закриття свічки. Аналіз виконується лише в браузері без нових біржових запитів.';
+    assert.ok(translateHookChartPhrase(language, sourceDescription).includes(description),
+      language + ' localized contextual explanation');
+    assert.ok(html.includes('visualSettingHelpButton'), language + ' accessible help trigger');
+    assert.ok(!html.includes(description), language + ' help is hidden until interaction');
     assert.doesNotMatch(html, /Автоматично показує на живому графіку/);
   }
 });
@@ -248,8 +252,9 @@ test('regression switch and description are translated and wired to HookChart pr
     }));
     const label = translateHookChartPhrase(lang, phrase);
     assert.ok(html.includes(label), lang + ' regression switch label');
-    assert.ok(html.includes(translateHookChartPhrase(lang, help)),
-      lang + ' regression help text');
+    assert.ok(html.includes('visualSettingHelpButton'), lang + ' regression help trigger');
+    assert.ok(!html.includes(translateHookChartPhrase(lang, help)),
+      lang + ' regression explanation is not duplicated inline');
   }
   const canvas = readFileSync('src/components/hookchart/HookChartCanvas.tsx', 'utf8');
   assert.ok(canvas.includes('runtimeSettings.scalperRegressionMode === true'));
@@ -372,7 +377,8 @@ test('Scalper Mode caption switch is independent and translated in all four char
     }));
     assert.ok(html.includes(translateHookChartPhrase(language, text)), language + ' caption control visible');
     assert.equal(translateHookChartPhrase(language, description), localizedDescriptions[language]);
-    assert.ok(html.includes(localizedDescriptions[language]), language + ' caption explanation visible');
+    assert.ok(html.includes('visualSettingHelpButton'), language + ' caption help trigger');
+    assert.ok(!html.includes(localizedDescriptions[language]), language + ' caption explanation stays in ? help');
   }
   const canvas = readFileSync('src/components/hookchart/HookChartCanvas.tsx', 'utf8');
   const painter = readFileSync('src/components/hookchart/engine.tsx', 'utf8');

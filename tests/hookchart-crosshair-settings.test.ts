@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OriginalHookChartSettings, normalizeOriginalHookChartPreferences } from '../src/components/hookchart/OriginalHookChartSettings';
+import { mainSettingHelpText } from '../src/components/hookchart/mainSettingsHelp';
 
 test('old preferences gain a thin crosshair and saved thickness survives normalization', () => {
   assert.equal(normalizeOriginalHookChartPreferences().crosshairLineWidth,1);
@@ -24,5 +25,9 @@ test('main chart settings expose a Crosshair section with the saved thin option 
   const section=html.slice(start,end);
   assert.match(section,/Товщина ліній/);
   assert.match(section,/<button(?=[^>]*value="0\.5")(?=[^>]*aria-pressed="true")[^>]*>0\.5 px<\/button>/);
-  assert.match(section,/Горизонтальна та вертикальна лінії курсора/);
+  // Explanations live behind the ? button instead of duplicating every setting.
+  assert.match(section, /aria-label="Пояснення: Товщина ліній"/);
+  assert.match(section, /aria-expanded="false"/);
+  assert.doesNotMatch(section, /Горизонтальна та вертикальна лінії курсора/);
+  assert.match(mainSettingHelpText('Перехрестя', 'Товщина ліній') ?? '', /горизонтальної та вертикальної ліній/);
 });

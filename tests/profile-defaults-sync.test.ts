@@ -86,13 +86,15 @@ test('authentication hydrates owner-scoped defaults and Replay preserves restore
   assert.match(terminal, /const activeTimeframe = blocks\.length === 1 \? blocks\[0\]\.timeframe : timeframe/);
 });
 
-test('HookChart follows the account timezone unless the chart user chooses an override', () => {
+test('HookChart uses the profile timezone and does not offer a redundant chart override', () => {
   const defaults = readFileSync(new URL('../src/components/hookchart/OriginalHookChartSettings.tsx', import.meta.url), 'utf8');
   const canvas = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
   const profileChart = readFileSync(new URL('../src/components/profile/ProfileHookChartSettings.tsx', import.meta.url), 'utf8');
   assert.match(defaults, /timezone: 'auto'/);
-  assert.match(defaults, /values=\{\['auto', 'Europe\/Warsaw', 'UTC'/);
-  assert.match(canvas, /settings\.timezone !== 'auto'/);
+  assert.doesNotMatch(defaults, /values=\{\['auto', 'Europe\/Warsaw', 'UTC'/,
+    'timezone is configured once in the account profile');
+  assert.doesNotMatch(canvas, /settings\.timezone !== 'auto'/,
+    'legacy per-chart timezone values must not override the profile');
   assert.match(canvas, /resolveTimeZone\(profile\?\.timeZone\)/);
   assert.match(profileChart, /previewTimezone=\{resolveTimeZone\(profile\.timeZone\)\}/);
 });

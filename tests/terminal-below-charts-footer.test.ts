@@ -59,8 +59,8 @@ test('Footer stays below the same chart grid for one or multiple coins', () => {
   const list = source.indexOf('{visibleWorkspaceBlocks.map((block, index)');
   const footerPlacement = source.indexOf('{blocks.length !== 0 && terminalBelowCharts}', list);
   assert.ok(list >= 0 && footerPlacement > list);
-  assert.equal((source.match(/\{terminalBelowCharts\}/g) ?? []).length, 1,
-    'shared controls are defined once, then rendered only for opened charts');
+  assert.equal((source.match(/\{blocks.length !== 0 && terminalBelowCharts\}/g) ?? []).length, 1,
+    'the shared controls render only below a populated chart grid');
   assert.doesNotMatch(source.slice(list, footerPlacement), /min-h-\[320px\]/);
   assert.doesNotMatch(source, /ref=\{chartListRef\} className="h-full w-full overflow-y-auto no-scrollbar"/);
   assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);

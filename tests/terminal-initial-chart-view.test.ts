@@ -284,7 +284,7 @@ test('legacy workspaces with over 50 charts paginate without discarding saved ch
   assert.match(page, /setWorkspacePage\(Math\.floor\(blockIndex \/ workspacePageSize\)\)/);
   assert.match(page, /const terminalBelowCharts = \(/);
   assert.match(page, /disabled=\{blocks\.length >= MAX_TERMINAL_CHARTS\}/);
-  const gridStart = page.indexOf('/* Multi-chart Grid Layout */');
+  const gridStart = page.indexOf('ref={chartListRef} className="w-full h-full');
   const gridEnd = page.indexOf('{/* Add Chart Modal */}', gridStart);
   assert.ok(gridStart >= 0 && gridEnd > gridStart);
   assert.doesNotMatch(page.slice(gridStart, gridEnd), /\{blocks\.map\(/);

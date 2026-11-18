@@ -43,5 +43,5 @@ test('first chart remains large with standard block resize and maximize controls
   assert.doesNotMatch(page, /clamp\(300px, calc\(\(100dvh - 120px\) \/ 2\), 500px\)/);
   assert.match(widget, /block\.heightPx\s*\? `\$\{block\.heightPx\}px`/);
   assert.match(widget, /isMaximized\s*\? 'calc\(100vh - 2rem\)'/);
-  assert.match(page, /\{terminalBelowCharts\}/);
+  assert.match(page, /\{blocks.length !== 0 && terminalBelowCharts\}/);
 });
