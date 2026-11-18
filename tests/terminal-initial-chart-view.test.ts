@@ -139,18 +139,22 @@ test('terminal chart initial view is passed only through terminal widgets to Hoo
   assert.match(canvas, /terminalInitialViewTarget && selectedTerminalInitialView/);
   assert.match(canvas, /normalizeVisualProfile\(selectedTerminalInitialView, activeVisualContext\)/);
   assert.match(canvas, /activeVisualProfile\?\.rightGapBars/);
-  assert.match(page, /visualContext="terminalLarge"/);
+  assert.match(page, /<TerminalGridItem/);
+  assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
   assert.doesNotMatch(source('../src/components/replay/ReplayChart.tsx'), /terminalInitialView/);
   assert.doesNotMatch(source('../src/components/ScreenerTable.tsx'), /terminalInitialView/);
 });
 
-test('single-chart Terminal renders the timeframe saved on its block instead of stale global selection', () => {
+test('single-chart Terminal keeps the saved per-block timeframe and uses the normal chart tile', () => {
   const page = source('../src/components/TerminalPage.tsx');
+  const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
   assert.match(page, /const activeTimeframe = blocks\.length === 1 \? blocks\[0\]\.timeframe : timeframe/);
-  assert.match(page, /timeframe=\{blocks\[0\]\.timeframe\}/);
-  assert.match(page, /const activeTimeframe = blocks\.length === 1/);
   assert.match(page, /activeTimeframe === tf/);
-  assert.match(page, /\{t\('terminal\.market\.timeframe'\)\} <strong[^>]*>\{activeTimeframe\}<\/strong>/);
+  assert.match(page, /<TerminalGridItem/);
+  assert.match(page, /block=\{block\}/);
+  assert.match(widget, /timeframe=\{block\.timeframe\}/);
+  assert.match(widget, /onTimeframeChange=\{useIntegratedHookChartToolbar/);
+  assert.doesNotMatch(page, /visualContext="terminalLarge"/);
 });
 
 test('maximizing one Terminal chart suspends other visible charts without changing their settings', () => {
@@ -173,11 +177,10 @@ test('Terminal coin changes clear pending prices from a prior instrument', () =>
   assert.match(widget, /setLivePrice\(nextPrice \?\? 0\)/);
 });
 
-test('Terminal renders truthful quote status, unique rapid-add IDs and indexed market lookups', () => {
+test('Terminal removes the separate 24h quote strip but keeps unique chart ids and indexed lookups', () => {
   const page = source('../src/components/TerminalPage.tsx');
-  assert.match(page, /const quotesAvailable = marketSnapshot\.timestamp !== null/);
-  assert.match(page, /Date\.now\(\) - marketSnapshot\.timestamp <= 90_000/);
-  assert.match(page, /!marketError && !marketSnapshot\.warning/);
+  assert.doesNotMatch(page, /terminal\.market\.(volume24h|high24h|low24h|quotes)/);
+  assert.doesNotMatch(page, /quotesAvailable/);
   assert.doesNotMatch(page, />WLive</);
   assert.match(page, /Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)/);
   assert.match(page, /const coinsByMarket = useMemo\(\(\) => \{/);
@@ -316,7 +319,7 @@ test('Terminal always chooses native HookChart, never legacy TradingView even on
   const wrapper = source('../src/components/ExchangeCandlestickChart.tsx');
   assert.match(page, /const chartProvider = normalizeChartProvider\('hookchart'\)/);
   assert.match(widget, /const chartProvider = normalizeChartProvider\('hookchart'\)/);
-  assert.match(page, /<ExchangeCandlestickChart\s+forceHookChart/);
+  assert.match(page, /<TerminalGridItem/);
   assert.match(widget, /<ExchangeCandlestickChart\s+forceHookChart/);
   assert.match(wrapper, /forceHookChart=\{forceHookChart\}/);
   assert.doesNotMatch(page, /tradingViewUrl|getTradingViewSymbol|s\.tradingview\.com|<iframe/);
@@ -369,17 +372,17 @@ test('late profile hydration never overwrites a locally edited workspace or clai
     'the CAS version must not be upgraded by a newer profile update from another device');
 });
 
-test('the sole HookChart uses the current block directly during profile hydration and coin switches', () => {
+test('the sole chart uses the same identity-bound grid item as multiple charts', () => {
   const page = source('../src/components/TerminalPage.tsx');
-  const start = page.indexOf('/* Single Screen 100% View HookChart */');
-  const end = page.indexOf('/* Multi-chart Grid Layout */', start);
-  assert.ok(start >= 0 && end > start);
-  const chart = page.slice(start, end);
-  assert.match(chart, /symbol=\{blocks\[0\]\.symbol\}/);
-  assert.match(chart, /exchange=\{blocks\[0\]\.exchange\}/);
-  assert.match(chart, /marketType=\{blocks\[0\]\.marketType\}/);
-  assert.match(chart, /timeframe=\{blocks\[0\]\.timeframe\}/);
-  assert.doesNotMatch(chart, /symbol=\{activeCoin\.symbol\}/);
+  const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
+  assert.match(page, /visibleWorkspaceBlocks\.map\(\(block, index\)/);
+  assert.match(page, /<TerminalGridItem[\s\S]*?key=\{block\.id\}[\s\S]*?block=\{block\}/);
+  assert.match(page, /getCoinForBlock\(block\)/);
+  assert.match(widget, /symbol=\{block\.symbol\}/);
+  assert.match(widget, /exchange=\{block\.exchange\}/);
+  assert.match(widget, /marketType=\{block\.marketType\}/);
+  assert.match(widget, /timeframe=\{block\.timeframe\}/);
+  assert.doesNotMatch(page, /<ExchangeCandlestickChart/);
 });
 
 test('Terminal increments save revisions only for committed React workspaces', () => {

@@ -42,12 +42,9 @@ import {
 } from '../types';
 import { TerminalGridItem } from './terminal/TerminalGridItem';
 import { createTerminalCoinPickerStore } from '../utils/terminalCoinPickerStore';
-import { ExchangeCandlestickChart } from './ExchangeCandlestickChart';
-import { TerminalRenderBoundary } from './terminal/TerminalRenderBoundary';
 import { SiteFooter } from './SiteFooter';
 import { AddChartModal } from './terminal/AddChartModal';
 import { TerminalSettingsDrawer } from './terminal/TerminalSettingsDrawer';
-import { formatVolume } from '../utils/formatters';
 import { getStoredPreferences, useAppPreferences } from '../utils/userPreferences';
 import { useAuth } from '../context/AuthContext';
 import { useArchive } from '../context/ArchiveContext';
@@ -1010,7 +1007,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   };
 
   const gridColsClass = useMemo(() => {
-    if (visibleWorkspaceBlocks.length === 1) return 'grid-cols-1';
+    // A single coin occupies a normal grid column, not the full chart width.
+    // Its normal width and controls now match all multi-coin tiles.
     switch (config.columns) {
       case 1: return 'grid-cols-1';
       case 2: return 'grid-cols-1 md:grid-cols-2';
@@ -1036,7 +1034,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   } as React.CSSProperties), [terminalAutoHeights]);
 
   const computedHeightStyle = useMemo(() => {
-    if (blocks.length === 1) return 'calc(100dvh - 105px)';
+    // A single coin remains a compact tile, not a fullscreen chart. Explicit
+    // per-block heightPx still overrides this default in TerminalChartWidget.
+    if (visibleWorkspaceBlocks.length === 1 && config.autoFitScreen)
+      return 'clamp(300px, calc((100dvh - 120px) / 2), 500px)';
     if (config.autoFitScreen) return 'var(--terminal-chart-height)';
     switch (config.blockHeight) {
       case 'compact': return '280px';
@@ -1044,16 +1045,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       case 'large': return '500px';
       default: return '380px';
     }
-  }, [blocks.length, config.autoFitScreen, config.blockHeight]);
-
-  // A loaded quote snapshot is not proof of an active WebSocket stream.
-  // Having a snapshot does not make it fresh forever (for example after
-  // resuming a background tab or an interrupted market connection).
-  const quotesAvailable = marketSnapshot.timestamp !== null
-    && Number.isFinite(marketSnapshot.timestamp)
-    && Date.now() - marketSnapshot.timestamp >= 0
-    && Date.now() - marketSnapshot.timestamp <= 90_000
-    && !marketError && !marketSnapshot.warning;
+  }, [visibleWorkspaceBlocks.length, config.autoFitScreen, config.blockHeight]);
 
   // Header shortcuts have a unique target only when the Terminal displays one
   // chart and its loaded instrument matches that chart. Grid cards carry their
@@ -1589,40 +1581,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         </div>
       </div>
 
-      {/* Sub-header: 24h Coin Market Stats Bar */}
-      {blocks.length === 1 && (
-        <div className="h-8 sm:h-9 bg-slate-950/80 border-b border-slate-800/80 px-3 sm:px-4 flex items-center justify-between gap-2 text-[11px] font-mono shrink-0 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-            <span className="flex items-center gap-1 text-slate-300">
-              {t('terminal.market.volume24h')} <strong className="text-white">{formatVolume(activeCoin.volume24hUsd || 0)}</strong>
-            </span>
-            {activeCoin.highPrice24h ? (
-              <span className="flex items-center gap-1 text-emerald-400">
-                {t('terminal.market.high24h')} <strong>{formatTerminalQuotedPrice(activeCoin.highPrice24h, activeCoin.quoteAsset)}</strong>
-              </span>
-            ) : null}
-            {activeCoin.lowPrice24h ? (
-              <span className="flex items-center gap-1 text-rose-400">
-                {t('terminal.market.low24h')} <strong>{formatTerminalQuotedPrice(activeCoin.lowPrice24h, activeCoin.quoteAsset)}</strong>
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-3 text-slate-400 text-[11px] shrink-0">
-            <span className="flex items-center gap-1.5 text-slate-300">
-              <span className={`h-2 w-2 rounded-full ${quotesAvailable ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-              {t('terminal.market.quotes')} <strong className={quotesAvailable ? 'text-cyan-400 font-bold' : 'text-amber-300 font-bold'}>
-                {t(quotesAvailable ? 'terminal.market.updated' : marketLoading && !marketSnapshot.timestamp ? 'terminal.market.loading' : 'terminal.market.partial')}
-              </strong>
-            </span>
-            <span className="text-slate-500">|</span>
-            <span>
-              {t('terminal.market.timeframe')} <strong className="text-cyan-400 font-bold">{activeTimeframe}</strong>
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area (100% remaining space) */}
       <main className="flex-1 min-h-0 w-full relative overflow-hidden bg-[#090d16]">
         {/* Collapsible Left Drawer (Шторка зліва з обраними монетами) */}
@@ -1788,46 +1746,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           </button>
         </div>
 
-        {/* Workspace Display: If 1 block or maximized block, show full single chart. If multiple blocks, show multi-chart grid */}
-        {blocks.length === 1 ? (
-          /* Single Screen 100% View HookChart */
-          <div ref={chartListRef} className="h-full w-full overflow-y-auto no-scrollbar">
-            <div className="flex h-full w-full flex-col overflow-hidden">
-              <div className="relative min-h-0 flex-1 overflow-hidden">
-            <TerminalRenderBoundary variant="chart" resetKey={`${blocks[0].exchange}:${blocks[0].marketType}:${blocks[0].symbol}:${blocks[0].timeframe}`}>
-            <ExchangeCandlestickChart
-              forceHookChart
-              visualContext="terminalLarge"
-              symbol={blocks[0].symbol}
-              // Enable live trade-derived OHLCV for the single Terminal panel.
-              terminalThirtySecondMode={blocks[0].timeframe === '30s'}
-              terminalAutoScale={autoScaleCharts && chartProvider === 'hookchart'}
-              terminalEcoMode={terminalEcoMode}
-              terminalRefreshMs={terminalRefreshMs}
-              terminalActiveCharts={1}
-              terminalInitialView={config.initialChartView}
-              terminalFitAllRequest={terminalFitAllRequest}
-              onAddToArchive={capture => {
-                const block = blocks[0];
-                const coin = getCoinForBlock(block);
-                const exactFormation = coin?.timeframe === block.timeframe
-                  && coin?.exchange === block.exchange && coin?.marketType === block.marketType
-                  ? coin.formations?.find(item => item.id === block.formationId)
-                    || coin.formations?.[0] || null
-                  : null;
-                handleTerminalArchiveCapture(block, coin, exactFormation, capture);
-              }}
-              isSavingArchive={savingTerminalArchive}
-              exchange={blocks[0].exchange}
-              marketType={blocks[0].marketType}
-              timeframe={blocks[0].timeframe}
-            />
-            </TerminalRenderBoundary>
-            </div>
-            </div>
-            <div className="px-2 pb-2 sm:px-3">{terminalBelowCharts}</div>
-          </div>
-        ) : (
+        {/* One or many coins share the same grid tiles, controls and live HookChart. */}
           /* Multi-chart Grid Layout */
           <div ref={chartListRef} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar">
             {blocks.length === 0 ? (
@@ -1895,7 +1814,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             )}
             {terminalBelowCharts}
           </div>
-        )}
       </main>
 
       {/* Shared Terminal shortcuts and the same saved HookChart bindings. */}

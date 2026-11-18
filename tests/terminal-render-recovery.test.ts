@@ -8,13 +8,14 @@ import { TerminalRenderBoundary } from '../src/components/terminal/TerminalRende
 
 const source = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
-test('single chart, multi-chart widget, and full Terminal route isolate React render failures', () => {
+test('single and multiple chart grid items isolate React render failures', () => {
   const page = source('src/components/TerminalPage.tsx');
   const widget = source('src/components/terminal/TerminalChartWidget.tsx');
   const app = source('src/App.tsx');
   const boundary = source('src/components/terminal/TerminalRenderBoundary.tsx');
 
-  assert.match(page, /<TerminalRenderBoundary variant="chart" resetKey=/);
+  assert.match(page, /<TerminalGridItem/);
+  assert.match(page, /onSaveToArchive=\{handleTerminalArchiveCapture\}/);
   assert.match(widget, /<TerminalRenderBoundary variant="chart" resetKey=/);
   assert.match(app, /<TerminalRenderBoundary variant="workspace"/);
   assert.match(widget, /resetKey=\{\x60\$\{block\.exchange\}:\$\{block\.marketType\}:\$\{block\.symbol\}:\$\{block\.timeframe\}\x60\}/);

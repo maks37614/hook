@@ -161,14 +161,17 @@ test('trade-derived 30s history remains bounded for long-running Terminal tabs',
   assert.ok(rows.every((row, i) => !i || row.time > rows[i - 1].time));
 });
 
-test('30s does not alter the single-chart HookChart layout or fabricate older exchange history', async () => {
+test('30s stays available in the shared Terminal grid without inventing older exchange history', async () => {
   const { readFileSync } = await import('node:fs');
   const file = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
   const terminal = file('../src/components/TerminalPage.tsx');
+  const widget = file('../src/components/terminal/TerminalChartWidget.tsx');
   const wrapper = file('../src/components/ExchangeCandlestickChart.tsx');
   const chart = file('../src/components/TradingViewChart.tsx');
   const hook = file('../src/components/hookchart/HookChartCanvas.tsx');
-  assert.match(terminal, /terminalThirtySecondMode=\{blocks\[0\]\.timeframe === '30s'\}/);
+  assert.match(terminal, /<TerminalGridItem/);
+  assert.match(widget, /timeframe=\{block\.timeframe\}/);
+  assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
   assert.match(wrapper, /terminalMode=\{terminalMode\}/);
   assert.match(wrapper, /terminalThirtySecondMode=\{terminalThirtySecondMode\}/);
   assert.match(chart, /const terminalTradeCandles = timeframe === '30s' && \(terminalMode \|\| terminalThirtySecondMode\)/);

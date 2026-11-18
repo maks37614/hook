@@ -33,7 +33,7 @@ test('Terminal centers a single large add button, small pager and found count ab
 test('Only one pager is mounted: automatic preset matches first, manual workspace pages otherwise', () => {
   const source = terminal();
   const content = controls();
-  assert.match(source, /const isPresetPaged = Boolean\(activeMarketPreset && presetMatches\.length > 0\)/);
+  assert.match(source, /const isPresetPaged = isAutomaticMarketSelection/);
   assert.match(source, /const foundCoinCount = activeMarketPreset \? presetMatches\.length : marketCoins\.length/);
   assert.match(source, /const canGoBack = isPresetPaged/);
   assert.match(source, /const canGoForward = isPresetPaged/);
@@ -54,13 +54,13 @@ test('Top coin counter equals mounted chart panels on the active workspace page'
   assert.match(source, /blocks\.slice\(\s*visibleWorkspaceStart, visibleWorkspaceStart \+ workspacePageSize/);
 });
 
-test('Footer stays below the actual chart rows in single-chart and grid mode', () => {
+test('Footer stays below the same chart grid for one or multiple coins', () => {
   const source = terminal();
   const list = source.indexOf('{visibleWorkspaceBlocks.map((block, index)');
   assert.ok(list >= 0 && source.indexOf('{terminalBelowCharts}', list) > list);
-  assert.equal((source.match(/\{terminalBelowCharts\}/g) ?? []).length, 2);
+  assert.equal((source.match(/\{terminalBelowCharts\}/g) ?? []).length, 1);
   assert.doesNotMatch(source.slice(list, source.indexOf('{terminalBelowCharts}', list)), /min-h-\[320px\]/);
-  assert.match(source, /ref=\{chartListRef\} className="h-full w-full overflow-y-auto no-scrollbar"/);
+  assert.doesNotMatch(source, /ref=\{chartListRef\} className="h-full w-full overflow-y-auto no-scrollbar"/);
   assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);
   assert.match(read('../src/components/SiteFooter.tsx'), /getLegalCopy\(language\)/);
 });

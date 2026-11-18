@@ -31,12 +31,15 @@ test('full-width blocks add rows; wide saved charts do not conceal other coins',
   assert.equal(terminalResponsiveRows([], 3, 'mobile'), 0);
 });
 
-test('Terminal grid auto-heights follow responsive breakpoints without resize or market polling', () => {
+test('Terminal grid keeps regular tile heights for one or many coins without additional polling', () => {
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
   assert.match(page, /terminalResponsiveAutoHeights\(visibleWorkspaceBlocks, config\.columns\)/);
   assert.match(page, /style=\{terminalHeightVariables\}/);
   assert.match(page, /return 'var\(--terminal-chart-height\)'/);
+  assert.match(page, /visibleWorkspaceBlocks\.length === 1 && config\.autoFitScreen/);
+  assert.match(page, /clamp\(300px, calc\(\(100dvh - 120px\) \/ 2\), 500px\)/);
+  assert.doesNotMatch(page, /if \(visibleWorkspaceBlocks\.length === 1\) return 'grid-cols-1'/);
   assert.doesNotMatch(page, /Math\.ceil\(visibleWorkspaceBlocks\.length \/ cols\)/);
   for (const size of ['mobile', 'tablet', 'desktop', 'wide']) {
     assert.ok(css.includes(`--terminal-height-${size}`), size);
