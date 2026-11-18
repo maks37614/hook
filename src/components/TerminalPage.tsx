@@ -1046,9 +1046,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   // chart and its loaded instrument matches that chart. Grid cards carry their
   // own explicit coin actions, so never silently target the first grid coin.
   const hasHeaderTarget = blocks.length === 1 && coinMarketKey(activeCoin) === coinMarketKey(blocks[0]);
-  const formation = activeCoin.formations?.[0] || null;
-  const isBullish = formation?.bias === 'bullish';
-  const isBearish = formation?.bias === 'bearish';
   // Only automatic market presets and legacy imports above 50 need paging.
   const isPresetPaged = isAutomaticMarketSelection;
   const hasTerminalPages = isPresetPaged
