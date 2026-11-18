@@ -255,6 +255,13 @@ export async function registerAccount(emailInput: unknown, passwordInput: unknow
         watchlist: [], watchlistFolders: {},
         chartTradeMarkers: { showEntry: true, showTarget: true, showStop: true },
         chartLabelSettings: { entry: true, target: true, stop: true },
+        // New accounts must explicitly opt in to linking with external terminals.
+        // Keep the legacy fallback untouched for existing user profiles.
+        terminalLinkSettings: {
+          provider: 'none', enabled: false,
+          switchOnChartOpen: false, autoSignals: false,
+        },
+        metaScalpSettings: { enabled: false, autoSwitchOnClick: false },
         terminalSettings: { columns: 2, blockHeight: 'medium', blocks: [] },
         searchSettings: { minVolumeUsd: 0, presetFilter: 'all', sortBy: 'volume', sortDirection: 'desc' },
         installGuideTipShown: false,
