@@ -36,7 +36,9 @@ test('Terminal coin rows wrap, core filters and add actions remain wired', () =>
   assert.doesNotMatch(source, /autoFocus/);
   assert.match(source, /terminal-add-chart-coin-row group flex min-w-0/);
   assert.match(source, /terminal-add-chart-coin-action flex min-w-0 shrink-0/);
-  assert.match(source, /setSelectedTimeframe\(tf\)/);
+  assert.doesNotMatch(source, /setSelectedTimeframe\(tf\)/, 'timeframe selector removed from Add Chart modal');
+  assert.doesNotMatch(source, /Таймфрейм:/, 'no timeframe row in the picker');
+  assert.match(source, /initialTimeframe \|\| '15m'/, 'the chart keeps its assigned timeframe internally');
   assert.match(source, /setSelectedMarket\('futures'\)/);
   assert.match(source, /setSelectedExchange\('binance'\)/);
   assert.match(source, /onAddChart\(coin, selectedTimeframe, firstFormation\?\.id\)/);
@@ -49,7 +51,7 @@ test('Add Chart reuses the Terminal quote snapshot instead of making duplicate m
   assert.match(source, /terminalMarketCoins\?: MarketCoin\[\]/);
   assert.match(source, /if \(terminalMarketCoins !== undefined\) \{/);
   assert.match(source, /const availableMarketCoins = terminalMarketCoins \?\? marketCoins/);
-  assert.match(source, /return availableMarketCoins\.filter\(mc => mc\.volumeUsd >= 50_000 && mc\.volumeUsd <= 10_000_000_000\)/);
+  assert.match(source, /availableMarketCoins\.filter\(mc => mc\.volumeUsd >= 50_000 && mc\.volumeUsd <= 10_000_000_000\)/);
   assert.match(source, /\}, \[isOpen, terminalMarketCoins\]\)/);
 });
 
