@@ -36,110 +36,13 @@ jobs:
           test -f source/.github/workflows/h00k-desktop-windows.yml
           test -f source/server/migrations/001_identity.sql
           test -f source/server.ts
-          sensitive="$(git -C source ls-files | grep -E '(^|/)\.env($|\.)|(^|/)[^/]+\.(pem|p12|pfx|dump|sqlite|sqlite3|db)
-            echo "::error::Source includes potentially sensitive tracked data. Import refused."
-            exit 1
-          fi
-          echo "Verified pinned source commit and required code paths."
-      - name: Import only tracked source files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git -C source archive HEAD | tar -x -C target
-          rm -f target/.github/workflows/import-h00k-once.yml
-          test ! -f target/.env
-          test ! -d target/node_modules
-          test ! -d target/.git/source
-          cat > target/CLEAN_LINUX_RESTORE_UA.md <<'EOF'
-          # h00k.top + h00k Desktop — чисте розгортання Linux
-
-          Це резервна копія вихідного коду **h00k.top та h00k Desktop** з репозиторію `maks37614/h00k`.
-
-          - Джерело: `main`, commit `89e6c3e849b6a77864f83908e80ab234e5d731e9` (18.11.2026).
-          - Містить: React/Vite, сервер Node.js, HookChart, Screener, Terminal, Formations, Replay, WebSocket, Alerts, Surveillance, Telegram, desktop Electron, Docker, SQL-міграції, тести, GitHub Actions.
-          - Не містить: PostgreSQL-даних, старих користувачів, налаштувань профілю, персональних подій, history, токенів, `.env`, секретів із VPS та встановлених залежностей.
-          - Примітка: вихідний код Windows-програми збережений у `desktop/`, але готовий `.exe` треба зібрати окремо через workflow `.github/workflows/h00k-desktop-windows.yml`.
-
-          ## Основні дії на новому Linux
-
-          1. Встановити Docker Engine, Docker Compose plugin, Git, HTTPS-проксі і TLS.
-          2. Клонувати `git clone https://github.com/maks37614/hook.git` і перейти у каталог `hook`.
-          3. Створити новий `.env` за прикладом `.env.example`, **заповнити новими або збереженими поза GitHub секретами**, включно з `POSTGRES_PASSWORD`, SMTP, Telegram та іншими необхідними параметрами.
-          4. Створити **порожню** PostgreSQL 16 і застосувати міграції з `server/migrations/` у правильному порядку. Не відновлювати стару базу.
-          5. Запустити `docker compose up -d --build` після налаштування БД та середовища.
-          6. Налаштувати HTTPS, WebSocket Upgrade, домен і маршрутизацію в обраному reverse proxy. На старому VPS `nginx` не було в PATH, тому необхідно перевірити поточну схему TLS перед видаленням старого сервера.
-          7. Перевірити реєстрацію, профілі, Screener, HookChart, Terminal, Formations, Replay, WebSocket Binance/Bybit, Alerts 24/7, Telegram, SMTP, звуки, усі мови та Desktop.
-
-          ## Важливо
-
-          Ця копія гарантує збереження **відстежуваного Git коду**, але не гарантує працездатності без конфігурації та перевірки усіх залежностей. Не перевстановлювати VPS до завершення перевірок і копіювання потрібних секретів у безпечне місце поза GitHub.
-
-          Окремі боти `krystian-mon`, `evgen-mon`, `auto-mon` та `community-stage` не належать до основного `compose.yaml` і цим бекапом не переносяться.
-          EOF
-          cd target
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "backup: full h00k and desktop source at 89e6c3e8"
-          git push origin HEAD:main
-          echo "Snapshot pushed to hook/main."
- | grep -v -E '(^|/)\.env\.(example|sample|template)
-            echo "::error::Source includes potentially sensitive tracked data. Import refused."
-            exit 1
-          fi
-          echo "Verified pinned source commit and required code paths."
-      - name: Import only tracked source files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git -C source archive HEAD | tar -x -C target
-          rm -f target/.github/workflows/import-h00k-once.yml
-          test ! -f target/.env
-          test ! -d target/node_modules
-          test ! -d target/.git/source
-          cat > target/CLEAN_LINUX_RESTORE_UA.md <<'EOF'
-          # h00k.top + h00k Desktop — чисте розгортання Linux
-
-          Це резервна копія вихідного коду **h00k.top та h00k Desktop** з репозиторію `maks37614/h00k`.
-
-          - Джерело: `main`, commit `89e6c3e849b6a77864f83908e80ab234e5d731e9` (18.11.2026).
-          - Містить: React/Vite, сервер Node.js, HookChart, Screener, Terminal, Formations, Replay, WebSocket, Alerts, Surveillance, Telegram, desktop Electron, Docker, SQL-міграції, тести, GitHub Actions.
-          - Не містить: PostgreSQL-даних, старих користувачів, налаштувань профілю, персональних подій, history, токенів, `.env`, секретів із VPS та встановлених залежностей.
-          - Примітка: вихідний код Windows-програми збережений у `desktop/`, але готовий `.exe` треба зібрати окремо через workflow `.github/workflows/h00k-desktop-windows.yml`.
-
-          ## Основні дії на новому Linux
-
-          1. Встановити Docker Engine, Docker Compose plugin, Git, HTTPS-проксі і TLS.
-          2. Клонувати `git clone https://github.com/maks37614/hook.git` і перейти у каталог `hook`.
-          3. Створити новий `.env` за прикладом `.env.example`, **заповнити новими або збереженими поза GitHub секретами**, включно з `POSTGRES_PASSWORD`, SMTP, Telegram та іншими необхідними параметрами.
-          4. Створити **порожню** PostgreSQL 16 і застосувати міграції з `server/migrations/` у правильному порядку. Не відновлювати стару базу.
-          5. Запустити `docker compose up -d --build` після налаштування БД та середовища.
-          6. Налаштувати HTTPS, WebSocket Upgrade, домен і маршрутизацію в обраному reverse proxy. На старому VPS `nginx` не було в PATH, тому необхідно перевірити поточну схему TLS перед видаленням старого сервера.
-          7. Перевірити реєстрацію, профілі, Screener, HookChart, Terminal, Formations, Replay, WebSocket Binance/Bybit, Alerts 24/7, Telegram, SMTP, звуки, усі мови та Desktop.
-
-          ## Важливо
-
-          Ця копія гарантує збереження **відстежуваного Git коду**, але не гарантує працездатності без конфігурації та перевірки усіх залежностей. Не перевстановлювати VPS до завершення перевірок і копіювання потрібних секретів у безпечне місце поза GitHub.
-
-          Окремі боти `krystian-mon`, `evgen-mon`, `auto-mon` та `community-stage` не належать до основного `compose.yaml` і цим бекапом не переносяться.
-          EOF
-          cd target
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "backup: full h00k and desktop source at 89e6c3e8"
-          git push origin HEAD:main
-          echo "Snapshot pushed to hook/main."
- || true)"
+          sensitive="$(git -C source ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.(local|production|development|test)$|(^|/)[^/]+\.(pem|p12|pfx|dump|sqlite|sqlite3|db)$' || true)"
           if [[ -n "$sensitive" ]]; then
-            printf '%s\n' "$sensitive"
-            echo "::error::Source includes potentially sensitive tracked data. Import refused."
+            echo "::error::Potentially sensitive files found in source: $sensitive"
             exit 1
           fi
           echo "Verified pinned source commit and required code paths."
-      - name: Import only tracked source files
+      - name: Import tracked source and push
         shell: bash
         run: |
           set -euo pipefail
@@ -147,38 +50,30 @@ jobs:
           rm -f target/.github/workflows/import-h00k-once.yml
           test ! -f target/.env
           test ! -d target/node_modules
-          test ! -d target/.git/source
           cat > target/CLEAN_LINUX_RESTORE_UA.md <<'EOF'
-          # h00k.top + h00k Desktop — чисте розгортання Linux
+          # h00k.top + h00k Desktop — чистий Linux
 
-          Це резервна копія вихідного коду **h00k.top та h00k Desktop** з репозиторію `maks37614/h00k`.
+          Джерело: maks37614/h00k, commit 89e6c3e849b6a77864f83908e80ab234e5d731e9 (18.11.2026).
+          Це копія вихідного коду h00k.top, Electron Desktop, Docker, SQL-міграцій, тестів та GitHub workflows.
 
-          - Джерело: `main`, commit `89e6c3e849b6a77864f83908e80ab234e5d731e9` (18.11.2026).
-          - Містить: React/Vite, сервер Node.js, HookChart, Screener, Terminal, Formations, Replay, WebSocket, Alerts, Surveillance, Telegram, desktop Electron, Docker, SQL-міграції, тести, GitHub Actions.
-          - Не містить: PostgreSQL-даних, старих користувачів, налаштувань профілю, персональних подій, history, токенів, `.env`, секретів із VPS та встановлених залежностей.
-          - Примітка: вихідний код Windows-програми збережений у `desktop/`, але готовий `.exe` треба зібрати окремо через workflow `.github/workflows/h00k-desktop-windows.yml`.
+          Без PostgreSQL-даних, старих користувачів, налаштувань профілю, Telegram-прив'язок, секретів VPS та .env.
 
-          ## Основні дії на новому Linux
+          Щоб відновити на чистому Linux:
+          1. Встановити Git, Docker Engine, Docker Compose plugin, reverse proxy з TLS.
+          2. Клонувати https://github.com/maks37614/hook.git.
+          3. Створити .env за .env.example, заповнивши секрети без збереження у GitHub.
+          4. Створити порожню PostgreSQL 16 і застосувати міграції з server/migrations.
+          5. Запустити docker compose up -d --build.
+          6. Налаштувати HTTPS/WebSocket, SMTP, Telegram і перевірити всі модулі.
+          7. Windows Desktop збирати окремо через .github/workflows/h00k-desktop-windows.yml.
 
-          1. Встановити Docker Engine, Docker Compose plugin, Git, HTTPS-проксі і TLS.
-          2. Клонувати `git clone https://github.com/maks37614/hook.git` і перейти у каталог `hook`.
-          3. Створити новий `.env` за прикладом `.env.example`, **заповнити новими або збереженими поза GitHub секретами**, включно з `POSTGRES_PASSWORD`, SMTP, Telegram та іншими необхідними параметрами.
-          4. Створити **порожню** PostgreSQL 16 і застосувати міграції з `server/migrations/` у правильному порядку. Не відновлювати стару базу.
-          5. Запустити `docker compose up -d --build` після налаштування БД та середовища.
-          6. Налаштувати HTTPS, WebSocket Upgrade, домен і маршрутизацію в обраному reverse proxy. На старому VPS `nginx` не було в PATH, тому необхідно перевірити поточну схему TLS перед видаленням старого сервера.
-          7. Перевірити реєстрацію, профілі, Screener, HookChart, Terminal, Formations, Replay, WebSocket Binance/Bybit, Alerts 24/7, Telegram, SMTP, звуки, усі мови та Desktop.
-
-          ## Важливо
-
-          Ця копія гарантує збереження **відстежуваного Git коду**, але не гарантує працездатності без конфігурації та перевірки усіх залежностей. Не перевстановлювати VPS до завершення перевірок і копіювання потрібних секретів у безпечне місце поза GitHub.
-
-          Окремі боти `krystian-mon`, `evgen-mon`, `auto-mon` та `community-stage` не належать до основного `compose.yaml` і цим бекапом не переносяться.
+          Важливо: Git-код не містить налаштувань, які існували лише на VPS. До перевстановлення VPS перевірити проксі, секрети та зовнішні інтеграції. Community і незалежні боти цим бекапом не переносяться.
           EOF
           cd target
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
-          git commit -m "backup: full h00k and desktop source at 89e6c3e8"
+          git commit -m "backup: complete h00k + desktop source at 89e6c3e8"
           git push origin HEAD:main
-          echo "Snapshot pushed to hook/main."
+          echo "Clean source snapshot uploaded successfully."
