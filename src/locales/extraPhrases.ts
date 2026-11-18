@@ -7,6 +7,18 @@ import type { SupportedLanguage } from './types';
 
 const phraseRows = [
   [
+    "Відтворення (доступно після реєстрації)",
+    "Replay (available after registration)",
+    "Воспроизведение (доступно после регистрации)",
+    "Odtwarzanie (dostępne po rejestracji)"
+  ],
+  [
+    "Увійдіть у свій акаунт, щоб відкрити сторінку «Відтворення».",
+    "Sign in to your account to open Replay.",
+    "Войдите в свою учётную запись, чтобы открыть страницу «Воспроизведение».",
+    "Zaloguj się na swoje konto, aby otworzyć stronę Odtwarzanie."
+  ],
+  [
     "Введіть адресу email.",
     "Enter your email address.",
     "Введите адрес электронной почты.",
