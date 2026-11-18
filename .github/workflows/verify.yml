@@ -1,0 +1,88 @@
+name: Verify h00k
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Keep one verification for the latest main revision; avoid overlapping 20-minute runs.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run lint
+      - name: Production Vite import isolation
+        run: node --import tsx --test tests/server-vite-production-isolation.test.ts
+      - name: Nodemailer 10 offline SMTP MIME and local-file security smoke
+        run: node --import tsx --test tests/auth-mail-nodemailer-transport.test.ts
+      - name: Encyclopedia regression tests
+        run: node --import tsx --test tests/encyclopediaKotapych.test.ts tests/encyclopediaClassicRules.test.ts
+      - name: Surveillance header and dropdown regression tests
+        run: node --import tsx --test tests/surveillance-header-layout.test.ts tests/surveillance-dropdown-style.test.ts
+      - name: HookChart visual profile and real-preview regression tests
+        run: node --import tsx --test tests/hookchart-visual-profiles.test.ts tests/hookchart-real-visual-preview.test.ts tests/hookchart-visual-save-runtime.test.ts tests/hookchart-visual-persistence.test.ts tests/hookchart-chart-connection.test.ts
+      - name: Site Notifications regression tests
+        run: node --import tsx --test tests/site-notifications.test.ts tests/notification-signals.test.ts tests/site-notification-server.test.ts tests/custom-notification-sound.test.ts
+      - name: Watchlist / favorite quotes regression tests
+        timeout-minutes: 2
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/watchlist-drawer-responsive.test.ts tests/watchlist-independent-market-quotes.test.ts
+      - name: Desktop cross-window 1/2/4/6 WS lifecycle regression
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/desktop-crosswindow-kline.test.ts tests/desktop-crosswindow-depth.test.ts tests/desktop-crosswindow-liquidations.test.ts tests/desktop-ws-load.test.ts
+      - name: Build
+        run: npm run build
+      - name: Tests
+        timeout-minutes: 12
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test --test-concurrency=1 tests/*.test.ts
+
+  postgres-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: h00k_test
+          POSTGRES_PASSWORD: offline-test-only
+          POSTGRES_DB: h00k_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U h00k_test -d h00k_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      H00K_PG_INTEGRATION_TEST: '1'
+      PGHOST: localhost
+      PGUSER: h00k_test
+      PGPASSWORD: offline-test-only
+      PGDATABASE: h00k_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: PostgreSQL identity and email recovery integration
+        run: node --import tsx --test tests/postgres-auth-integration.test.ts tests/postgres-mail-flow-integration.test.ts
+      - name: Surveillance HTTP regression with PostgreSQL sessions
+        run: node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/surveillance-api.test.ts
+      - name: Personal state indexed migration against PostgreSQL 16
+        run: node --import tsx --test tests/postgres-personal-state-integration.test.ts
