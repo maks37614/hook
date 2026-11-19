@@ -95,6 +95,9 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
     : loadSettings(uid, profile?.uid === uid ? profile.siteNotificationSettings : undefined);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  // Account hydration must not rerun for each unrelated profile field change.
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   const [itemState, setItemState] = useState<{ uid: string; items: SiteNotificationItem[] }>(() => ({
     uid, items: loadStoredItems(uid),
@@ -129,13 +132,14 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
   }, []);
 
   useEffect(() => {
+    const accountProfile = profileRef.current;
     closeVisibleBrowserNotifications();
     stopCustomNotificationSound();
-    setSettingsState({ uid, settings: loadSettings(uid, profile?.uid === uid ? profile.siteNotificationSettings : undefined) });
+    setSettingsState({ uid, settings: loadSettings(uid, accountProfile?.uid === uid ? accountProfile.siteNotificationSettings : undefined) });
     setItemState({ uid, items: loadStoredItems(uid) });
     deliveredSeen.current = { uid, ids: loadSeen(uid) };
     setError(null);
-    const currentSettings = loadSettings(uid, profile?.uid === uid ? profile.siteNotificationSettings : undefined);
+    const currentSettings = loadSettings(uid, accountProfile?.uid === uid ? accountProfile.siteNotificationSettings : undefined);
     // The sound is per device: old profile values are read only during the
     // one-time local migration below.
     const selectedSound = currentSettings.optedIn ? readStoredSound(uid) : false;
@@ -369,15 +373,15 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
 
   // Backfill price alerts from server history after login, without sound.
   useEffect(() => {
-    if (uid === 'guest' || !settings.optedIn || !settings.enabled || !settings.price || !settings.enabledAt) return;
+    if (uid === 'guest' || !settingsRef.current.optedIn || !settingsRef.current.enabled || !settingsRef.current.price || !settingsRef.current.enabledAt) return;
     const existing = new Set(itemsRef.current.map(item => item.id));
     let clearedAt = 0;
     try { clearedAt = Number(localStorage.getItem(siteNotificationClearedAtKey(uid))) || 0; } catch {}
     const collected: SiteNotificationItem[] = [];
     for (const h of history.slice(0, 80)) {
       if (h.userId !== uid || !Number.isFinite(h.triggeredAt)
-          || h.triggeredAt <= Math.max(clearedAt, settings.enabledAt)) continue;
-      if (!matchesNotificationScope(settings, h, favoritesRef.current, { timeframeIndependent: true })) continue;
+          || h.triggeredAt <= Math.max(clearedAt, settingsRef.current.enabledAt)) continue;
+      if (!matchesNotificationScope(settingsRef.current, h, favoritesRef.current, { timeframeIndependent: true })) continue;
       const id = h.alertId ? 'price:' + h.alertId + ':' + String(h.deliveryEpoch ?? 0) : 'price-history:' + h.id;
       if (existing.has(id)) continue;
       existing.add(id);
@@ -388,9 +392,9 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     if (collected.length) replaceItems([...itemsRef.current, ...collected].sort((a, b) => b.timestamp - a.timestamp));
-  }, [uid, settings.optedIn, settings.enabled, settings.enabledAt, settings.price,
-    settings.scopeExchange, settings.scopeMarket, settings.scopeTimeframe, settings.scopeSymbols,
-    settings.onlyFavorites, history, replaceItems]);
+  }, [uid, settingsRef.current.optedIn, settingsRef.current.enabled, settingsRef.current.enabledAt, settingsRef.current.price,
+    settingsRef.current.scopeExchange, settingsRef.current.scopeMarket, settingsRef.current.scopeTimeframe, settingsRef.current.scopeSymbols,
+    settingsRef.current.onlyFavorites, history, replaceItems]);
 
   // Surveillance is already monitored by the server. Only new, explicitly
   // enabled per-category events are shown as unread; old events stay silent.
@@ -420,7 +424,7 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
 
   // One direct WS per selected coin, never a global ticker REST loop.
   useEffect(() => {
-    const config = settings;
+    const config = settingsRef.current;
     if (!config.enabled || !config.impulses || !config.impulseSymbol || typeof WebSocket === 'undefined') return;
     const symbol = config.impulseSymbol;
     const tracker = new ImpulseTracker(config.impulseWindowMinutes);
@@ -518,7 +522,7 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
   // Explicit opt-in chart-feed liquidation monitor. No additional REST polling.
   // Uses a single selected symbol and ignores the server's historical snapshot.
   useEffect(() => {
-    const cfg = settings;
+    const cfg = settingsRef.current;
     if (!notificationEnabled(cfg, 'liquidations') || !cfg.impulseSymbol
         || typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
     const symbol = cfg.impulseSymbol, exchange = cfg.impulseExchange;
