@@ -495,26 +495,34 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    return()=>observer.disconnect();
  },[hasVisualProfile,visualProfileKey]);
  const rangeRestored=useRef(false);
+ const focusFormationId=focusFormation?.id;
  useLayoutEffect(()=>{
-   if(!terminalMode||visualProfile||!candles.length||initialLogicalRange)return;
-   const key=focusFormation?.id||'latest';
+   if(!terminalMode||hasVisualProfile||!hasHistoryCandles||initialLogicalRange)return;
+   const key=focusFormationId||'latest';
    if(terminalFocusKey.current!==key){terminalFocusKey.current=key;terminalNavigation.current=false}
    const canvas=ref.current;if(!canvas)return;
-   const fit=()=>{const width=canvas.getBoundingClientRect().width;if(width>0&&!terminalNavigation.current)setVp(terminalHookViewport(candles,hookChartPlotWidth(width),focusFormation,rightPaddingBars))};
+   const fit=()=>{
+     const width=canvas.getBoundingClientRect().width;
+     if(width>0&&!terminalNavigation.current) {
+       const {candles: latestCandles,focusFormation: latestFocus}=latestViewportInputs.current;
+       setVp(terminalHookViewport(latestCandles,hookChartPlotWidth(width),latestFocus,rightPaddingBars));
+     }
+   };
    fit();const observer=new ResizeObserver(fit);observer.observe(canvas);
    return()=>observer.disconnect();
- },[terminalMode,!!visualProfile,candles.length,focusFormation?.id,initialLogicalRange,rightPaddingBars]);
+ },[terminalMode,hasVisualProfile,hasHistoryCandles,focusFormationId,initialLogicalRange,rightPaddingBars]);
  // Apply only on profile changes, first data load, or the initial history arrival.
  // Replay passes no visualProfile, so its original viewport logic is untouched.
  const terminalHistoryPhase=terminalViewportHistoryPhase(tf,candles.length,
    terminalMode||!!visualProfileKey?.startsWith('terminal'),terminalHistoryReady);
  useLayoutEffect(()=>{
-   if(!visualProfile||!visualProfileKey||!candles.length)return;
+   const profile=visualProfileRef.current,latestCandles=latestViewportInputs.current.candles;
+   if(!profile||!visualProfileKey||!latestCandles.length)return;
    const width=ref.current?.getBoundingClientRect().width||0;
    if(width<=0)return;
    // Include the coin and timeframe: switching markets must restore the
    // selected profile even when its numeric settings have not changed.
-   const profilePrefix=[interactionScope||symbol,symbol,tf,visualProfileKey,visualProfile.visibleBars,visualProfile.verticalZoom,visualProfile.autoPriceScale,visualProfile.rightGapBars,terminalAutoScale].join(':');
+   const profilePrefix=[interactionScope||symbol,symbol,tf,visualProfileKey,profile.visibleBars,profile.verticalZoom,profile.autoPriceScale,profile.rightGapBars,terminalAutoScale].join(':');
    const historyPhase=terminalHistoryPhase;
    const signature=`${profilePrefix}:${historyPhase}:${Math.round(width)}`;
    // Saving a gesture-edited preview must preserve its exact viewport, rather
@@ -551,40 +559,40 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    lastVisualGapRef.current=rightPaddingBars;
    terminalNavigation.current=true;
    const plotWidth=hookChartPlotWidth(width);
-   // A saved request for hundreds of visible candles needs sub-3px bars.
+   // A saved request for hundreds of visible latestCandles needs sub-3px bars.
    // The canvas already uses aggregated rasterization for tiny bar widths.
    const minBar=.12;
-   // Fit the requested number of candles AND the right-hand empty slots.
-   // Previously a 144-candle view + an 81-bar gap displayed only ~63 candles.
-   const visibleSlots=Math.max(1,visualProfile.visibleBars+Math.max(0,rightPaddingBars));
+   // Fit the requested number of latestCandles AND the right-hand empty slots.
+   // Previously a 144-candle view + an 81-bar gap displayed only ~63 latestCandles.
+   const visibleSlots=Math.max(1,profile.visibleBars+Math.max(0,rightPaddingBars));
    const barWidth=Math.max(minBar,Math.min(34,plotWidth/visibleSlots));
-   const count=Math.max(1,Math.min(candles.length,Math.ceil(visualProfile.visibleBars)));
-   const recent=candles.slice(-count);
+   const count=Math.max(1,Math.min(latestCandles.length,Math.ceil(profile.visibleBars)));
+   const recent=latestCandles.slice(-count);
    let low=Infinity,high=-Infinity;
    for(const candle of recent){low=Math.min(low,candle.l);high=Math.max(high,candle.h)}
    const spread=Number.isFinite(low)&&Number.isFinite(high)?Math.max(high-low,Math.abs(high)*.01,1e-10):1;
    const center=Number.isFinite(high)&&Number.isFinite(low)?(high+low)/2:1;
-   const priceAuto=terminalAutoScale||visualProfile.autoPriceScale;
+   const priceAuto=terminalAutoScale||profile.autoPriceScale;
    // Restore the saved Terminal profile when auto-scale turns OFF. Extreme
    // manual zoom must not clip visible wicks or overlap the volume band.
    const terminalManualProfile=!priceAuto&&(terminalMode||visualProfileKey.startsWith('terminal'));
    const manualPrice=terminalManualProfile&&Number.isFinite(low)&&Number.isFinite(high)
      ? terminalSafeManualPriceViewport(low,high,Math.max(40,ref.current?.getBoundingClientRect().height||80),
-         showVolumes,visualProfile.verticalZoom)
+         showVolumes,profile.verticalZoom)
      : null;
    setVp({
      // The Graph-tab rightGapBars is applied exactly once by rightPaddingBars.
      barWidth,rightOffset:0,autoY:priceAuto,
      manualCenter:priceAuto?null:(manualPrice?.manualCenter??center),
-     manualRange:priceAuto?null:(manualPrice?.manualRange??spread*(terminalMode?1.32:1.16)/visualProfile.verticalZoom),
+     manualRange:priceAuto?null:(manualPrice?.manualRange??spread*(terminalMode?1.32:1.16)/profile.verticalZoom),
      // With auto price scaling enabled, Terminal profiles should prioritize the
      // visible candle range (including wicks) over distant DOM/target markers.
      // Use the existing volume-safe price fit with no extra market requests.
-     yZoom:terminalAutoScale?1:visualProfile.verticalZoom,fitAll:false,
+     yZoom:terminalAutoScale?1:profile.verticalZoom,fitAll:false,
      candleFit:priceAuto && (terminalMode || visualProfileKey.startsWith('terminal')),
    });
- },[symbol,tf,interactionScope,visualProfileKey,visualProfileCaptureVersion,visualProfile?.visibleBars,visualProfile?.verticalZoom,visualProfile?.autoPriceScale,visualProfile?.rightGapBars,!!candles.length,terminalHistoryPhase,initialLogicalRange,terminalMode,terminalAutoScale,visualCanvasWidth]);
- useLayoutEffect(()=>{if(visualProfile||rangeRestored.current||!candles.length||!initialLogicalRange)return;const width=ref.current?.getBoundingClientRect().width||800,restored=restoredHookViewport(candles.length,hookChartPlotWidth(width),initialLogicalRange);if(restored){rangeRestored.current=true;setVp({...restored,rightOffset:restored.rightOffset+Math.max(0,rightPaddingBars)+Math.max(0,rightPadding)/Math.max(3,restored.barWidth)})}},[candles.length,initialLogicalRange,rightPaddingBars,rightPadding,!!visualProfile]);
+ },[symbol,tf,interactionScope,visualProfileKey,visualProfileCaptureVersion,profileVisibleBars,profileZoom,profileAutoPrice,profileRightGap,hasHistoryCandles,terminalHistoryPhase,initialLogicalRange,terminalMode,terminalAutoScale,visualCanvasWidth,fitAllScopeKey,rightPaddingBars,showVolumes]);
+ useLayoutEffect(()=>{if(hasVisualProfile||rangeRestored.current||!candles.length||!initialLogicalRange)return;const width=ref.current?.getBoundingClientRect().width||800,restored=restoredHookViewport(candles.length,hookChartPlotWidth(width),initialLogicalRange);if(restored){rangeRestored.current=true;setVp({...restored,rightOffset:restored.rightOffset+Math.max(0,rightPaddingBars)+Math.max(0,rightPadding)/Math.max(3,restored.barWidth)})}},[candles.length,initialLogicalRange,rightPaddingBars,rightPadding,hasVisualProfile]);
  const [draft,setDraft]=useState<{t:number,p:number}|null>(null),[selectedDrawingId,setSelectedDrawingId]=useState<string|null>(null),[editingDrawingId,setEditingDrawingId]=useState<string|null>(null);
  const [drawingActions,setDrawingActions]=useState<{id:string;x:number;y:number}|null>(null);
  const [alertActions,setAlertActions]=useState<{id:string;x:number;y:number}|null>(null),suppressDrawingClick=useRef(false);
@@ -2069,7 +2077,11 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    return null;
  };
  archiveScreenshotRef.current=takeArchiveScreenshot;
- useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:fitAllHistory,zoomToLatest:reset,focusLatest:()=>{fitAllScopeRef.current=null;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false}))},zoom:zoomButton}),[candles,vp]);
+ // The externally exposed actions remain stable while always reading current
+ // market geometry. A new candle must not repeatedly detach and assign the ref.
+ const chartControlActionsRef=useRef({fitAllHistory,reset,zoomButton});
+ chartControlActionsRef.current={fitAllHistory,reset,zoomButton};
+ useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:()=>chartControlActionsRef.current.fitAllHistory(),zoomToLatest:()=>chartControlActionsRef.current.reset(),focusLatest:()=>{fitAllScopeRef.current=null;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false}))},zoom:(factor:number)=>chartControlActionsRef.current.zoomButton(factor)}),[]);
  const actionDrawing=drawingActions?.id===selectedDrawingId?drawings.find(d=>d.id===selectedDrawingId&&d.id.startsWith(symbol+':')):null;
  const barCountdown=!hideBarCountdown?<ChartBarCountdown tf={tf} intervalMs={intervalMs} lastBarStart={candles.at(-1)?.t}/>:null;
  const scaleControls=(<div role="toolbar" aria-label={translateHookChartPhrase(language,"Керування масштабом графіка")} className={'chartScaleDock '+(zoomPanelOpen?'expanded':'collapsed')}>
