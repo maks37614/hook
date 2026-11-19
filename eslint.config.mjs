@@ -41,7 +41,7 @@ export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'react-hooks/rules-of-hooks': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
     },
   },

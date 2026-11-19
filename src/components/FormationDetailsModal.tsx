@@ -82,7 +82,19 @@ interface FormationDetailsModalProps {
   onToggleWatchlist?: (symbol: string) => void;
 }
 
-export const FormationDetailsModal: React.FC<FormationDetailsModalProps> = ({
+/** A null selection unmounts the active details view rather than skipping only
+ * some hooks on the same component instance. This preserves hook call order. */
+type ActiveFormationDetailsProps = FormationDetailsModalProps & {
+  coin: ScannedCoin;
+  formation: DetectedFormation;
+};
+
+export const FormationDetailsModal: React.FC<FormationDetailsModalProps> = (props) => {
+  if (!props.coin || !props.formation) return null;
+  return <FormationDetailsContent {...props} coin={props.coin} formation={props.formation} />;
+};
+
+const FormationDetailsContent: React.FC<ActiveFormationDetailsProps> = ({
   coin,
   formation,
   onFormationChange,
@@ -109,8 +121,6 @@ export const FormationDetailsModal: React.FC<FormationDetailsModalProps> = ({
     return exact !== source ? exact : source.split(' · ').map(tr).join(' · ');
   };
   const { status: telegramStatus } = useTelegram();
-  if (!coin || !formation) return null;
-
   // Keep all detected patterns available in the detailed view, including an
   // archived pattern that is no longer present in the latest scanner snapshot.
   const formationOptions = Array.from(new Map<string, DetectedFormation>(
