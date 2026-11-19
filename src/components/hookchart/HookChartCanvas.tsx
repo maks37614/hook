@@ -294,6 +294,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     };
   }, [replay, user?.uid]);
   const ecoActive = terminalEcoMode && !replay && !externalData;
+  const hasExternalData = Boolean(externalData);
   // Read-only runtime overlay: neither setSettings nor queueSave sees ECO overrides.
   const runtimeSettings = useMemo(() => {
     const next = terminalEcoPreferences(settings, ecoActive);
@@ -374,10 +375,10 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     });
   }, []);
   const recurrenceMarks = useMemo<readonly MarketRecurrenceMark[]>(() => {
-    if (replay || archiveMode || !!externalData || ecoActive ||
+    if (replay || archiveMode || hasExternalData || ecoActive ||
         recurrenceOverlay?.scope !== historyScope || !recurrenceOverlay.report) return [];
     return createMarketRecurrenceMarks(recurrenceOverlay.report);
-  }, [recurrenceOverlay, historyScope, replay, archiveMode, !!externalData, ecoActive]);
+  }, [recurrenceOverlay, historyScope, replay, archiveMode, hasExternalData, ecoActive]);
   const crosshair = useMemo(() => createChartCrosshairStore(), [historyScope]);
   const [extraHistory, setExtraHistory] = useState<ScopedHookChartHistory>(() => ({ scope: historyScope, rows: [] }));
   const liquidationMapSupported = !replay && !externalData && marketType === 'futures' &&
@@ -526,8 +527,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     return () => cleanup.forEach(dispose => dispose());
   }, [terminalMode, integratedToolbar, terminalExtraToolsOpen, settings.showTopToolbarIcons, settings.showMarketStatsBar]);
   // Stable indicator IDs avoid redoing the SVG calculations for unrelated feed updates.
-  const indicators = useMemo(() => (replay || archiveMode) ? replayIndicators : enabledIndicators(runtimeSettings, !!externalData, marketType),
-    [replay, archiveMode, replayIndicators, runtimeSettings.indicators, !!externalData, marketType]);
+  const indicators = useMemo(() => (replay || archiveMode) ? replayIndicators : enabledIndicators(runtimeSettings, hasExternalData, marketType),
+    [replay, archiveMode, replayIndicators, runtimeSettings, hasExternalData, marketType]);
   // Chart time is owned by the user's profile. Ignore legacy per-chart
   // timezone overrides so changing the profile updates every HookChart view.
   const timezone = resolveTimeZone(profile?.timeZone);
@@ -585,6 +586,11 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     );
   }, [recurrenceEnabled, mapChartData, liquidationMapPeriod, referencePriceBucket]);
   const historyRequestKey = useRef('');
+  // Only the transition from no input candles may start historical paging.
+  // Read the current snapshot without rescheduling the fetch on every candle.
+  const historyKlinesRef = useRef(klines);
+  historyKlinesRef.current = klines;
+  const hasInitialKlines = klines.length > 0;
   useEffect(() => {
     // The renderer always shows the most recent candles first; the full
     // configured history is fetched separately in pages of up to 1000.
@@ -592,19 +598,19 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     const normalizedSymbol = normalizeExchangeSymbol(symbol);
     // Compact Terminal charts request older pages only when the user pans back;
     // Settings > retry can still explicitly request the configured full history.
-    if (replay || archiveMode || externalData || timeframe === '30s' || (terminalMode && historyRetry === 0) || !maxChartCandles || !klines.length ||
+    if (replay || archiveMode || hasExternalData || timeframe === '30s' || (terminalMode && historyRetry === 0) || !maxChartCandles || !hasInitialKlines ||
         !isValidExchangeSymbol(normalizedSymbol)) return;
     const key = [exchange, marketType, normalizedSymbol, timeframe, maxChartCandles, historyRetry].join(':');
     if (historyRequestKey.current === key) return;
     historyRequestKey.current = key;
 
     const controller = new AbortController();
-    const source = [...scopedHookChartHistoryRows(extraHistoryRef.current, historyScope), ...klines].sort((a, b) => a.time - b.time);
+    const source = [...scopedHookChartHistoryRows(extraHistoryRef.current, historyScope), ...historyKlinesRef.current].sort((a, b) => a.time - b.time);
     if (source.length >= maxChartCandles) {
       setHistoryState({ scope: historyScope, status: 'idle' });
       return;
     }
-    const firstCurrentTime = Math.min(...klines.map(row => row.time));
+    const firstCurrentTime = Math.min(...historyKlinesRef.current.map(row => row.time));
     const acceptPage = (rows: Kline[]) => {
       if (controller.signal.aborted) return;
       setExtraHistory({ scope: historyScope, rows: rows.filter(row => row.time < firstCurrentTime) });
@@ -632,7 +638,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         setHistoryState({ scope: historyScope, status: 'error' });
       });
     return () => controller.abort();
-  }, [replay, archiveMode, !!externalData, terminalMode, historyScope, exchange, marketType, symbol, timeframe, maxChartCandles, klines.length > 0, historyRetry]);
+  }, [replay, archiveMode, hasExternalData, terminalMode, historyScope, exchange, marketType, symbol, timeframe, maxChartCandles, hasInitialKlines, historyRetry]);
 
   const activeStrategy = useMemo(() => archiveMode ? null : strategyPreset(runtimeSettings.strategyId || ''), [runtimeSettings.strategyId, archiveMode]);
   const liveFeed = useOriginalHookChartLiveFeed({
@@ -663,18 +669,24 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     };
   };
   useEffect(() => {
-    if (!terminalInitialViewTarget || replay || archiveMode || externalData) return;
+    if (!terminalInitialViewTarget || replay || archiveMode || hasExternalData) return;
     const ownerScope = evidenceScope(user?.uid ?? 'guest', { exchange, marketType, symbol }, timeframe);
     return registerTerminalEvidence(ownerScope, () => terminalEvidenceOwner.current === ownerScope
       ? terminalEvidence.current() : { manualLevels: [], densityEnabled: false, densities: [], oi: [] });
-  }, [terminalInitialViewTarget, replay, archiveMode, !!externalData, user?.uid, exchange, marketType, symbol, timeframe]);
+  }, [terminalInitialViewTarget, replay, archiveMode, hasExternalData, user?.uid, exchange, marketType, symbol, timeframe]);
   const channelEnabled = !archiveMode && (replay ? replayOverlays.includes('channel') : runtimeSettings.autoChannel);
   const needsTrendSeries = channelEnabled || !!activeStrategy;
-  const levelIntervals = settings.levelIntervals || [];
-  const trendIntervals = needsTrendSeries ? settings.trendIntervals || [] : [];
+  // Stable scalar keys avoid restarting shared timeframe streams when settings
+  // are reconstructed with equivalent arrays on a chart render.
+  const levelTfKey = (settings.levelIntervals || []).join(',');
+  const trendTfKey = needsTrendSeries ? (settings.trendIntervals || []).join(',') : '';
+  const strategyTfKey = (activeStrategy?.requiredTfs || []).join(',');
   const analysisTfs = useMemo(() => ecoActive || archiveMode ? [timeframe] : Array.from(new Set<string>([
-    timeframe, ...levelIntervals, ...trendIntervals, ...(activeStrategy?.requiredTfs || []),
-  ])), [ecoActive, archiveMode, timeframe, levelIntervals.join(','), trendIntervals.join(','), activeStrategy?.id]);
+    timeframe,
+    ...(levelTfKey ? levelTfKey.split(',') : []),
+    ...(trendTfKey ? trendTfKey.split(',') : []),
+    ...(strategyTfKey ? strategyTfKey.split(',') : []),
+  ])), [ecoActive, archiveMode, timeframe, levelTfKey, trendTfKey, strategyTfKey]);
   const analysisTfKey = analysisTfs.join(',');
   const analysisHistoryLimit = Math.min(1000, Math.max(
     250, settings.levelHistory || 500, needsTrendSeries ? settings.trendHistory || 300 : 0,
@@ -682,8 +694,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
 
   useEffect(() => {
     const exchangeSymbol = /^[A-Z0-9]+$/i.test(symbol);
-    if (replay || externalData || !exchangeSymbol) { setRemoteState(null); return; }
-    const requested = analysisTfs.filter(tf => tf !== timeframe && ANALYSIS_TIMEFRAMES.has(tf));
+    if (replay || hasExternalData || !exchangeSymbol) { setRemoteState(null); return; }
+    const requested = analysisTfKey.split(',').filter(tf => tf !== timeframe && ANALYSIS_TIMEFRAMES.has(tf));
     if (!requested.length) {
       // No additional timeframe: no dormant per-chart polling timer.
       setRemoteState(current => current?.scope === historyScope &&
@@ -717,7 +729,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       },
     ));
     return () => stop.forEach(unsubscribe => unsubscribe());
-  }, [exchange, marketType, symbol, timeframe, replay, !!externalData, analysisTfKey,
+  }, [exchange, marketType, symbol, timeframe, replay, hasExternalData, analysisTfKey,
     analysisHistoryLimit, historyScope]);
 
   const analysisSeries = useMemo(() => {
@@ -727,7 +739,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       aggregateCache.current = { scope: historyScope, series: new Map() };
     }
     const series: Record<string, Candle[]> = { [timeframe]: candles };
-    for (const tf of analysisTfs) {
+    for (const tf of analysisTfKey.split(',')) {
       if (tf === timeframe) continue;
       if (remoteSeries[tf]?.length) {
         series[tf] = remoteSeries[tf];
@@ -736,7 +748,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       // The 30s trade feed contains only a recent, potentially sparse window.
       // Never present its partial 1m/5m aggregates as full exchange candles.
       if (timeframe === '30s') continue;
-      if (replay || externalData) {
+      if (replay || hasExternalData) {
         const aggregated = aggregateHookChartCandles(candles, timeframe, tf);
         if (aggregated.length) series[tf] = aggregated;
         continue;
@@ -749,8 +761,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       if (next.candles.length) series[tf] = next.candles;
     }
     return series;
-  }, [candles, timeframe, analysisTfKey, remoteSeries, historyScope, replay, !!externalData]);
-  const autoLevels = useMemo(() => (runtimeSettings.levelIntervals || []).flatMap(tf => {
+  }, [candles, timeframe, analysisTfKey, remoteSeries, historyScope, replay, hasExternalData]);
+  const activeLevelTfKey = (runtimeSettings.levelIntervals || []).join(',');
+  const autoLevels = useMemo(() => (activeLevelTfKey ? activeLevelTfKey.split(',') : []).flatMap(tf => {
     if (!LEVEL_TFS.has(tf as LevelTf)) return [];
     const series = analysisSeries[tf] || [];
     if (series.length < 40) return [];
@@ -762,7 +775,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       pivotBars: settings.levelCandleCount ?? 15,
       allowWickPenetration: settings.allowWick !== false,
     });
-  }), [analysisSeries, (runtimeSettings.levelIntervals || []).join(','), settings.levelCount, settings.levelDiff, settings.levelHistory, settings.levelBreak, settings.levelCandleCount, settings.allowWick]);
+  }), [analysisSeries, activeLevelTfKey, settings.levelCount, settings.levelDiff, settings.levelHistory, settings.levelBreak, settings.levelCandleCount, settings.allowWick]);
   const visibleAutoLevels = useMemo(() => settings.showBrokenLevels === false ? autoLevels.filter(level => !level.broken) : autoLevels, [autoLevels, settings.showBrokenLevels]);
   const strategyResult = useMemo(() => activeStrategy && candles.length ? evaluateStrategy(activeStrategy, {
     series: analysisSeries,
@@ -776,7 +789,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     currentPrice: candles.at(-1)?.c || 0,
     cascadeRisk: liveFeed.cascadeRisk.score,
   }) : null, [
-    activeStrategy?.id, analysisSeries, candles, autoLevels, oi.binance, oi.bybit, exchange,
+    activeStrategy, analysisSeries, candles, autoLevels, oi.binance, oi.bybit, exchange,
     liveFeed.densities, liveFeed.book, liveFeed.fundingHistory, liveFeed.fundingRate, liveFeed.cascadeRisk.score,
   ]);
   // Cached pivots are recalculated only when bounded closed-candle history
@@ -922,7 +935,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [user?.uid, profile?.uid]);
 
   const queueSave = useCallback((delta: HookChartPreferences) => {
-    if (!user) return;
+    if (!user?.uid) return;
     setSaveStatus('saving');
     if (pendingOwnerUid.current && pendingOwnerUid.current !== user.uid) {
       pending.current = null;
@@ -957,7 +970,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       (pending.current && pendingOwnerUid.current === uid) ||
       (uid && (savingByUid.current.get(uid) || 0) > 0)
     ) return;
-    if (user && profile?.uid !== user.uid) {
+    if (user?.uid && profile?.uid !== user.uid) {
       setSettings(normalizeOriginalHookChartPreferences());
       drawingsRef.current = [];
       alertsRef.current = [];
@@ -976,10 +989,10 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     alertsRef.current = nextAlerts;
     setDrawingsState(next);
     setAlertsState(nextAlerts);
-  }, [user?.uid, profile?.uid, preferences, scope, sharedScope, profileSyncVersion, replay, archiveMode, archiveSnapshot]);
+  }, [user?.uid, profile?.uid, preferences, scope, sharedScope, symbol, profileSyncVersion, replay, archiveMode, archiveSnapshot]);
 
   useEffect(() => {
-    if (user && profile?.uid !== user.uid) return;
+    if (user?.uid && profile?.uid !== user.uid) return;
     if (settings.siteLanguageAtSelection === siteLanguage) return;
     const delta = { language: siteLanguage, siteLanguageAtSelection: siteLanguage };
     setSettings(current => ({ ...current, ...delta }));
@@ -1426,7 +1439,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
 
   const showOi = !archiveMode && (indicators.includes('oi') || !!activeStrategy?.config.oiWindow);
   useEffect(() => {
-    if (!showOi || replay || externalData || timeframe === '30s' || marketType !== 'futures') {
+    if (!showOi || replay || hasExternalData || timeframe === '30s' || marketType !== 'futures') {
       oiEvidenceScope.current = '';
       setOi(EMPTY_OI); setOiError(false); return;
     }
@@ -1450,7 +1463,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         onError: () => setOiError(true),
       },
     );
-  }, [showOi, symbol, timeframe, replay, marketType, !!externalData]);
+  }, [showOi, symbol, timeframe, replay, marketType, hasExternalData]);
 
   // Only construct a capture when Save Archive is explicitly pressed.
   // Its coordinates and visibility correspond to THIS chart at that moment,
