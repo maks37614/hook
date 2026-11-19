@@ -125,6 +125,9 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
   const [draft, setDraft] = useState<HookChartHotkeys>(() => ({ ...DEFAULT_HOOKCHART_HOTKEYS, ...chartHotkeys }));
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Capture the newest saved configuration only when the dialog opens.
+  const chartHotkeysRef = useRef(chartHotkeys);
+  chartHotkeysRef.current = chartHotkeys;
 
   useEffect(() => {
     if (!open) return;
@@ -133,7 +136,7 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
     setEditingPage(null);
     setConflict(false);
     setStatus('idle');
-    setDraft({ ...DEFAULT_HOOKCHART_HOTKEYS, ...chartHotkeys });
+    setDraft({ ...DEFAULT_HOOKCHART_HOTKEYS, ...chartHotkeysRef.current });
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.focus({ preventScroll: true });
     return () => previous?.focus({ preventScroll: true });
@@ -154,6 +157,10 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
     setStatus('saving');
     void onSaveChartHotkeys(next).then(() => setStatus('saved'), () => setStatus('failed'));
   };
+  // Keyboard listeners stay attached while editing, while validation and saves
+  // always read the latest key bindings and callbacks.
+  const keyboardHandlersRef = useRef({ reserved, save });
+  keyboardHandlersRef.current = { reserved, save };
 
   useEffect(() => {
     if (!open || !editing || !onSaveChartHotkeys) return;
@@ -162,15 +169,15 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
       event.stopImmediatePropagation();
       if (event.key === 'Escape') { setEditing(null); return; }
       if (event.key === 'Backspace' || event.key === 'Delete') {
-        save({ ...draft, [editing]: '' });
+        keyboardHandlersRef.current.save({ ...draft, [editing]: '' });
         setEditing(null);
         return;
       }
       const value = hotkeyFromEvent(event);
       if (!value || ['Ctrl', 'Alt', 'Shift', 'Meta'].includes(value)) return;
-      if (reserved(value, 'chart', editing)) { setConflict(true); return; }
+      if (keyboardHandlersRef.current.reserved(value, 'chart', editing)) { setConflict(true); return; }
       setConflict(false);
-      save({ ...draft, [editing]: value });
+      keyboardHandlersRef.current.save({ ...draft, [editing]: value });
       setEditing(null);
     };
     window.addEventListener('keydown', capture, true);
@@ -191,7 +198,7 @@ export function TerminalHotkeysDialog({ open, onClose, chartHotkeys, pageHotkeys
       }
       const value = hotkeyFromEvent(event);
       if (!value || ['Ctrl', 'Alt', 'Shift', 'Meta'].includes(value)) return;
-      if (reserved(value, 'page', editingPage)) { setConflict(true); return; }
+      if (keyboardHandlersRef.current.reserved(value, 'page', editingPage)) { setConflict(true); return; }
       onSavePageHotkeys({ ...pageHotkeys, [editingPage]: value });
       setConflict(false);
       setEditingPage(null);

@@ -333,7 +333,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     window.dispatchEvent(new CustomEvent(CHART_TRADE_LEVELS_EVENT, {
       detail: { accountKey: user?.uid || 'guest', levels },
     }));
-    if (user) {
+    if (user?.uid) {
       void updateProfileData({ chartLabelSettings: levels })
         .catch(error => console.error('Не вдалося зберегти TP/SL у профілі', error));
     }
@@ -533,10 +533,11 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
       window.removeEventListener('storage', onStorage);
     };
   }, [necklineKey, necklineScope]);
-  const savedNecklineChoice = useMemo(
-    () => readChartNecklineOverride(necklineKey, necklineScope),
-    [necklineKey, necklineScope, necklineRevision],
-  );
+  const savedNecklineChoice = useMemo(() => {
+    // This revision signals a localStorage change with identical market keys.
+    void necklineRevision;
+    return readChartNecklineOverride(necklineKey, necklineScope);
+  }, [necklineKey, necklineScope, necklineRevision]);
   const necklineOverride = localNecklineOverride?.key === necklineKey
     && localNecklineOverride.scope === necklineScope
     ? localNecklineOverride.visible : savedNecklineChoice;
