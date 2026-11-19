@@ -263,11 +263,15 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     })();
   };
 
+  // The one-shot form scan is keyed by the open tab/timeframe, never by
+  // a new callback closure created during unrelated market-list updates.
+  const loadFormationsRef = useRef(loadFormationsOnDemand);
+  loadFormationsRef.current = loadFormationsOnDemand;
   // The selected tab survives dialog reopens. If it is still Formations,
   // request results again only when no snapshot has been loaded yet.
   useEffect(() => {
     if (isOpen && filterTab === 'formations' && formationScanStatus === 'idle') {
-      loadFormationsOnDemand();
+      loadFormationsRef.current();
     }
   }, [isOpen, filterTab, formationScanStatus, selectedTimeframe]);
 

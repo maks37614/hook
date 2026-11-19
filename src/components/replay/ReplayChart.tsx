@@ -469,14 +469,17 @@ export const ReplayChart = forwardRef<ReplayChartHandle, ReplayChartProps>(({
     focusOnCandlesRef.current = focusOnCandles;
   }, [focusOnCandles]);
 
+  // Refit only on a new date/coin or the first available candle.
+  // Do not schedule another 80ms refit on every Replay playback candle.
+  const hasVisibleCandles = visibleCandles.length > 0;
   // Auto-focus on candles whenever a new date/coin is loaded (focusTrigger increments)
   useEffect(() => {
-    if (visibleCandles.length === 0) return;
+    if (!hasVisibleCandles) return;
     const timer = setTimeout(() => {
       focusOnCandlesRef.current(true);
     }, 80);
     return () => clearTimeout(timer);
-  }, [focusTrigger]);
+  }, [focusTrigger, hasVisibleCandles]);
 
   // Replay playback auto-follow: ensure newly stepped-in candles stay comfortably inside visible range
   useEffect(() => {

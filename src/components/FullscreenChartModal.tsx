@@ -265,9 +265,12 @@ export const FullscreenChartModal: React.FC<FullscreenChartModalProps> = ({
     if (pageMode || watchlist.length > 0) setLocalWatchlist(Array.from(new Set(watchlist)));
   }, [watchlist, pageMode]);
 
-  // Sync activeCoin with parent coin prop when symbol changes
+  // Only a market switch replaces the active chart; live price changes must
+  // not reset a favorite or open another price/candle subscription.
+  const incomingCoinRef = useRef(coin);
+  incomingCoinRef.current = coin;
   useEffect(() => {
-    setActiveCoin(coin);
+    setActiveCoin(incomingCoinRef.current);
   }, [coin.symbol, coin.exchange, coin.marketType]);
 
   const chartHistoryScope = fullscreenChartHistoryScope(activeCoin.exchange, activeCoin.marketType, activeCoin.symbol, timeframe);
@@ -332,7 +335,8 @@ export const FullscreenChartModal: React.FC<FullscreenChartModalProps> = ({
     };
     void fetchHistory();
     return () => { cancelled = true; controller.abort(); };
-  }, [isOpen, chartHistoryScope, hasSuppliedHistory, historyRetry]);
+  }, [isOpen, chartHistoryScope, hasSuppliedHistory, historyRetry,
+    activeCoin.exchange, activeCoin.marketType, activeCoin.symbol, timeframe]);
   // Keep exchange/market identity from the account's real watchlist.
   const handleRemoveFromWatchlist = (favCoin: ScannedCoin, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -469,24 +473,34 @@ export const FullscreenChartModal: React.FC<FullscreenChartModalProps> = ({
     }
   };
 
+  // One pointer-handler registration per opened drawer. Each handler reads
+  // current chart slots; moving a favorite must not reattach DOM listeners.
+  const favoriteGestureActionsRef = useRef({
+    moveTouchFavorite, finishFavoritePointer, chartUnderPointer,
+    clearFavoriteDrag, acceptFavoriteDrop,
+  });
+  favoriteGestureActionsRef.current = {
+    moveTouchFavorite, finishFavoritePointer, chartUnderPointer,
+    clearFavoriteDrag, acceptFavoriteDrop,
+  };
   // The chart canvas may consume bubbled drag/drop events. Capture them before
   // HookChart's gesture handlers; use a pointer fallback for browsers/webviews
   // that do not initiate native HTML5 drag from a button.
   useEffect(() => {
     if (!isFavoritesDrawerOpen || !pageMode || earlyCandidate) return;
-    const handlePointerMove = (event: PointerEvent) => moveTouchFavorite(event);
+    const handlePointerMove = (event: PointerEvent) => favoriteGestureActionsRef.current.moveTouchFavorite(event);
     const handlePointerUp = (event: PointerEvent) => {
-      if (finishFavoritePointer(event.pointerId, event.clientX, event.clientY)) {
+      if (favoriteGestureActionsRef.current.finishFavoritePointer(event.pointerId, event.clientX, event.clientY)) {
         event.preventDefault();
         event.stopPropagation();
       }
     };
     const handlePointerCancel = (event: PointerEvent) => {
-      finishFavoritePointer(event.pointerId, event.clientX, event.clientY, true);
+      favoriteGestureActionsRef.current.finishFavoritePointer(event.pointerId, event.clientX, event.clientY, true);
     };
     const onFavoriteNativeDragOver = (event: DragEvent) => {
       if (!favoriteDraggingRef.current) return;
-      const targetId = chartUnderPointer(event.clientX, event.clientY);
+      const targetId = favoriteGestureActionsRef.current.chartUnderPointer(event.clientX, event.clientY);
       setFavoriteDropTargetId(targetId);
       if (!targetId) return;
       event.preventDefault();
@@ -494,11 +508,11 @@ export const FullscreenChartModal: React.FC<FullscreenChartModalProps> = ({
     };
     const onFavoriteNativeDrop = (event: DragEvent) => {
       if (!favoriteDraggingRef.current) return;
-      const targetId = chartUnderPointer(event.clientX, event.clientY);
-      if (!targetId) { clearFavoriteDrag(); return; }
+      const targetId = favoriteGestureActionsRef.current.chartUnderPointer(event.clientX, event.clientY);
+      if (!targetId) { favoriteGestureActionsRef.current.clearFavoriteDrag(); return; }
       event.preventDefault();
       event.stopPropagation();
-      acceptFavoriteDrop(targetId);
+      favoriteGestureActionsRef.current.acceptFavoriteDrop(targetId);
     };
     document.addEventListener('pointermove', handlePointerMove, true);
     document.addEventListener('pointerup', handlePointerUp, true);
