@@ -951,6 +951,32 @@ export function OriginalHookChartSettings({
             <SwitchRow label="Підказки" desc="Підказки в інтерфейсі під час наведення миші" value={prefs.tooltips !== false} onChange={value => set('tooltips', value)} />
           </Section>
 
+          {/* Place the opt-in Scalper switch near the top so it remains discoverable on mobile. */}
+          <Section title="Автоматична розмітка">
+            <SwitchRow
+              label="Режим Скальпера"
+              desc="Автоматично показує на живому графіку підтверджені дотиками діапазони, трикутники, клини, похилі лінії та подвійні вершини/дна. Можливий пробій не є підтвердженим до закриття свічки. Аналіз виконується лише в браузері без нових біржових запитів."
+              value={prefs.scalperMode === true}
+              onChange={value => set('scalperMode', value)}
+            />
+            <SwitchRow
+              label="Усереднена регресійна лінія"
+              desc="Альтернативна побудова, як у попередній версії: лінія усереднює підтверджені High/Low методом лінійної регресії. Вона може проходити між кінчиками тіней і через тіла свічок. Якщо вимкнено (за замовчуванням), лінії проходять через фактичні High/Low тіней. Змінює тільки алгоритм розмітки, не біржові дані."
+              value={prefs.scalperRegressionMode === true}
+              onChange={value => set('scalperRegressionMode', value)}
+            />
+            <SwitchRow
+              label="Показувати підписи Режиму Скальпера"
+              desc="Якщо вимкнено, приховує лише назви фігур та статуси біля автоматично намальованих ліній. Лінії, дотики тіней і позначки пробою залишаються видимими."
+              value={prefs.showScalperLabels !== false}
+              onChange={value => set('showScalperLabels', value)}
+            />
+            <Setting label="Товщина трендової лінії (Скальпер)"
+              desc="Змінює лише автоматично знайдені трендові лінії Режиму Скальпера. Не впливає на ручні малюнки, трикутники чи інші фігури.">
+              <Num value={prefs.scalperTrendLineWidth ?? 0.9} min={0.2} max={5} step={0.1} set={value => set('scalperTrendLineWidth', value)} /><b className="valueBadge">px</b>
+            </Setting>
+          </Section>
+
           <Section title="Інтерфейс">
             <Setting label="Максимальна історія свічок" desc="Скільки свічок зберігати на графіку. Від 100 до 5000. Історія підвантажується частинами; на біржі може бути менше даних."><Num value={prefs.maxChartCandles ?? 1000} min={100} max={5000} step={100} set={value => set('maxChartCandles', Math.round(value))} /><b className="valueBadge">свічок</b></Setting>
             {!embedded && <div className="settingsHint" role="status" aria-live="polite" aria-atomic="true">
@@ -999,31 +1025,6 @@ export function OriginalHookChartSettings({
               {translateHookChartPhrase(chartLanguage, 'DPR екрана:')} <strong>{Number(deviceDpr.toFixed(2))}</strong>
               {' · '}{translateHookChartPhrase(chartLanguage, 'Фактичний DPR полотна:')} <strong>{Number(effectiveDpr.toFixed(2))}</strong>
             </div>
-          </Section>
-
-          <Section title="Автоматична розмітка">
-            <SwitchRow
-              label="Режим Скальпера"
-              desc="Автоматично показує на живому графіку підтверджені дотиками діапазони, трикутники, клини, похилі лінії та подвійні вершини/дна. Можливий пробій не є підтвердженим до закриття свічки. Аналіз виконується лише в браузері без нових біржових запитів."
-              value={prefs.scalperMode === true}
-              onChange={value => set('scalperMode', value)}
-            />
-            <SwitchRow
-              label="Усереднена регресійна лінія"
-              desc="Альтернативна побудова, як у попередній версії: лінія усереднює підтверджені High/Low методом лінійної регресії. Вона може проходити між кінчиками тіней і через тіла свічок. Якщо вимкнено (за замовчуванням), лінії проходять через фактичні High/Low тіней. Змінює тільки алгоритм розмітки, не біржові дані."
-              value={prefs.scalperRegressionMode === true}
-              onChange={value => set('scalperRegressionMode', value)}
-            />
-            <SwitchRow
-              label="Показувати підписи Режиму Скальпера"
-              desc="Якщо вимкнено, приховує лише назви фігур та статуси біля автоматично намальованих ліній. Лінії, дотики тіней і позначки пробою залишаються видимими."
-              value={prefs.showScalperLabels !== false}
-              onChange={value => set('showScalperLabels', value)}
-            />
-            <Setting label="Товщина трендової лінії (Скальпер)"
-              desc="Змінює лише автоматично знайдені трендові лінії Режиму Скальпера. Не впливає на ручні малюнки, трикутники чи інші фігури.">
-              <Num value={prefs.scalperTrendLineWidth ?? 0.9} min={0.2} max={5} step={0.1} set={value => set('scalperTrendLineWidth', value)} /><b className="valueBadge">px</b>
-            </Setting>
           </Section>
 
           <Section title="Ліквідації">
