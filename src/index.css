@@ -813,7 +813,7 @@ html[data-site-font="inter-light"] #root :is(button, input, select, textarea):no
  * BETWEEN tiles instead; preserve canvas pinch/pan behavior and desktop gaps. */
 @media (pointer: coarse) {
   .terminal-workspace-grid {
-    gap: 24px;
+    gap: var(--terminal-touch-gap, 20px);
     touch-action: pan-y;
   }
 }

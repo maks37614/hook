@@ -27,6 +27,8 @@ export interface TerminalWorkspaceConfig {
   columns: 1 | 2 | 3 | 4 | 5 | 6;
   /** Free grid adapts automatically; false preserves an explicit column choice. */
   freeLayoutAutoColumns?: boolean;
+  /** Touch-screen gap between Terminal chart tiles in CSS pixels. */
+  touchGapPx?: number;
   autoFitScreen: boolean;
   /** Hide the Terminal header clock and its trading sessions popover. Defaults to visible. */
   showClock?: boolean;

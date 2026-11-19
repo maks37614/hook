@@ -149,6 +149,27 @@ export const terminalSettingsDrawerRows = [
     "Liczba kolumn na ekranie"
   ],
   [
+    "touchGap",
+    "Відступ між графіками",
+    "Gap between charts",
+    "Расстояние между графиками",
+    "Odstęp między wykresami"
+  ],
+  [
+    "touchGapAria",
+    "Налаштувати відступ між графіками на сенсорних екранах",
+    "Adjust the gap between charts on touch screens",
+    "Настроить расстояние между графиками на сенсорных экранах",
+    "Zmień odstęp między wykresami na ekranach dotykowych"
+  ],
+  [
+    "touchGapHelp",
+    "На телефоні та планшеті проводьте пальцем у цьому проміжку, щоб прокручувати Термінал. Жести всередині графіків не змінюються.",
+    "On phones and tablets, swipe in this space to scroll the Terminal. Gestures inside charts stay unchanged.",
+    "На телефоне и планшете проводите пальцем в этом промежутке для прокрутки Терминала. Жесты внутри графиков не меняются.",
+    "Na telefonie i tablecie przesuwaj palcem w tym odstępie, aby przewijać Terminal. Gesty wewnątrz wykresów pozostają bez zmian."
+  ],
+  [
     "autoFit",
     "Під розмір монітора (Auto-Fit)",
     "Fit monitor size (Auto-Fit)",

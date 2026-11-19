@@ -7,6 +7,7 @@ import type { TerminalChartBlock, TerminalSavedPreset, TerminalWorkspaceConfig, 
 import { getStoredPreferences } from './userPreferences';
 import { normalizeVisualProfile } from '../components/hookchart/visualProfiles';
 import { normalizeTerminalChartRefreshMs } from './terminalChartRefresh';
+import { DEFAULT_TERMINAL_TOUCH_GAP_PX, normalizeTerminalTouchGapPx } from './terminalTouchGap';
 import { normalizeTerminalBlocks, normalizeTerminalPresets, terminalStorageKey, TERMINAL_PRESETS_STORAGE_KEY } from './terminalPresets';
 
 const BLOCKS_KEY = 'crypto_screener_terminal_blocks';
@@ -33,6 +34,7 @@ function saveConflictBackup(uid: string, value: WorkspaceSnapshot): boolean {
 const DEFAULT_CONFIG: TerminalWorkspaceConfig = {
   layoutPreset: 'custom', columns: 2, freeLayoutAutoColumns: true, autoFitScreen: true, showClock: true, blocks: [], showFormations: true, blockHeight: 'medium',
   terminalMarketAlerts: false,
+  touchGapPx: DEFAULT_TERMINAL_TOUCH_GAP_PX,
 };
 /** Validate imported files before replacing any chart or saving to a profile. */
 export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
@@ -88,6 +90,7 @@ export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
     config.columns = source.columns as TerminalWorkspaceConfig['columns'];
   if (typeof source.freeLayoutAutoColumns === 'boolean')
     config.freeLayoutAutoColumns = source.freeLayoutAutoColumns;
+  config.touchGapPx = normalizeTerminalTouchGapPx(source.touchGapPx);
   if (typeof source.autoFitScreen === 'boolean') config.autoFitScreen = source.autoFitScreen;
   if (typeof source.showClock === 'boolean') config.showClock = source.showClock;
   if (typeof source.autoScaleCharts === 'boolean') config.autoScaleCharts = source.autoScaleCharts;
@@ -132,6 +135,7 @@ export function loadTerminalWorkspace(uid?: string, settings?: TerminalWorkspace
     : storedConfig && typeof storedConfig === 'object' ? storedConfig : {};
   const config = { ...DEFAULT_CONFIG, ...sourceConfig } as TerminalWorkspaceConfig;
   if (![1, 2, 3, 4, 5, 6].includes(config.columns)) config.columns = 2;
+  config.touchGapPx = normalizeTerminalTouchGapPx(config.touchGapPx);
   config.freeLayoutAutoColumns = config.freeLayoutAutoColumns !== false;
   if ((config.blockHeight as string) === 'tall') config.blockHeight = 'large';
   if (!['compact', 'medium', 'large'].includes(config.blockHeight)) config.blockHeight = 'medium';

@@ -55,6 +55,7 @@ import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
 import { terminalGridColumnClasses, terminalResponsiveAutoHeights, terminalResponsiveSpanClasses } from '../utils/terminalResponsiveGrid';
+import { normalizeTerminalTouchGapPx } from '../utils/terminalTouchGap';
 import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset, type TerminalPresetCoin } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
@@ -1032,7 +1033,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     '--terminal-height-tablet': terminalAutoHeights.tablet,
     '--terminal-height-desktop': terminalAutoHeights.desktop,
     '--terminal-height-wide': terminalAutoHeights.wide,
-  } as React.CSSProperties), [terminalAutoHeights]);
+    '--terminal-touch-gap': `${normalizeTerminalTouchGapPx(config.touchGapPx)}px`,
+  } as React.CSSProperties), [terminalAutoHeights, config.touchGapPx]);
 
   const computedHeightStyle = useMemo(() => {
     // First chart is large, with the normal draggable/resizable grid controls.

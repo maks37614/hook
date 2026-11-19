@@ -19,6 +19,7 @@ import {
 import { Timeframe, TerminalWorkspaceConfig } from '../../types';
 import type { MarketSelection } from '../../utils/marketCoinLoader';
 import { TERMINAL_PRESET_PAGE_SIZES } from '../../utils/terminalPresetPaging';
+import { MAX_TERMINAL_TOUCH_GAP_PX, MIN_TERMINAL_TOUCH_GAP_PX, TERMINAL_TOUCH_GAP_STEP_PX, normalizeTerminalTouchGapPx } from '../../utils/terminalTouchGap';
 import { getVisualProfile, VISUAL_GAP_MAX, VISUAL_ZOOM_MIN, VISUAL_ZOOM_MAX } from '../hookchart/visualProfiles';
 import { applyTerminalInitialViewNow, discardTerminalInitialViewPreview, TERMINAL_FIT_HISTORY_PROFILE } from './terminalInitialViewApply';
 
@@ -358,6 +359,30 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Touch-only scroll gutter; chart canvas gestures remain independent. */}
+          <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/80 p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="terminal-touch-gap" className="font-bold text-slate-200">
+                {t('terminal.drawer.touchGap')}
+              </label>
+              <output htmlFor="terminal-touch-gap" className="font-mono font-semibold text-cyan-300">
+                {normalizeTerminalTouchGapPx(config.touchGapPx)} px
+              </output>
+            </div>
+            <input
+              id="terminal-touch-gap"
+              type="range"
+              min={MIN_TERMINAL_TOUCH_GAP_PX}
+              max={MAX_TERMINAL_TOUCH_GAP_PX}
+              step={TERMINAL_TOUCH_GAP_STEP_PX}
+              value={normalizeTerminalTouchGapPx(config.touchGapPx)}
+              onChange={event => onUpdateConfig({ touchGapPx: normalizeTerminalTouchGapPx(Number(event.target.value)) })}
+              aria-label={t('terminal.drawer.touchGapAria')}
+              className="w-full accent-cyan-500"
+            />
+            <p className="text-[11px] leading-relaxed text-slate-400">{t('terminal.drawer.touchGapHelp')}</p>
           </div>
 
           {/* Screen Adaptation: Auto-fit to viewport */}

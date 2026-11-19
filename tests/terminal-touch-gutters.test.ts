@@ -10,7 +10,7 @@ test('Terminal has native vertical scrolling from chart gutters on touch screens
 
   assert.match(page, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);
   assert.match(page, /terminal-workspace-grid grid/);
-  assert.match(css, /@media \(pointer: coarse\)\s*\{\s*\.terminal-workspace-grid\s*\{\s*gap: 24px;\s*touch-action: pan-y;/);
+  assert.match(css, /@media \(pointer: coarse\)\s*\{\s*\.terminal-workspace-grid\s*\{\s*gap: var\(--terminal-touch-gap, 20px\);\s*touch-action: pan-y;/);
 });
 
 test('Terminal gutter scrolling does not change the HookChart canvas gestures', () => {
