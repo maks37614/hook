@@ -55,7 +55,7 @@ import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
 import { terminalGridColumnClasses, terminalResponsiveAutoHeights, terminalResponsiveSpanClasses } from '../utils/terminalResponsiveGrid';
-import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset } from '../utils/marketPresets';
+import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset, type TerminalPresetCoin } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
 import { applyTerminalTimeframe } from '../utils/terminalTimeframe';
@@ -76,6 +76,8 @@ import { terminalAnalysisText } from '../utils/terminalAnalysis/presentation';
 
 interface TerminalPageProps {
   coins: ScannedCoin[];
+  /** The already-filtered, already-sorted list displayed on Formations. */
+  formationPresetCoins?: readonly ScannedCoin[];
   watchlist: string[];
   onToggleWatchlist: (symbol: string) => void;
   onSendMetaScalp?: (coin: ScannedCoin) => void;
@@ -87,6 +89,7 @@ interface TerminalPageProps {
 
 export const TerminalPage: React.FC<TerminalPageProps> = ({
   coins: formationCoins,
+  formationPresetCoins = [],
   watchlist,
   onToggleWatchlist,
   onSendMetaScalp,
@@ -132,7 +135,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     syncError, syncConflict, backupFailed, retrySync, downloadLocalBackup, importWorkspaceBackup,
     restoreCloudWorkspace, requestImmediateWorkspaceSync } = useTerminalWorkspace();
   const [activeMarketPreset, setActiveMarketPreset] = useState<TerminalMarketPreset | null>(null);
-  const [presetMatches, setPresetMatches] = useState<MarketCoin[]>([]);
+  const [presetMatches, setPresetMatches] = useState<TerminalPresetCoin[]>([]);
   const [presetPage, setPresetPage] = useState(0);
   const presetPageRef = useRef(0);
   const chartListRef = useRef<HTMLDivElement>(null);
@@ -793,7 +796,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     }
   };
 
-  const applyPresetPage = useCallback((selected: MarketCoin[], requestedPage: number, pageSize = coinPresetLimit) => {
+  const applyPresetPage = useCallback((selected: TerminalPresetCoin[], requestedPage: number, pageSize = coinPresetLimit) => {
     if (!selected.length) return;
     const { page, coins: pageCoins } = getTerminalPresetPage(selected, requestedPage, pageSize);
     presetPageRef.current = page;
@@ -861,13 +864,15 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     chartListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [applyPresetPage, presetMatches]);
 
-  const handleApplyMarketCoins = useCallback((selected: MarketCoin[]) => {
+  const handleApplyMarketCoins = useCallback((selected: TerminalPresetCoin[]) => {
     if (!selected.length) return;
     // Each 30s market refresh creates new quote objects even if the ordered
     // instrument list is unchanged. Keep the previous ranking identity so
     // the pagination effect doesn't redundantly apply the same page twice.
     setPresetMatches(current => current.length === selected.length
-      && current.every((coin, index) => coinMarketKey(coin) === coinMarketKey(selected[index]))
+      && current.every((coin, index) => coinMarketKey(coin) === coinMarketKey(selected[index])
+        && coin.timeframe === selected[index].timeframe
+        && coin.formationId === selected[index].formationId)
       ? current : selected);
     applyPresetPage(selected, presetPageRef.current);
   }, [applyPresetPage]);
@@ -1539,6 +1544,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         <div className="min-h-0 overflow-y-auto">
           <TerminalPresetPanel
             blocks={blocks} watchlist={localWatchlist} presets={customPresets}
+            formationCoins={formationPresetCoins}
             selection={coinPresetSelection} timeframe={timeframe} activePreset={activeMarketPreset} autoUpdate={presetAutoUpdate}
             menuOpen={showCoinPresets}
             snapshot={marketSnapshot} loading={marketLoading} error={marketError}

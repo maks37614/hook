@@ -183,6 +183,18 @@ export const terminalPagePhraseRows = [
     "Aktywne monety według zmienności z 5 min, jak w Skanerze"
   ],
   [
+    "Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування",
+    "Coins from the current Formations or early W/M list, preserving filters and sort order",
+    "Монеты из текущего списка Формаций или раннего W/M с учётом фильтров и сортировки",
+    "Monety z bieżącej listy formacji lub wczesnego W/M, z uwzględnieniem filtrów i kolejności"
+  ],
+  [
+    "У списку Формацій немає монет за поточними фільтрами.",
+    "No coins match the current Formations filters.",
+    "По текущим фильтрам в списке Формаций нет монет.",
+    "Brak monet pasujących do bieżących filtrów formacji."
+  ],
+  [
     "Найбільше зростання за 24 години",
     "Biggest gains over 24 hours",
     "Наибольший рост за 24 часа",

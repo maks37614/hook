@@ -1464,6 +1464,13 @@ export default function App() {
     () => getVisibleEarlyFormations(projectedEarlyCoins, earlyFilters, earlyStage),
     [projectedEarlyCoins, earlyFilters, earlyStage],
   );
+  // Feed the Terminal preset from the exact visible Formations list, not the
+  // unfiltered scan universe. A preset click never launches a new scanner.
+  const terminalFormationPresetCoins = useMemo(() => earlyMode
+    ? earlyItems.map(item => item.coin)
+    : groupedItems.map(group => ({ ...group.coin, formations: group.formations })),
+    [earlyMode, earlyItems, groupedItems],
+  );
 
   // Coins matching search query even if no formation is detected on current timeframe
   const matchingCoinsSearch = useMemo(
@@ -1715,6 +1722,7 @@ export default function App() {
           <TerminalPage
             key={user?.uid || 'guest'}
             coins={coins}
+            formationPresetCoins={terminalFormationPresetCoins}
             watchlist={watchlist}
             onToggleWatchlist={handleToggleWatchlist}
             onSendMetaScalp={(coin) => handleSendToMetaScalp(coin, 'terminal')}

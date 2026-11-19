@@ -2,16 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase, type LocaleParams } from '../../locales';
 import { MarketDataFreshnessIcon } from '../MarketDataFreshnessIcon';
-import { Activity, ChevronDown, ChevronUp, Download, Plus, Save, Star, Trash2, TrendingDown, TrendingUp, Upload, X } from 'lucide-react';
-import type { MarketCoin, TerminalChartBlock, TerminalSavedPreset, Timeframe } from '../../types';
+import { Activity, ChevronDown, ChevronUp, Download, Plus, Save, ScanLine, Star, Trash2, TrendingDown, TrendingUp, Upload, X } from 'lucide-react';
+import type { MarketCoin, ScannedCoin, TerminalChartBlock, TerminalSavedPreset, Timeframe } from '../../types';
 import type { MarketCoinSnapshot, MarketSelection } from '../../utils/marketCoinLoader';
-import { MARKET_PRESETS, coinMarketKey, selectMarketPresetCoins, type TerminalMarketPreset } from '../../utils/marketPresets';
+import { MARKET_PRESETS, coinMarketKey, selectFormationPresetCoins, selectMarketPresetCoins, type TerminalMarketPreset, type TerminalPresetCoin } from '../../utils/marketPresets';
 import { blocksForSavedFavorites } from '../../utils/terminalPresets';
 
 interface Props {
   blocks: TerminalChartBlock[];
   watchlist: string[];
   presets: TerminalSavedPreset[];
+  /** Matches the trader-visible Formations page (including early W/M). */
+  formationCoins: readonly ScannedCoin[];
   selection: MarketSelection;
   timeframe: Timeframe;
   activePreset: TerminalMarketPreset | null;
@@ -23,7 +25,7 @@ interface Props {
   error: string | null;
   onActivePresetChange: (preset: TerminalMarketPreset | null) => void;
   onPresetChosen?: () => void;
-  onApplyCoins: (coins: MarketCoin[]) => void;
+  onApplyCoins: (coins: TerminalPresetCoin[]) => void;
   onSavePreset: (name: string, blocks: TerminalChartBlock[]) => void;
   onLoadPreset: (preset: TerminalSavedPreset) => void;
   onDeletePreset: (id: string) => void;
@@ -35,10 +37,10 @@ interface Props {
   signedIn: boolean;
 }
 
-const ICONS = { active: Activity, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
+const ICONS = { active: Activity, formations: ScanLine, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
-export function TerminalPresetPanel({ blocks, watchlist, presets, selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
+export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
   onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, syncConflict, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
@@ -53,27 +55,32 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, selection, tim
 
   const readyCoins = useMemo(() => {
     const result = Object.fromEntries(MARKET_PRESETS.map(preset =>
-      [preset.id, [] as MarketCoin[]])) as Record<TerminalMarketPreset, MarketCoin[]>;
+      [preset.id, [] as TerminalPresetCoin[]])) as Record<TerminalMarketPreset, TerminalPresetCoin[]>;
     // The hidden panel only needs the active auto-updating category, not five
     // full-market filter + sort passes every 30 seconds.
     const ids = menuOpen ? MARKET_PRESETS.map(preset => preset.id)
       : activePreset && autoUpdate ? [activePreset] : [];
     for (const id of ids) {
-      result[id] = selectMarketPresetCoins(snapshot.coins, id, selection, Number.POSITIVE_INFINITY);
+      result[id] = id === 'formations'
+        ? selectFormationPresetCoins(formationCoins)
+        : selectMarketPresetCoins(snapshot.coins, id, selection, Number.POSITIVE_INFINITY);
     }
     return result;
-  }, [snapshot.coins, selection, menuOpen, activePreset, autoUpdate]);
+  }, [snapshot.coins, formationCoins, selection, menuOpen, activePreset, autoUpdate]);
 
   useEffect(() => {
     // Do not replace live charts using partial/stale exchange source snapshots.
-    if (activePreset && autoUpdate && !error && !snapshot.warning && readyCoins[activePreset].length) {
+    if (activePreset && autoUpdate && readyCoins[activePreset].length
+        && (activePreset === 'formations' || (!error && !snapshot.warning))) {
       applyRef.current(readyCoins[activePreset]);
     }
   }, [activePreset, autoUpdate, readyCoins, error, snapshot.warning]);
 
   const chooseReadyPreset = (id: TerminalMarketPreset) => {
-    if (error || !readyCoins[id].length) {
-      setMessage(error ? { text: error } : { key: 'terminal.presets.emptySelection' });
+    if ((id !== 'formations' && error) || !readyCoins[id].length) {
+      setMessage(id === 'formations'
+        ? { text: translatePhrase(language, 'У списку Формацій немає монет за поточними фільтрами.') }
+        : error ? { text: error } : { key: 'terminal.presets.emptySelection' });
       return;
     }
     setMessage(null);
@@ -153,10 +160,10 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, selection, tim
         {MARKET_PRESETS.map(preset => {
           const Icon = ICONS[preset.id];
           return <button key={preset.id} type="button" title={translatePhrase(language, preset.description)} aria-pressed={activePreset === preset.id}
-            disabled={loading && !snapshot.coins.length} onClick={() => chooseReadyPreset(preset.id)}
+            disabled={preset.id !== 'formations' && loading && !snapshot.coins.length} onClick={() => chooseReadyPreset(preset.id)}
             className={`flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-40 ${activePreset === preset.id
               ? 'border-cyan-500/60 bg-cyan-500/15 text-cyan-300' : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/50 hover:text-white'}`}>
-            <Icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{translatePhrase(language, preset.label)}</span>
+            <Icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{preset.id === 'formations' ? t('patterns') : translatePhrase(language, preset.label)}</span>
           </button>;
         })}
         <button type="button" aria-expanded={showPresets} onClick={() => setShowPresets(value => !value)}
