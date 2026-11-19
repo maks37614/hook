@@ -245,7 +245,7 @@ async function fetchDerivatives(
 }
 
 // Generate Comprehensive Smart Analysis
-export async function generateSmartAnalysis(params: {
+type SmartAnalysisParams = {
   symbol: string;
   exchange?: ExchangeId;
   marketType?: MarketType;
@@ -253,7 +253,26 @@ export async function generateSmartAnalysis(params: {
   formation?: DetectedFormation | null;
   currentPrice?: number;
   klines?: Kline[];
-}): Promise<SmartAnalysisData> {
+};
+
+// Visitors asking for the same public instrument share one analysis request.
+// Private candle/formation inputs never join another visitor's calculation.
+const activePublicAnalyses = new Map<string, Promise<SmartAnalysisData>>();
+export function generateSmartAnalysis(params: SmartAnalysisParams): Promise<SmartAnalysisData> {
+  if (params.formation || params.klines?.length) return calculateSmartAnalysis(params);
+  const key = [params.symbol.toUpperCase(), params.exchange ?? 'binance',
+    params.marketType ?? 'futures', params.timeframe ?? '1h'].join(':');
+  const pending = activePublicAnalyses.get(key);
+  if (pending) return pending;
+  const operation = calculateSmartAnalysis(params);
+  activePublicAnalyses.set(key, operation);
+  void operation.finally(() => {
+    if (activePublicAnalyses.get(key) === operation) activePublicAnalyses.delete(key);
+  }).catch(() => {}); // A rejected shared operation must not create an unhandled rejection.
+  return operation;
+}
+
+async function calculateSmartAnalysis(params: SmartAnalysisParams): Promise<SmartAnalysisData> {
   const symbol = params.symbol.toUpperCase();
   const exchange = params.exchange || 'binance';
   const marketType = params.marketType || 'futures';

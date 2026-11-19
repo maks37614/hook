@@ -1,13 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseAISetupScore } from '../server/geminiService';
 
 const source = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const ui = source('../src/components/FormationDetailsModal.tsx');
 const server = source('../server.ts');
-const gemini = source('../server/geminiService.ts');
-
 const smart = source('../src/components/SmartAnalysisBlock.tsx');
 
 test('restore AI + Quant and replace ONLY its two top ratings with the detected setup', () => {
@@ -73,19 +70,9 @@ test('removed standalone AI-score icon without altering Smart Analysis refresh',
   assert.match(smart, /<SmartAnalysisBlock|fetchAnalysis/);
   assert.match(smart, /fetch\(`\/api\/market\/smart-analysis\?\$\{queryParams\.toString\(\)\}`/);
   assert.match(smart, /analysisAbortRef\.current\?\.abort\(\)/);
-  // The already deployed authenticated API may remain available for clients
-  // but must not be invoked by this page or affect chart loading.
-  assert.match(server, /app\.post\('\/api\/ai\/setup-score', requireUserAuth/);
-  assert.match(gemini, /model: 'gemini-2\.5-flash'/);
-});
-
-test('AI numeric response parser accepts only independent integer /100 values', () => {
-  assert.equal(parseAISetupScore('{"score":0}'),0);
-  assert.equal(parseAISetupScore('{"score":79}'),79);
-  assert.equal(parseAISetupScore('{"score":100}'),100);
-  assert.equal(parseAISetupScore('```json\n{"score":63}\n```'),63);
-  for (const raw of ['{"score":-1}', '{"score":101}', '{"score":99.5}',
-    '{"score":"97"}', '{}', 'analysis unavailable', 'null', '[]']) {
-    assert.throws(()=>parseAISetupScore(raw), 'must reject non-numeric/out-of-range results');
-  }
+  // Obsolete LLM endpoints and the dependency must be absent; deterministic
+  // formation quality and the Quant analysis panel remain available.
+  assert.doesNotMatch(server, /\/api\/ai\//);
+  assert.doesNotMatch(server, /geminiService/);
+  assert.match(server, /\/api\/market\/smart-analysis/);
 });
