@@ -19,7 +19,7 @@ test('disconnect, timeout and unmount always stop the holding-time clock', () =>
   assert.match(feed, /const clearDepth = \(\) => \{\s*stopDepthHoldClock\(\)/);
   assert.match(feed, /if \(status !== 'live'\) clearDepth\(\)/);
   assert.match(feed, /stopDepth\(\);\s*stopDepthHoldClock\(\)/);
-  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol\) \{/,
+  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| !depthEnabled\) \{/,
     'Replay must never allocate a live-depth timer');
 });
 
