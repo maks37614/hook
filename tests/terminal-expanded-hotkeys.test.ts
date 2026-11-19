@@ -23,7 +23,7 @@ test('the five chart data/inspection shortcuts are real, remappable and localize
   for (const action of entries) {
     assert.ok(ids.includes(action), action);
     assert.ok(DEFAULT_HOOKCHART_HOTKEYS[action].startsWith('Alt+Shift+'));
-    assert.ok(chart.includes(`use('${action}')`), action + ' must have a live chart handler');
+    assert.ok(chart.includes(`matchesShortcut('${action}')`), action + ' must have a live chart handler');
     for (const locale of ['uk', 'en', 'pl', 'ru'] as const) {
       assert.ok(hotkeyActionLabel(locale, action, action).length > 3, locale + ':' + action);
     }
@@ -82,6 +82,6 @@ test('Escape closes an active dialog before navigating away from Terminal', () =
   assert.match(page, /e\.target\.closest\('\[role="dialog"\], \[aria-modal="true"\]'\)/);
   assert.match(page, /if \(e\.defaultPrevented\) return;/);
   // Chart Escape cancels an active drawing before the page can handle it.
-  assert.match(chart, /if \(use\('cancel'\)\)/);
+  assert.match(chart, /if \(matchesShortcut\('cancel'\)\)/);
   assert.match(chart, /event\.preventDefault\(\);[\s\S]*?setTool\('cursor'\)/);
 });

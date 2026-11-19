@@ -40,6 +40,6 @@ test('CI enforces ESLint and both TypeScript checks without deploying lint depen
   assert.match(config, /from 'typescript-eslint'/);
   assert.match(config, /from 'eslint-plugin-react-hooks'/);
   assert.match(config, /no-unreachable': 'error'/);
-  assert.match(config, /react-hooks\/rules-of-hooks': 'warn'/);
+  assert.match(config, /react-hooks\/rules-of-hooks': 'error'/);
   assert.doesNotMatch(config, /projectService:\s*true/);
 });

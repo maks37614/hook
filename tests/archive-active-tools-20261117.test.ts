@@ -117,6 +117,6 @@ test('live HookChart captures only on the explicit save path; archive replays fr
   assert.match(canvas,/archiveMode \? archivedDensities : replay \? \[\] : chartDensities/);
   assert.match(canvas,/showDensityLines=\{archiveMode \?/);
   assert.match(canvas, /!archiveMode && drawingToolbarOpen && panel === 'indicators'/);
-  assert.match(canvas, /if \(use\('signalLevel'\) && !archiveMode\)/);
+  assert.match(canvas, /if \(matchesShortcut\('signalLevel'\) && !archiveMode\)/);
   assert.match(server,/\(payload->'chartSnapshot'\) - 'drawings' - 'scalperLines' - 'density' - 'overlayScene'/);
 });
