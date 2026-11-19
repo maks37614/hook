@@ -379,7 +379,11 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         recurrenceOverlay?.scope !== historyScope || !recurrenceOverlay.report) return [];
     return createMarketRecurrenceMarks(recurrenceOverlay.report);
   }, [recurrenceOverlay, historyScope, replay, archiveMode, hasExternalData, ecoActive]);
-  const crosshair = useMemo(() => createChartCrosshairStore(), [historyScope]);
+  const crosshair = useMemo(() => {
+    // A new market owns its own transient cursor state.
+    void historyScope;
+    return createChartCrosshairStore();
+  }, [historyScope]);
   const [extraHistory, setExtraHistory] = useState<ScopedHookChartHistory>(() => ({ scope: historyScope, rows: [] }));
   const liquidationMapSupported = !replay && !externalData && marketType === 'futures' &&
     !archiveMode &&
@@ -1269,9 +1273,21 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     }
   }, [drawingToolbarOpen]);
 
+  // Keep window listeners attached to the focused chart, while the event
+  // reads the newest interaction state and account-safe action closures.
+  const shortcutStateRef = useRef({
+    changeSettings, setAlerts, terminalMode, panel,
+    densityQuickOpen, keyboardMagnifierActive,
+  });
+  shortcutStateRef.current = {
+    changeSettings, setAlerts, terminalMode, panel,
+    densityQuickOpen, keyboardMagnifierActive,
+  };
   useEffect(() => {
     const hotkeys = { ...DEFAULT_HOOKCHART_HOTKEYS, ...(settings.hotkeys || {}) };
     const onKeyDown = (event: KeyboardEvent) => {
+      const { changeSettings, setAlerts, terminalMode, panel,
+        densityQuickOpen, keyboardMagnifierActive } = shortcutStateRef.current;
       if (event.defaultPrevented || !rootRef.current?.contains(document.activeElement)) return;
       const target = event.target as HTMLElement | null;
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
@@ -1352,8 +1368,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     settings.showLiquidationCandleSums, settings.showMarketPrintSums, symbol, exchange, marketType,
     timeframe, replay, archiveMode, onTimeframeChange, externalData?.timeframes, externalData?.onTimeframeChange, tool]);
 
+  // The history action retains its stable market scope and reads current
+  // candles on-demand. A new real-time candle must not replace the handler.
+  const chartHistorySourcesRef = useRef({ externalData, klines });
+  chartHistorySourcesRef.current = { externalData, klines };
   // Replay is deliberately isolated: only the simulator's visible candles are passed to the engine.
   const needHistory = useCallback(async (timestamp: number) => {
+    const { externalData, klines } = chartHistorySourcesRef.current;
     if (replay || timestamp > Date.now() || timeframe === '30s') return false;
     if (externalData) return externalData.onNeedHistory(timestamp);
     if (archiveMode && archiveOnNeedHistory) return archiveOnNeedHistory(timestamp);
@@ -1429,12 +1450,15 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [exchange, marketType, symbol, timeframe, replay, terminalMode, maxChartCandles, klines.length,
     historyScope, externalData?.onNeedHistory, archiveMode, archiveOnNeedHistory]);
 
+  const visibleOldestTime = candles[0]?.t, visibleCandleCount = candles.length;
   useEffect(() => {
-    if (!externalData || !candles.length || viewport.fitAll) return;
+    const historySource = chartHistorySourcesRef.current.externalData;
+    if (!historySource || !visibleCandleCount || viewport.fitAll || visibleOldestTime === undefined) return;
     const width = rootRef.current?.clientWidth || 600;
-    const start = candles.length - viewport.rightOffset - width / Math.max(.12, viewport.barWidth);
-    if (start < 25) void externalData.onNeedHistory(candles[0].t - 1);
-  }, [candles[0]?.t, candles.length, viewport.rightOffset, viewport.barWidth, viewport.fitAll, externalData?.onNeedHistory]);
+    const start = visibleCandleCount - viewport.rightOffset - width / Math.max(.12, viewport.barWidth);
+    if (start < 25) void historySource.onNeedHistory(visibleOldestTime - 1);
+  }, [hasExternalData, visibleOldestTime, visibleCandleCount,
+    viewport.rightOffset, viewport.barWidth, viewport.fitAll]);
 
   useEffect(() => {
     if (focusTrigger !== undefined) engineRef.current?.zoomToLatest();
