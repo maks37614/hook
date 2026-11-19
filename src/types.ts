@@ -709,6 +709,10 @@ export interface HookChartPreferences {
   showScalperLabels?: boolean;
   /** Optional legacy least-squares fit instead of exact wick-tip anchored scalp lines. */
   scalperRegressionMode?: boolean;
+  /** Appearance only; auto preserves the existing status-based solid/dashed strokes. */
+  scalperLineStyle?: 'auto' | 'solid' | 'dash' | 'dot';
+  /** Hide only wick-contact circles; leave patterns and breakout markers intact. */
+  showScalperTouchPoints?: boolean;
   hotkeys?: Record<string, string>;
 }
 

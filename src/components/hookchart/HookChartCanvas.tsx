@@ -2082,6 +2082,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         horizontalDrawingLineWidth={runtimeSettings.horizontalDrawingLineWidth ?? 0.4}
         trendDrawingLineWidth={runtimeSettings.trendDrawingLineWidth ?? 0.4}
         scalperTrendLineWidth={runtimeSettings.scalperTrendLineWidth ?? 0.9}
+        scalperLineStyle={runtimeSettings.scalperLineStyle || 'auto'}
+        showScalperTouchPoints={runtimeSettings.showScalperTouchPoints !== false}
         rightPaddingBars={rightPaddingBars}
         roundGrid={!!runtimeSettings.roundGrid}
         roundness={runtimeSettings.roundness ?? 2}

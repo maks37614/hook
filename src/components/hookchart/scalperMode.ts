@@ -7,6 +7,18 @@
 export type ScalperCandle = { t: number; o: number; h: number; l: number; c: number };
 export type ScalperKind = 'range' | 'triangle' | 'wedge' | 'trend' | 'double-top' | 'double-bottom';
 export type ScalperStatus = 'forming' | 'possible' | 'confirmed' | 'failed';
+export type ScalperLineStyle = 'auto' | 'solid' | 'dash' | 'dot';
+// Shared immutable-by-convention patterns: no new arrays for each rendered line.
+const SCALPER_SOLID_DASH: number[] = [];
+const SCALPER_STATUS_DASH: number[] = [4, 4];
+const SCALPER_MANUAL_DASH: number[] = [7, 5];
+const SCALPER_DOT_DASH: number[] = [2, 4];
+/** Presentation-only choice: 'auto' keeps the existing per-status visual distinction. */
+export function scalperLineDash(style: ScalperLineStyle, status: ScalperStatus): number[] {
+  if (style === 'solid' || (style === 'auto' && status === 'confirmed')) return SCALPER_SOLID_DASH;
+  if (style === 'dot') return SCALPER_DOT_DASH;
+  return style === 'dash' ? SCALPER_MANUAL_DASH : SCALPER_STATUS_DASH;
+}
 export type ScalperSide = 'up' | 'down';
 export type ScalperPoint = { t: number; p: number };
 export type ScalperLine = { from: ScalperPoint; to: ScalperPoint; role: 'upper' | 'lower' | 'neckline' };

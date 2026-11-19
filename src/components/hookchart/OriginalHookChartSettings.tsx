@@ -176,6 +176,8 @@ export const ORIGINAL_HOOKCHART_DEFAULTS: HookChartPreferences = {
   scalperMode: false,
   scalperRegressionMode: false,
   showScalperLabels: true,
+  scalperLineStyle: 'auto',
+  showScalperTouchPoints: true,
   hotkeys: DEFAULT_HOOKCHART_HOTKEYS,
 };
 
@@ -209,6 +211,8 @@ export function normalizeOriginalHookChartPreferences(source?: HookChartPreferen
   next.scalperMode = source?.scalperMode === true;
   next.scalperRegressionMode = source?.scalperRegressionMode === true;
   next.showScalperLabels = source?.showScalperLabels !== false;
+  next.scalperLineStyle = ['auto', 'solid', 'dash', 'dot'].includes(source?.scalperLineStyle || '') ? source!.scalperLineStyle : 'auto';
+  next.showScalperTouchPoints = source?.showScalperTouchPoints !== false;
   next.showLiquidationCandleSums = source?.showLiquidationCandleSums !== false;
   for (const key of ['liquidationLongMinUsd', 'liquidationShortMinUsd'] as const) {
     const value = source?.[key];
@@ -970,6 +974,20 @@ export function OriginalHookChartSettings({
               desc="Якщо вимкнено, приховує лише назви фігур та статуси біля автоматично намальованих ліній. Лінії, дотики тіней і позначки пробою залишаються видимими."
               value={prefs.showScalperLabels !== false}
               onChange={value => set('showScalperLabels', value)}
+            />
+            <Choice
+              label="Вигляд ліній Режиму Скальпера"
+              desc="Авто зберігає поточний вигляд: підтверджені лінії суцільні, інші — пунктирні. Інші варіанти змінюють лише малювання ліній, не логіку пошуку формацій."
+              values={['auto', 'solid', 'dash', 'dot']}
+              labels={['Авто (за статусом)', 'Суцільна', 'Пунктир', 'Крапки']}
+              value={prefs.scalperLineStyle || 'auto'}
+              set={value => set('scalperLineStyle', value)}
+            />
+            <SwitchRow
+              label="Показувати точки дотику Скальпера"
+              desc="Показує або приховує маленькі кружечки у підтверджених High/Low тіней. Лінії, позначки пробою та пошук формацій не змінюються."
+              value={prefs.showScalperTouchPoints !== false}
+              onChange={value => set('showScalperTouchPoints', value)}
             />
             <Setting label="Товщина трендової лінії (Скальпер)"
               desc="Змінює лише автоматично знайдені трендові лінії Режиму Скальпера. Не впливає на ручні малюнки, трикутники чи інші фігури.">
