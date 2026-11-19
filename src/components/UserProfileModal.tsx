@@ -113,7 +113,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setDefaultTimeframe(profile.defaultTimeframe ?? DEFAULT_APP_PREFERENCES.defaultTimeframe);
     if (isNewAccount || !touchedFields.current.timeZone)
       setTimeZone(profile.timeZone || 'auto');
-  }, [profile, user?.uid, isOpen]);
+  }, [profile, user, isOpen, newTouchedFields]);
 
   if (!isOpen || !user) return null;
 

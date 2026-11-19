@@ -149,7 +149,7 @@ const FormationDetailsContent: React.FC<ActiveFormationDetailsProps> = ({
 
   useEffect(() => {setShowLiveArchivedChart(false);setArchiveImage(null);setArchiveVisualError(false)},[archivedItem?.id]);
   useEffect(() => {
-    if(!archivedItem?.chartSnapshot || showLiveArchivedChart) return;
+    if(!archivedVisualAvailable || showLiveArchivedChart) return;
     let active=true;
     const controller=new AbortController();
     setArchiveVisualError(false);
@@ -454,7 +454,7 @@ const FormationDetailsContent: React.FC<ActiveFormationDetailsProps> = ({
   useEffect(() => {
     if (Number.isFinite(coin.currentPrice) && coin.currentPrice > 0) {
       setLivePrice(coin.currentPrice);
-      if (!customAlertPrice) setCustomAlertPrice(coin.currentPrice.toString());
+      setCustomAlertPrice(current => current || coin.currentPrice.toString());
     }
   }, [coin.exchange, coin.marketType, coin.symbol, coin.currentPrice]);
 

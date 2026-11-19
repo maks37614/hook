@@ -109,7 +109,7 @@ export const TelegramAlertsModal: React.FC<TelegramAlertsModalProps> = ({
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   useEffect(() => { setTestResult(null); }, [user?.uid]);
   useEffect(() => {
-    if (isOpen && user) { fetchTelegramStatus().catch(() => {}); fetchHistory(); }
+    if (isOpen && user?.uid) { fetchTelegramStatus().catch(() => {}); fetchHistory(); }
   }, [isOpen, user?.uid, fetchTelegramStatus, fetchHistory]);
 
   const handleClearHistory = async () => {

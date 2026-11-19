@@ -129,8 +129,12 @@ export const SmartAnalysisBlock: React.FC<SmartAnalysisBlockProps> = ({
     }
   };
 
+  // The public Quant request is scoped to market+timeframe, not every
+  // real-time price tick. Keep the newest callback without expanding its cadence.
+  const fetchAnalysisRef = useRef(fetchAnalysis);
+  fetchAnalysisRef.current = fetchAnalysis;
   useEffect(() => {
-    void fetchAnalysis();
+    void fetchAnalysisRef.current();
     return () => analysisAbortRef.current?.abort();
   }, [coin.symbol, coin.exchange, coin.marketType, coin.timeframe, timeframe]);
 
