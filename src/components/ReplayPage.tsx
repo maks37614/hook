@@ -230,6 +230,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     }[language];
     showToast('danger', 'Replay', message);
   };
+  // Screenshot cleanup follows PostgreSQL revisions, not locale/UI renders.
+  const screenshotCleanupErrorRef = useRef(reportScreenshotCleanupError);
+  screenshotCleanupErrorRef.current = reportScreenshotCleanupError;
   const schedulePngCleanupAfterSync = (tradeIds: string[], all = false) => {
     if (!owner) return;
     pendingPngCleanup.current.push({
@@ -254,7 +257,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       const clean = item.all && journalItems.length === 0 && lastSyncedTradeIds.length === 0
         ? () => clearReplayScreenshots(owner)
         : () => deleteReplayScreenshots(owner, item.tradeIds);
-      void queueImageOperation(clean).catch(reportScreenshotCleanupError);
+      void queueImageOperation(clean).catch(() => screenshotCleanupErrorRef.current());
     }
     pendingPngCleanup.current = remaining;
   }, [owner, isReady, lastSyncedRevision, lastSyncedTradeIds, journalItems]);
@@ -483,6 +486,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     } catch { reportScreenshotCleanupError(); }
   };
 
+  // Failed IndexedDB writes must show the latest translation without
+  // restarting the screenshot persistence effect on language change.
+  const screenshotLocaleRef = useRef({ language, showToast });
+  screenshotLocaleRef.current = { language, showToast };
   // The journal never sends base64 screenshots to PostgreSQL/localStorage.
   // Persist the PNG bytes to the signed-in owner's IndexedDB and keep only a
   // tiny reference in the profile state. Guests keep ephemeral in-memory images.
@@ -510,8 +517,8 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
             en: 'Could not save the PNG in this browser. Download it manually or free storage.',
             pl: 'Nie udało się zapisać PNG w przeglądarce. Pobierz plik ręcznie lub zwolnij miejsce.',
             ru: 'Не удалось сохранить PNG в браузере. Скачайте его вручную или освободите место.',
-          }[language];
-          showToast('danger', 'Replay PNG', message);
+          }[screenshotLocaleRef.current.language];
+          screenshotLocaleRef.current.showToast('danger', 'Replay PNG', message);
           // Preserve the original data URL for a confirmed legacy import. If
           // we removed it, PostgreSQL would ACK a photo-less trade and then
           // erase the only remaining local backup containing that image.
@@ -637,6 +644,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     [symbol, exchange, marketType, timeframe, showToast, t, uiLocale, language]
   );
 
+  // Hydration is once per account. Refs keep fresh actions/symbol without
+  // restarting an expensive history request on an unrelated callback change.
+  const replayInitRef = useRef({ loadHistoryForDate, symbol });
+  replayInitRef.current = { loadHistoryForDate, symbol };
   // Wait until the correct account snapshot has loaded before initializing
   // Replay candles. Never clear a restored open position on page entry.
   useEffect(() => {
@@ -647,7 +658,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       setExchange(restoredContext.exchange);
       setMarketType(restoredContext.marketType);
       setTimeframe(restoredContext.timeframe);
-      void loadHistoryForDate(new Date(restoredContext.atTime * 1000),
+      void replayInitRef.current.loadHistoryForDate(new Date(restoredContext.atTime * 1000),
         restoredContext.symbol, restoredContext.exchange, restoredContext.marketType,
         restoredContext.timeframe, false, true);
     } else {
@@ -659,7 +670,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       setMarketType(initial.marketType);
       setTimeframe(initial.timeframe);
       randomHistorySelectionRef.current = true;
-      void loadHistoryForDate(generateRandomHistoricalDate(), symbol,
+      void replayInitRef.current.loadHistoryForDate(generateRandomHistoricalDate(), replayInitRef.current.symbol,
         initial.exchange, initial.marketType, initial.timeframe, false);
     }
   }, [isReady, ownerKey, restoredContext]);
@@ -891,6 +902,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     showToast,
     playSound,
     t,
+    setJournalItems, setPendingOrders, setPosition, setSettings,
   ]);
 
   const handleStepForwardRef = useRef(handleStepForward);
@@ -1009,7 +1021,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.marketOpenDescription', { symbol, size: params.sizeUsd, leverage: params.leverage, price: execPrice.toFixed(2) })
       );
     },
-    [currentPrice, position, settings, symbol, currentCandle, showToast, playSound, t]
+    [currentPrice, position, settings, symbol, currentCandle, showToast, playSound, t, setPosition]
   );
 
   // Place Pending Order (Limit / Stop)
@@ -1047,7 +1059,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.pendingCreatedDescription', { side: params.side.toUpperCase(), price: params.price.toFixed(2) })
       );
     },
-    [symbol, currentCandle, showToast, t]
+    [symbol, currentCandle, showToast, t, setPendingOrders]
   );
 
   // Close Position Manually
@@ -1123,6 +1135,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     showToast,
     playSound,
     t,
+    setJournalItems, setPosition, setSettings,
   ]);
 
   // Market/date switches previously discarded an open trade and pending orders
