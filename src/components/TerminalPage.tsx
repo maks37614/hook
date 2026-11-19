@@ -96,6 +96,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   onReturnToPatterns,
 }) => {
   const { t, language } = useLanguage();
+  // Keep error labels current without restarting the market refresh timer on language changes.
+  const translateRef = useRef(t);
+  translateRef.current = t;
   // Stable event forwarding: chart cards do not repaint when App recreates
   // navigation callbacks for an unrelated market/UI update.
   const terminalActionsRef = useRef({ onSendMetaScalp, onOpenFullscreenModal, onOpenTelegramAlerts });
@@ -284,7 +287,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         setMarketSnapshot(next);
         setMarketError(null);
       } catch (cause) {
-        if (!controller.signal.aborted) setMarketError(cause instanceof Error ? cause.message : t('terminal.market.loadError'));
+        if (!controller.signal.aborted) setMarketError(cause instanceof Error ? cause.message : translateRef.current('terminal.market.loadError'));
       } finally {
         busy = false;
         if (!controller.signal.aborted) setMarketLoading(false);

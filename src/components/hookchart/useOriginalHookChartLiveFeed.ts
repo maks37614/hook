@@ -236,7 +236,7 @@ export function useOriginalHookChartLiveFeed({
       depthBook.clear();
     };
   }, [
-    exchange, marketType, symbol, replay, lightweight,
+    exchange, marketType, symbol, replay, lightweight, depthScope,
   ]);
 
   // The drawing toggle does not reopen the exchange connection. Hide print
@@ -291,14 +291,15 @@ export function useOriginalHookChartLiveFeed({
   }, [exchange, marketType, symbol, replay, lightweight, needsFunding]);
 
   // Display thresholds never mutate the incoming events or the session totals.
-  const visibleLiquidations = useMemo(() => lightweight ? EMPTY_LIQUIDATIONS : filterVisibleLiquidations(liquidations, liquidationCut, settings),
+  const visibleLiquidations = useMemo(() => lightweight ? EMPTY_LIQUIDATIONS : filterVisibleLiquidations(liquidations, liquidationCut, settingsRef.current),
     [lightweight, liquidations, liquidationCut, settings.showLiquidationLong,
       settings.showLiquidationShort, settings.liquidationLongMinUsd, settings.liquidationShortMinUsd]);
+  const lastCandlePrice = candles.at(-1)?.c || 0;
   const risk = useMemo(
     // The clock state invalidates this memo at 1m/5m event boundaries.
     // On price/cut changes use real wall-clock time too, never a stale tick.
-    () => lightweight ? EMPTY_CASCADE_RISK : calcCascadeRisk(liquidations, liquidationCut, candles.at(-1)?.c || 0),
-    [lightweight, liquidations, liquidationCut, candles.at(-1)?.c, cascadeClock],
+    () => lightweight ? EMPTY_CASCADE_RISK : calcCascadeRisk(liquidations, liquidationCut, lastCandlePrice),
+    [lightweight, liquidations, liquidationCut, lastCandlePrice, cascadeClock],
   );
   const liquidationSource = marketType === 'futures'
     ? (exchange === 'binance' ? 'BIN forceOrder' : 'BYB allLiq')
