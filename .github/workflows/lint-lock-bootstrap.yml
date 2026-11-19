@@ -1,0 +1,34 @@
+name: Prepare pinned ESLint lockfile (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lint-lock-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve locked, dev-only lint tools
+        run: |
+          npm install --package-lock-only --ignore-scripts --save-dev --save-exact eslint@9.39.5 typescript-eslint@8.46.4 eslint-plugin-react-hooks@7.0.1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          for (const [name, path] of [['PKG', 'package.json'], ['LOCK', 'package-lock.json']]) {
+            const data = JSON.stringify(JSON.parse(readFileSync(path, 'utf8')));
+            for (let index = 0, offset = 0; offset < data.length; index++, offset += 8000) {
+              console.log('H00K_LINT_' + name + '_CHUNK_' + String(index).padStart(4, '0') + ':' + data.slice(offset, offset + 8000));
+            }
+            console.log('H00K_LINT_' + name + '_FINISHED:' + data.length);
+          }
+          NODE
