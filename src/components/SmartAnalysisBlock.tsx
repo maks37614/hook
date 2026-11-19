@@ -31,6 +31,7 @@ import {
 import { SmartAnalysisData, ScannedCoin, DetectedFormation, Kline, Timeframe, CoinGeckoHolderSnapshot } from '../types';
 import { formatCryptoPrice, formatVolume, formatPercent } from '../utils/formatters';
 import { getSmartAnalysisVisibility, selectVisibleTab, type SmartAnalysisTab, type SmartAnalysisModule } from '../utils/smartAnalysisVisibility';
+import { buildSmartAnalysisQuery } from '../utils/smartAnalysisRequest';
 
 interface SmartAnalysisBlockProps {
   coin: ScannedCoin;
@@ -101,13 +102,10 @@ export const SmartAnalysisBlock: React.FC<SmartAnalysisBlockProps> = ({
     // Old ATR/market data must not be shown under another coin/timeframe.
     setData(null);
     try {
-      const queryParams = new URLSearchParams({
-        symbol: coin.symbol,
-        exchange: coin.exchange,
-        marketType: coin.marketType,
-        timeframe: timeframe || coin.timeframe || '1h',
-        price: String(coin.currentPrice),
-      });
+      // The Quant endpoint accepts exchange candle timeframes (not Terminal's
+      // synthetic 30s) and derives its price from verified closed candles.
+      // Never send an unset/NaN live quote or a pair with '/' to the server.
+      const queryParams = buildSmartAnalysisQuery(coin, timeframe);
 
       const res = await fetch(`/api/market/smart-analysis?${queryParams.toString()}`, {
         signal: controller.signal,

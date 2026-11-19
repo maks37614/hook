@@ -50,7 +50,7 @@ import {
 } from './server/surveillanceService';
 import { ExchangeId, MarketType, Timeframe, type Kline } from './src/types';
 import { normalizeLanguage, telegramText } from './src/locales';
-import { normalizeExchangeSymbol, resolveSurveillanceSymbol, searchSurveillanceSymbols } from './src/utils/marketSymbols';
+import { isValidExchangeSymbol, normalizeExchangeSymbol, resolveSurveillanceSymbol, searchSurveillanceSymbols } from './src/utils/marketSymbols';
 import { marketTickerFeed } from './server/marketTickerFeed';
 import { cronManager } from './server/cronService';
 import { surveillanceManager } from './server/surveillance/surveillanceManager';
@@ -292,13 +292,14 @@ async function startServer() {
   // A single app replica runs behind one trusted reverse proxy on the VPS.
   const smartAnalysisGate = new SmartAnalysisGate();
   app.get('/api/market/smart-analysis', async (req, res) => {
-    const symbol = typeof req.query.symbol === 'string' ? req.query.symbol.trim().toUpperCase() : 'BTCUSDT';
+    const rawSymbol = typeof req.query.symbol === 'string' ? req.query.symbol.trim() : 'BTCUSDT';
+    const symbol = normalizeExchangeSymbol(rawSymbol);
     const exchange = req.query.exchange ?? 'binance';
     const marketType = req.query.marketType ?? 'futures';
     const timeframe = req.query.timeframe ?? '1h';
     const rawPrice = req.query.price;
     const currentPrice = typeof rawPrice === 'string' && rawPrice.trim() !== '' ? Number(rawPrice) : undefined;
-    if (!/^[A-Z0-9]{3,36}$/.test(symbol) ||
+    if (!isValidExchangeSymbol(symbol) ||
         (exchange !== 'binance' && exchange !== 'bybit') ||
         (marketType !== 'spot' && marketType !== 'futures') ||
         !['1m', '5m', '15m', '1h', '4h', '1d'].includes(String(timeframe)) ||
