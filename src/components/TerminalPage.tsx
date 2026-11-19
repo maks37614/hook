@@ -56,6 +56,7 @@ import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarket
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
 import { terminalGridColumnClasses, terminalResponsiveAutoHeights, terminalResponsiveSpanClasses } from '../utils/terminalResponsiveGrid';
 import { normalizeTerminalTouchGapPx } from '../utils/terminalTouchGap';
+import { enableTerminalGutterTouchScroll } from '../utils/terminalGutterTouchScroll';
 import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset, type TerminalPresetCoin } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
@@ -140,6 +141,13 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const [presetPage, setPresetPage] = useState(0);
   const presetPageRef = useRef(0);
   const chartListRef = useRef<HTMLDivElement>(null);
+  // A finger may begin dragging in a narrow gutter without a preparatory tap.
+  // Bind one DOM-only listener to the shared scroll viewport, not each live chart.
+  useEffect(() => {
+    const scrollViewport = chartListRef.current;
+    if (!scrollViewport) return;
+    return enableTerminalGutterTouchScroll(scrollViewport);
+  }, []);
   const [showCoinPresets, setShowCoinPresets] = useState(false);
   const [showHotkeys, setShowHotkeys] = useState(false);
   // Keyboard bindings are scoped per signed-in account (or guest) on this device.
