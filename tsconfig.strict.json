@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "allowJs": false,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "noEmit": true
+  },
+  "files": [
+    "server/smartAnalysisGate.ts",
+    "server/boundedAnalysisCache.ts",
+    "server/surveillanceLimits.ts",
+    "src/components/hookchart/crosshairState.ts"
+  ]
+}

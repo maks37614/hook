@@ -191,7 +191,7 @@ type FeedScope = { exchange: ExchangeId; marketType: MarketType; symbol: string 
 // Share Binance public aggTrade by default where Web Locks + BroadcastChannel
 // are available. Setting VITE_H00K_SHARED_BINANCE_TRADES=0 at BUILD time
 // restores the original per-tab exchange connection without changing Bybit.
-const useBinanceTradeRelay = (scope: FeedScope): boolean =>
+const shouldUseBinanceTradeRelay = (scope: FeedScope): boolean =>
   import.meta.env?.VITE_H00K_SHARED_BINANCE_TRADES !== '0' &&
   typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol) &&
   typeof BroadcastChannel !== 'undefined' &&
@@ -337,7 +337,7 @@ class SharedMarketTradeStream {
   }
 
   async start() {
-    if (useBinanceTradeRelay(this.scope)) {
+    if (shouldUseBinanceTradeRelay(this.scope)) {
       try {
         const scope = this.scope;
         const endpoint = scope.marketType === 'futures' ? '/fapi/v1/aggTrades' : '/api/v3/aggTrades';

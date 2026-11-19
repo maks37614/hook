@@ -1260,9 +1260,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       const target = event.target as HTMLElement | null;
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
       if (typing && event.key !== 'Escape') return;
-      const use = (action: keyof typeof hotkeys) => hotkeyMatches(event, hotkeys[action]);
-      if (use('tempRuler')) { if (!event.repeat && !tempRulerRef.current) { event.preventDefault(); tempRulerRef.current = { code: event.code, tool }; setTool('ruler'); } return; }
-      if (use('cancel')) {
+      const matchesShortcut = (action: keyof typeof hotkeys) => hotkeyMatches(event, hotkeys[action]);
+      if (matchesShortcut('tempRuler')) { if (!event.repeat && !tempRulerRef.current) { event.preventDefault(); tempRulerRef.current = { code: event.code, tool }; setTool('ruler'); } return; }
+      if (matchesShortcut('cancel')) {
         // Terminal's Escape closes the page only when the focused chart is idle.
         // During drawing/inspection Escape first cancels the active operation.
         if (terminalMode && tool === 'cursor' && !panel && !densityQuickOpen && !keyboardMagnifierActive)
@@ -1271,7 +1271,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         setTool('cursor'); setPanel(null); setDensityQuickOpen(false); setKeyboardMagnifierActive(false);
         return;
       }
-      if (use('toggleDensity') && !replay && !archiveMode) {
+      if (matchesShortcut('toggleDensity') && !replay && !archiveMode) {
         event.preventDefault();
         // Determine visibility from the master analysis switch as well as
         // presentation flags: otherwise a previously disabled analysis takes
@@ -1284,35 +1284,35 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         });
         return;
       }
-      if (use('toggleLiquidations') && !replay && !archiveMode) {
+      if (matchesShortcut('toggleLiquidations') && !replay && !archiveMode) {
         event.preventDefault(); changeSettings({ showLiquidations: settings.showLiquidations === false }); return;
       }
-      if (use('toggleLiqCandleSums') && !replay && !archiveMode) {
+      if (matchesShortcut('toggleLiqCandleSums') && !replay && !archiveMode) {
         event.preventDefault(); changeSettings({ showLiquidationCandleSums: settings.showLiquidationCandleSums === false }); return;
       }
-      if (use('toggleMarketPrintSums') && !replay && !archiveMode) {
+      if (matchesShortcut('toggleMarketPrintSums') && !replay && !archiveMode) {
         event.preventDefault(); changeSettings({ showMarketPrintSums: settings.showMarketPrintSums !== true }); return;
       }
-      if (use('toggleMagnifier')) {
+      if (matchesShortcut('toggleMagnifier')) {
         event.preventDefault(); setKeyboardMagnifierActive(current => !current); setTool('cursor'); return;
       }
-      if (use('zoomIn')) { event.preventDefault(); engineRef.current?.zoom(1.18); return; }
-      if (use('zoomOut')) { event.preventDefault(); engineRef.current?.zoom(0.84); return; }
-      if (use('copyTicker')) { event.preventDefault(); void navigator.clipboard?.writeText(symbol); return; }
-      if (use('openWindow')) { event.preventDefault(); window.open(window.location.href, '_blank', 'noopener,noreferrer'); return; }
-      if (use('level')) { event.preventDefault(); setTool('level'); return; }
-      if (use('trend')) { event.preventDefault(); setTool('trend'); return; }
-      if (use('ray')) { event.preventDefault(); setTool('ray'); return; }
-      if (use('fib')) { event.preventDefault(); setTool('fib'); return; }
-      if (use('erase')) { event.preventDefault(); setTool(current => current === 'erase' ? 'cursor' : 'erase'); return; }
-      if (use('clearAlerts')) { event.preventDefault(); setAlerts([]); return; }
-      if (use('signalLevel') && !archiveMode) { event.preventDefault(); setTool('alert'); return; }
+      if (matchesShortcut('zoomIn')) { event.preventDefault(); engineRef.current?.zoom(1.18); return; }
+      if (matchesShortcut('zoomOut')) { event.preventDefault(); engineRef.current?.zoom(0.84); return; }
+      if (matchesShortcut('copyTicker')) { event.preventDefault(); void navigator.clipboard?.writeText(symbol); return; }
+      if (matchesShortcut('openWindow')) { event.preventDefault(); window.open(window.location.href, '_blank', 'noopener,noreferrer'); return; }
+      if (matchesShortcut('level')) { event.preventDefault(); setTool('level'); return; }
+      if (matchesShortcut('trend')) { event.preventDefault(); setTool('trend'); return; }
+      if (matchesShortcut('ray')) { event.preventDefault(); setTool('ray'); return; }
+      if (matchesShortcut('fib')) { event.preventDefault(); setTool('fib'); return; }
+      if (matchesShortcut('erase')) { event.preventDefault(); setTool(current => current === 'erase' ? 'cursor' : 'erase'); return; }
+      if (matchesShortcut('clearAlerts')) { event.preventDefault(); setAlerts([]); return; }
+      if (matchesShortcut('signalLevel') && !archiveMode) { event.preventDefault(); setTool('alert'); return; }
       const choices = externalData?.timeframes || (terminalMode ? TERMINAL_TIMEFRAMES : TIMEFRAMES), index = choices.indexOf(timeframe);
       const changeTimeframe = externalData?.onTimeframeChange || onTimeframeChange;
-      if (changeTimeframe && !replay && use('prevTf')) { event.preventDefault(); changeTimeframe(choices[Math.max(0, index - 1)] as Timeframe); return; }
-      if (changeTimeframe && !replay && use('nextTf')) { event.preventDefault(); changeTimeframe(choices[Math.min(choices.length - 1, index + 1)] as Timeframe); return; }
+      if (changeTimeframe && !replay && matchesShortcut('prevTf')) { event.preventDefault(); changeTimeframe(choices[Math.max(0, index - 1)] as Timeframe); return; }
+      if (changeTimeframe && !replay && matchesShortcut('nextTf')) { event.preventDefault(); changeTimeframe(choices[Math.min(choices.length - 1, index + 1)] as Timeframe); return; }
       for (const action of ['openMetaScalp', 'deleteCoin', 'toggleFavorites', 'prevCoin', 'nextCoin', 'prevChart', 'nextChart', 'prevTfAll', 'nextTfAll'] as const) {
-        if (use(action)) {
+        if (matchesShortcut(action)) {
           event.preventDefault();
           window.dispatchEvent(new CustomEvent('signalhook:hookchart-hotkey', { detail: { action, symbol, exchange, marketType, timeframe } }));
           return;
