@@ -713,7 +713,7 @@ export interface HookChartPreferences {
   scalperRegressionMode?: boolean;
   /** Appearance only; auto preserves the existing status-based solid/dashed strokes. */
   scalperLineStyle?: 'auto' | 'solid' | 'dash' | 'dot';
-  /** Hide only wick-contact circles; leave patterns and breakout markers intact. */
+  /** One visual toggle for all Scalper circles: wick contacts and breakout rings. */
   showScalperTouchPoints?: boolean;
   hotkeys?: Record<string, string>;
 }

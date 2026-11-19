@@ -62,15 +62,15 @@ test('Scalper line style and contact points are visual-only independent preferen
       open: true, embedded: true, prefs,
       onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
     }));
-    for (const label of ['Вигляд ліній Режиму Скальпера', 'Показувати точки дотику Скальпера', 'Авто (за статусом)', 'Суцільна', 'Пунктир', 'Крапки']) {
+    for (const label of ['Вигляд ліній Режиму Скальпера', 'Показувати точки Режиму Скальпера', 'Авто (за статусом)', 'Суцільна', 'Пунктир', 'Крапки']) {
       const localized = translateHookChartPhrase(language, label);
       assert.ok(html.includes(localized), language + ': control or option ' + label);
       if (language !== 'uk' && label !== 'Пунктир') assert.notEqual(localized, label, language + ': untranslated ' + label);
     }
     assert.ok(html.includes('value="dot" aria-pressed="true"'), language + ': selected line type');
-    assert.ok(html.includes('type="checkbox" aria-label="' + translateHookChartPhrase(language, 'Показувати точки дотику Скальпера') + '"'),
+    assert.ok(html.includes('type="checkbox" aria-label="' + translateHookChartPhrase(language, 'Показувати точки Режиму Скальпера') + '"'),
       language + ': touch point switch');
-    assert.ok(!html.includes(translateHookChartPhrase(language, 'Показує або приховує маленькі кружечки у підтверджених High/Low тіней. Лінії, позначки пробою та пошук формацій не змінюються.')),
+    assert.ok(!html.includes(translateHookChartPhrase(language, 'Приховує або показує всі кружечки Скальпера: дотики до High/Low тіней та круглі мітки можливого чи підтвердженого пробою. Лінії, визначення формацій та текстові статуси не змінюються.')),
       language + ': help should remain hidden');
   }
   const canvas = readFileSync('src/components/hookchart/HookChartCanvas.tsx', 'utf8');
@@ -79,8 +79,15 @@ test('Scalper line style and contact points are visual-only independent preferen
   assert.match(canvas, /showScalperTouchPoints=\{runtimeSettings\.showScalperTouchPoints !== false\}/);
   assert.match(painter, /q\.setLineDash\(scalperLineDash\(scalperLineStyle, setup\.status\)\)/);
   assert.match(painter, /if \(showScalperTouchPoints\) for \(const touch of setup\.touches\)/);
-  assert.ok(painter.indexOf('if (showScalperTouchPoints) for (const touch') < painter.indexOf('if (setup.breakout)'),
-    'breakout marker must remain separate from touch-point visibility');
+  assert.ok(painter.indexOf('if (showScalperTouchPoints) for (const touch') < painter.indexOf('if (showScalperTouchPoints && setup.breakout)'),
+    'both filled wick points and outlined breakout rings must follow the same visibility switch');
+  assert.match(painter, /if \(showScalperTouchPoints && setup\.breakout\)/,
+    'the breakout circle must not remain visible when Scalper points are disabled');
+  const scalperLayer = painter.split('if (scalperResult?.setups.length) {')[1]?.split('drawHookTimeMarkers(q,g,timeMarkers,mouse);')[0] ?? '';
+  assert.equal((scalperLayer.match(/q\.arc\(/g) || []).length, 2,
+    'new circular annotations in the Scalper layer must be added to the shared points switch');
+  assert.match(scalperLayer, /if \(showScalperTouchPoints\) for \(const touch[\s\S]*?q\.arc\([\s\S]*?if \(showScalperTouchPoints && setup\.breakout\)[\s\S]*?q\.arc\(/,
+    'all currently painted Scalper circles must be behind the shared switch');
   assert.match(painter, /scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels/,
     'changing either visual setting must trigger a repaint');
   assert.match(canvas, /runtimeSettings\.scalperMode === true && !archiveMode && !replay && !externalData && !ecoActive/,

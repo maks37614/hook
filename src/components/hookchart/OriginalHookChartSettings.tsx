@@ -984,8 +984,8 @@ export function OriginalHookChartSettings({
               set={value => set('scalperLineStyle', value)}
             />
             <SwitchRow
-              label="Показувати точки дотику Скальпера"
-              desc="Показує або приховує маленькі кружечки у підтверджених High/Low тіней. Лінії, позначки пробою та пошук формацій не змінюються."
+              label="Показувати точки Режиму Скальпера"
+              desc="Приховує або показує всі кружечки Скальпера: дотики до High/Low тіней та круглі мітки можливого чи підтвердженого пробою. Лінії, визначення формацій та текстові статуси не змінюються."
               value={prefs.showScalperTouchPoints !== false}
               onChange={value => set('showScalperTouchPoints', value)}
             />

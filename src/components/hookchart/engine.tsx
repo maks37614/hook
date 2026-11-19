@@ -1239,6 +1239,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   if(strategyResult&&!archiveCapture){const events=strategyResult.events.slice().sort((a,b)=>a.t-b.t);q.save();for(const e of events){if(e.zone){const y0=g.y(e.zone.high),y1=g.y(e.zone.low),top=Math.max(0,Math.min(y0,y1)),bot=Math.min(g.plotH,Math.max(y0,y1));if(bot>top){q.fillStyle=e.direction==='bullish'?'rgba(38,166,154,.055)':e.direction==='bearish'?'rgba(239,83,80,.055)':'rgba(123,145,171,.045)';q.fillRect(0,top,g.plotW,Math.max(1,bot-top))}}if(e.lines)for(const ln of e.lines){const x0=g.x(ln.t0),x1=g.x(ln.t1),y0=g.y(ln.p0),y1=g.y(ln.p1);q.strokeStyle='#8aa4c3';q.globalAlpha=.78;q.lineWidth=1;q.setLineDash([5,4]);q.beginPath();q.moveTo(x0,y0);q.lineTo(x1,y1);q.stroke()}const xx=g.x(e.t),yy=e.p!=null?g.y(e.p):NaN;if(xx<0||xx>g.plotW||!Number.isFinite(yy)||yy<0||yy>g.plotH)continue;const col=e.type==='OVERHEAT'?'#f0a45d':e.type==='FAILED_BREAKOUT'?'#ef6b73':e.direction==='bullish'?'#56c5aa':e.direction==='bearish'?'#e8787e':'#91a4bd';q.globalAlpha=.95;q.fillStyle=col;q.beginPath();q.arc(xx,yy,2.6,0,Math.PI*2);q.fill();q.font='700 9px system-ui';const text=`${translateHookChartPhrase(language,e.label)} ${e.score}`,tw=q.measureText(text).width,tx=Math.max(3,Math.min(g.plotW-tw-3,xx+5)),ty=Math.max(11,Math.min(g.plotH-4,yy+(e.direction==='bearish'?14:-7)));q.lineWidth=3;q.strokeStyle=CHART_THEME.bg;q.strokeText(text,tx,ty);q.fillStyle=col;q.fillText(text,tx,ty)}q.setLineDash([]);q.globalAlpha=1;q.restore()}
   // Opt-in scalp geometry belongs to the market scene, not the user's drawings.
   // Strictly bounded: at most two structures, four lines and sixteen touch dots.
+  // All Scalper-only circular markers (filled contacts and outlined breakout rings)
+  // are presentation gated by one preference, never by separate saved layers.
   // Only the automatic trend-line setup uses the independent Scalper width.
   const scalperTrendStrokeWidth=Math.max(0.2,Math.min(5,Number.isFinite(scalperTrendLineWidth)?scalperTrendLineWidth:0.9));
   if (scalperResult?.setups.length) {
@@ -1265,7 +1267,11 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         q.beginPath(); q.arc(x,y,2.3,0,Math.PI*2);
         q.fillStyle = color; q.fill();
       }
-      if (setup.breakout) {
+      // The outlined breakout ring is also a Scalper point. It must follow
+      // the same per-profile visibility switch as filled wick-contact dots.
+      // Only the canvas annotation is hidden: keep the detected breakout and
+      // its status, line geometry and optional text intact.
+      if (showScalperTouchPoints && setup.breakout) {
         const x = g.x(setup.breakout.t), y = g.y(setup.breakout.p);
         if (Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= g.plotW && y >= 0 && y <= g.plotH) {
           q.beginPath(); q.arc(x,y,4,0,Math.PI*2);
