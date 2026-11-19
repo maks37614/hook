@@ -5,6 +5,7 @@ import type { BookUpdate } from '../src/utils/binanceOrderBook';
 import { chartDepthScope, type ChartDepthPacket } from '../src/utils/hookChartDepthProtocol';
 import { isFreshDepthTime, ORDER_BOOK_MAX_AGE_MS, parseDepthLevels } from '../src/utils/orderBookValidation';
 import { normalizeExchangeSymbol } from '../src/utils/marketSymbols';
+import { applyDepthSide } from '../src/components/hookchart/depthBestPrice';
 import { acquireExchangeStream } from './surveillance/sharedExchangeStream';
 
 export interface ChartDepthSource {
@@ -19,6 +20,7 @@ type Entry = {
   scope: string; source: ChartDepthSource; clients: Set<WebSocket>;
   status: ChartDepthPacket['status'];
   bids: Map<number, number>; asks: Map<number, number>;
+  bestBid: number; bestAsk: number;
   sequence: number; eventTime: number; receivedAt: number;
 };
 
@@ -69,6 +71,7 @@ export function installHookChartDepthStream(server: Server, createSource: Source
   };
   const clear = (entry: Entry) => {
     entry.bids.clear(); entry.asks.clear();
+    entry.bestBid = -Infinity; entry.bestAsk = Infinity;
     entry.sequence = entry.eventTime = entry.receivedAt = 0;
   };
   const release = (entry: Entry, client: WebSocket) => {
@@ -98,7 +101,7 @@ export function installHookChartDepthStream(server: Server, createSource: Source
     if (!entry) {
       try {
         const source = createSource(symbol, exchange as ExchangeId, market as MarketType);
-        entry = { scope, source, status: source.status === 'ERROR' ? 'ERROR' : 'SYNCING', clients: new Set(), bids: new Map(), asks: new Map(), sequence: 0, eventTime: 0, receivedAt: 0 };
+        entry = { scope, source, status: source.status === 'ERROR' ? 'ERROR' : 'SYNCING', clients: new Set(), bids: new Map(), asks: new Map(), bestBid: -Infinity, bestAsk: Infinity, sequence: 0, eventTime: 0, receivedAt: 0 };
         entries.set(scope, entry);
         const current = entry;
         source.on('status', (status: string) => {
@@ -117,9 +120,11 @@ export function installHookChartDepthStream(server: Server, createSource: Source
           if (update.isSnapshot) clear(current);
           else if (!current.sequence) { source.resyncOrderBook(); return; }
           else if (update.sequence <= current.sequence) return;
-          for (const [p, q] of bids) q ? current.bids.set(p, q) : current.bids.delete(p);
-          for (const [p, q] of asks) q ? current.asks.set(p, q) : current.asks.delete(p);
-          if (!current.bids.size || !current.asks.size || Math.max(...current.bids.keys()) >= Math.min(...current.asks.keys())) {
+          // Preserve every level and every delta; only removing the best price
+          // can require a full scan for its successor on that side.
+          current.bestBid = applyDepthSide(current.bids, bids, current.bestBid, true);
+          current.bestAsk = applyDepthSide(current.asks, asks, current.bestAsk, false);
+          if (!current.bids.size || !current.asks.size || current.bestBid >= current.bestAsk) {
             clear(current); publish(current, 'RESYNCING'); source.resyncOrderBook(); return;
           }
           current.sequence = update.sequence; current.eventTime = eventTime; current.receivedAt = now;

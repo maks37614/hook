@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import NodeWebSocket from 'ws';
@@ -321,4 +322,66 @@ test('simultaneous HookCharts receive every identical depth frame without coales
 
   first.client.close(); second.client.close();
   await Promise.all([once(first.client, 'close'), once(second.client, 'close')]);
+});
+
+
+test('incremental server book keeps density levels on chart and in late subscriber snapshots', async t => {
+  const f = await fixture(t);
+  const first = await f.open();
+  await until(() => f.sources.length === 1);
+  const source = f.sources[0].source;
+  const settings = { densityMode: 'manual', densityThreshold: 100_000, densityDiffPct: 5 } as const;
+  const chart = new HookChartDensityBook();
+  const firstSnapshot: BookUpdate = { isSnapshot: true, sequence: 200, eventTime: Date.now(),
+    bids: [[99, 2000], [98, 2]], asks: [[101, 2000], [102, 2]] };
+  const send = async (update: BookUpdate) => {
+    source.emit('depth', update);
+    await until(() => first.packets.some(p => p.update?.sequence === update.sequence));
+    const delivered = first.packets.find(p => p.update?.sequence === update.sequence)!.update!;
+    assert.deepEqual(delivered, update, 'full depth packets must reach the graph unchanged');
+    assert.equal(chart.apply(delivered), true);
+    return chart.read(settings, 0);
+  };
+  let view = await send(firstSnapshot);
+  assert.deepEqual(view.densities.map(d => d.side).sort(), ['ASK', 'BID']);
+  view = await send({ sequence: 201, eventTime: Date.now(), bids: [[98, 3]], asks: [[102, 3]] });
+  assert.deepEqual(view.densities.map(d => d.side).sort(), ['ASK', 'BID']);
+  await send({ sequence: 202, eventTime: Date.now(), bids: [[100, 2000]], asks: [[100.5, 2000]] });
+  view = await send({ sequence: 203, eventTime: Date.now(),
+    bids: [[100, 0], [99.5, 2000]], asks: [[100.5, 0], [100.75, 2000]] });
+  assert.equal(source.resyncs, 0, 'valid replacements of best levels must stay LIVE');
+  assert.ok(view.densities.some(d => d.side === 'BID' && d.p === 99.5 && d.usd === 199_000));
+  assert.ok(view.densities.some(d => d.side === 'ASK' && d.p === 100.75 && d.usd === 201_500));
+
+  const late = await f.open();
+  await until(() => late.packets.some(p => p.update?.isSnapshot));
+  const latePacket = late.packets.find(p => p.update?.isSnapshot)!.update!;
+  assert.equal(latePacket.sequence, 203);
+  assert.ok(latePacket.bids.some(([p, q]) => p === 99.5 && q === 2000));
+  assert.ok(latePacket.asks.some(([p, q]) => p === 100.75 && q === 2000));
+  assert.ok(!latePacket.bids.some(([p]) => p === 100));
+  assert.ok(!latePacket.asks.some(([p]) => p === 100.5));
+  const lateChart = new HookChartDensityBook();
+  assert.equal(lateChart.apply(latePacket), true);
+  assert.ok(lateChart.read(settings, 0).densities.some(d => d.p === 99.5));
+  assert.ok(lateChart.read(settings, 0).densities.some(d => d.p === 100.75));
+
+  source.emit('depth', { sequence: 204, eventTime: Date.now(), bids: [[102, 1]], asks: [] });
+  await until(() => source.resyncs === 1);
+  assert.ok(!first.packets.some(p => p.update?.sequence === 204), 'crossed book is never published');
+  const recovered: BookUpdate = { isSnapshot: true, sequence: 300, eventTime: Date.now(),
+    bids: [[49, 3000]], asks: [[51, 3000]] };
+  source.emit('depth', recovered);
+  await until(() => first.packets.some(p => p.update?.sequence === 300));
+  const recoveryChart = new HookChartDensityBook();
+  assert.equal(recoveryChart.apply(first.packets.find(p => p.update?.sequence === 300)!.update!), true);
+  assert.deepEqual(recoveryChart.read(settings, 0).densities.map(d => d.side).sort(), ['ASK', 'BID']);
+});
+
+test('server no longer enumerates every best BID/ASK on ordinary deltas', () => {
+  const source = readFileSync(new URL('../server/hookChartDepth.ts', import.meta.url), 'utf8');
+  assert.match(source, /applyDepthSide\(current\.bids, bids, current\.bestBid, true\)/);
+  assert.match(source, /applyDepthSide\(current\.asks, asks, current\.bestAsk, false\)/);
+  assert.doesNotMatch(source, /Math\.max\(\.\.\.current\.bids\.keys\(\)\)/);
+  assert.doesNotMatch(source, /Math\.min\(\.\.\.current\.asks\.keys\(\)\)/);
 });
