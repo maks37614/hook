@@ -33,6 +33,22 @@ test('scalper defaults OFF, persists only explicit true, and ECO is a read-only 
   assert.equal(terminalEcoPreferences(original, false).scalperMode, true);
 });
 
+test('Scalper Mode on/off switch is prominent in both chart and profile settings', () => {
+  for (const embedded of [false, true]) {
+    const html = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
+      open: true, embedded, prefs: normalizeOriginalHookChartPreferences({ language: 'uk' }),
+      onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
+    }));
+    const application = html.indexOf('data-hookchart-guide-section="Застосунок"');
+    const scalper = html.indexOf('data-hookchart-guide-section="Автоматична розмітка"');
+    const interfaceSettings = html.indexOf('data-hookchart-guide-section="Інтерфейс"');
+    assert.ok(application >= 0 && scalper > application && interfaceSettings > scalper,
+      'Scalper toggle must be near the top of Main before the long Interface settings');
+    assert.match(html.slice(scalper, interfaceSettings), /aria-label="Режим Скальпера"/,
+      'the switch must be accessible and present in the near-top section');
+  }
+});
+
 test('Scalper Mode help follows chart-specific EN/PL/RU locale even when site is Ukrainian', () => {
   for (const [language, title, description] of [
     ['en', 'Scalper Mode', 'Automatically draws touch-validated ranges'],
