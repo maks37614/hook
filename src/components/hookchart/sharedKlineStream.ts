@@ -20,6 +20,12 @@ const BYBIT_WS: Record<MarketType, string> = {
 const BINANCE_INTERVAL: Record<string, string> = {
   '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d',
 };
+// Direct exchange sockets may stay OPEN while no valid candles arrive.
+// A generous 60s watchdog catches silent connections without constant polling.
+export const DIRECT_KLINE_SILENCE_MS = 60_000;
+const DIRECT_KLINE_WATCH_MS = 5_000;
+const RELAY_RETRY_BASE_MS = 120_000;
+
 const BYBIT_INTERVAL: Record<string, string> = {
   '1m': '1', '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D',
 };
@@ -78,9 +84,10 @@ export function parseSharedKlineMessage(exchange: ExchangeId, payload: any, symb
 export function createSharedKlineSubscriptions(socketFactory: SocketFactory = url => new WebSocket(url)) {
   type Entry = {
     listeners: Set<Listener>; socket: WebSocket | null; closed: boolean;
-    ping: ReturnType<typeof setInterval> | null; retry: ReturnType<typeof setTimeout> | null;
+    ping: ReturnType<typeof setInterval> | null; silenceWatch: ReturnType<typeof setInterval> | null;
+    retry: ReturnType<typeof setTimeout> | null;
     failures: number; connected: boolean; last: LiveKline | null; stop: () => void;
-    relayFallback: boolean;
+    relayFallback: boolean; relayFailureStreak: number; nextRelayRetryAt: number;
   };
   const entries = new Map<string, Entry>();
   const subscribe = (scope: Scope, listener: Listener): (() => void) => {
@@ -114,8 +121,8 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
 
     const shared: Entry = {
       listeners: new Set([listener]), socket: null, closed: false, ping: null,
-      retry: null, failures: 0, connected: false, last: null, stop: () => {},
-      relayFallback: false,
+      silenceWatch: null, retry: null, failures: 0, connected: false, last: null, stop: () => {},
+      relayFallback: false, relayFailureStreak: 0, nextRelayRetryAt: 0,
     };
     entries.set(key, shared);
     const status = (connected: boolean) => {
@@ -129,8 +136,23 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
       if (shared.ping !== null) clearInterval(shared.ping);
       shared.ping = null;
     };
+    const clearSilenceWatch = () => {
+      if (shared.silenceWatch !== null) clearInterval(shared.silenceWatch);
+      shared.silenceWatch = null;
+    };
+    const markRelayFallback = () => {
+      // A broken relay switches to direct exchange data, but is eligible for
+      // a bounded relay re-attempt on a future normal reconnect.
+      if (shared.relayFallback) return;
+      shared.relayFallback = true;
+      const cooldown = Math.min(30 * 60_000,
+        RELAY_RETRY_BASE_MS * 2 ** Math.min(4, shared.relayFailureStreak++));
+      shared.nextRelayRetryAt = Date.now() + cooldown +
+        Math.floor(Math.random() * 30_000);
+    };
     const reconnect = () => {
       clearPing();
+      clearSilenceWatch();
       if (shared.closed || shared.retry !== null) return;
       recordChartReconnect();
       status(false);
@@ -152,6 +174,8 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
       // Cache is scoped to the market, but relay startup health is scoped to
       // each WebSocket. An old cached candle must not mask a dead reconnect.
       let acceptedOnThisSocket = false;
+      let directOpenedAt = 0;
+      let directLastAcceptedAt = 0;
       try {
         let url: string;
         if (useRelay) {
@@ -170,14 +194,14 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
         }
         ws = socketFactory(url);
       } catch {
-        if (useRelay) shared.relayFallback = true;
+        if (useRelay) markRelayFallback();
         reconnect();
         return;
       }
       shared.socket = ws;
       if (useRelay) startupWatch = setTimeout(() => {
         if (!shared.closed && shared.socket === ws && !acceptedOnThisSocket) {
-          shared.relayFallback = true;
+          markRelayFallback();
           try { ws.close(); } catch {}
         }
       }, 10_000);
@@ -196,7 +220,22 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
             }
           }, 20_000);
         }
-        if (!useRelay) status(true);
+        if (!useRelay) {
+          status(true);
+          directOpenedAt = Date.now();
+          // This timer is per shared symbol, never per HookChart subscriber.
+          // A live TCP socket without fresh accepted klines is not healthy.
+          shared.silenceWatch = setInterval(() => {
+            if (shared.closed || shared.socket !== ws || ws.readyState !== 1) return;
+            const anchor = acceptedOnThisSocket ? directLastAcceptedAt : directOpenedAt;
+            if (anchor && Date.now() - anchor >= DIRECT_KLINE_SILENCE_MS) {
+              recordChartTransportError();
+              status(false);
+              clearSilenceWatch();
+              try { ws.close(); } catch { reconnect(); }
+            }
+          }, DIRECT_KLINE_WATCH_MS);
+        }
       };
       ws.onmessage = event => {
         if (shared.closed || shared.socket !== ws) return;
@@ -210,7 +249,7 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
               // at once. REST fallback remains active while the relay recovers.
               if (startupWatch === null) startupWatch = setTimeout(() => {
                 if (shared.closed || shared.socket !== ws) return;
-                shared.relayFallback = true;
+                markRelayFallback();
                 try { ws.close(); } catch {}
               }, 10_000 + Math.floor(Math.random() * 2000));
             }
@@ -226,7 +265,12 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
           acceptedOnThisSocket = true;
           shared.failures = 0;
           if (startupWatch !== null) { clearTimeout(startupWatch); startupWatch = null; }
-          if (useRelay) status(true);
+          if (useRelay) {
+            shared.relayFallback = false;
+            shared.relayFailureStreak = 0;
+            shared.nextRelayRetryAt = 0;
+            status(true);
+          } else directLastAcceptedAt = Date.now();
           recordChartKline(useRelay ? 'relay' : 'exchange', Number(candle.eventTime));
           shared.last = candle;
           for (const sub of [...shared.listeners]) {
@@ -238,6 +282,7 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
       ws.onclose = (event) => {
         if (startupWatch !== null) clearTimeout(startupWatch);
         if (shared.socket === ws) {
+          clearSilenceWatch();
           // A healthy relay may restart or briefly lose its upstream. Retry
           // the shared VPS first, rather than fan out hundreds of browser
           // sockets to the exchanges after every transient network closure.
@@ -245,7 +290,14 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
           // use direct market WS as the bounded fail-open path.
           if (useRelay && !acceptedOnThisSocket &&
               (shared.failures >= 1 || event.code === 1013)) {
-            shared.relayFallback = true;
+            markRelayFallback();
+          }
+          // Do not interrupt a healthy direct stream just to probe VPS health.
+          // On the next natural direct reconnect after a cooldown, retry the
+          // shared VPS relay before opening another exchange socket.
+          if (!useRelay && shared.relayFallback &&
+              Date.now() >= shared.nextRelayRetryAt) {
+            shared.relayFallback = false;
           }
           reconnect();
         }
@@ -256,6 +308,7 @@ export function createSharedKlineSubscriptions(socketFactory: SocketFactory = ur
       if (shared.retry !== null) clearTimeout(shared.retry);
       shared.retry = null;
       clearPing();
+      clearSilenceWatch();
       status(false);
       shared.socket?.close();
       shared.socket = null;

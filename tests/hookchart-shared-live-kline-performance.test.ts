@@ -151,7 +151,7 @@ test('historical Replay does not subscribe to a live-market feed', () => {
   assert.match(replay, /<HookChart[^>]*klines=\{visibleCandles\}/);
   assert.match(replay, /markers=\{hookMarkers\} replay/);
   assert.doesNotMatch(replay, /subscribeSharedKlines|subscribeMarketTrades|fetchSharedLiveFallback/);
-  assert.match(hook, /if \(replay \|\| lightweight \|\| !exchangeSymbol\)/);
+  assert.match(hook, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| !depthEnabled\)/);
   assert.match(hook, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| marketType !== 'futures'\)/);
 });
 
@@ -397,6 +397,83 @@ test('brief shared-relay closure retries VPS before opening direct exchange sock
     (globalThis as any).setTimeout = oldSet;
     (globalThis as any).clearTimeout = oldClear;
     if (savedWindow) Object.defineProperty(globalThis, 'window', savedWindow);
+    else delete (globalThis as any).window;
+  }
+});
+
+
+test('silent direct Binance socket closes and reconnects without creating per-chart timers', t => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: undefined });
+  t.mock.timers.enable({ apis: ['Date', 'setInterval', 'setTimeout'], now: 1_800_000_000_000 });
+  const sockets: FakeSocket[] = [];
+  const manager = createSharedKlineSubscriptions(url => {
+    const socket = new FakeSocket(url); sockets.push(socket);
+    return socket as unknown as WebSocket;
+  });
+  const statuses: boolean[] = [];
+  const stops = Array.from({ length: 4 }, () => manager.subscribe({
+    exchange: 'binance', marketType: 'futures', symbol: 'BTCUSDT', timeframe: '1m',
+  }, { onCandle: () => {}, onStatus: connected => statuses.push(connected) }));
+  try {
+    assert.equal(sockets.length, 1, 'one shared WS for all four charts');
+    const direct = sockets[0];
+    direct.onopen?.({});
+    assert.equal(statuses.at(-1), true);
+    t.mock.timers.tick(60_001);
+    assert.equal(direct.closed, 1, 'a silent OPEN socket must be retired');
+    assert.equal(statuses.at(-1), false, 'REST fallback may run when transport is stale');
+    direct.onclose?.({ code: 1006 });
+    t.mock.timers.tick(2000);
+    assert.equal(sockets.length, 2, 'one bounded retry for the shared scope');
+    stops.forEach(stop => stop());
+    t.mock.timers.tick(120_000);
+    assert.equal(sockets.length, 2, 'closing charts stops watchdog and retries');
+  } finally {
+    stops.forEach(stop => stop());
+    t.mock.timers.reset();
+    if (saved) Object.defineProperty(globalThis, 'window', saved);
+    else delete (globalThis as any).window;
+  }
+});
+
+test('direct fallback retries VPS relay after cooldown on natural reconnect', t => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true, value: { location: { protocol: 'https:', href: 'https://h00k.top/' } },
+  });
+  t.mock.timers.enable({ apis: ['Date', 'setInterval', 'setTimeout'], now: 1_800_000_000_000 });
+  const sockets: FakeSocket[] = [];
+  const manager = createSharedKlineSubscriptions(url => {
+    const socket = new FakeSocket(url); sockets.push(socket);
+    return socket as unknown as WebSocket;
+  });
+  const stop = manager.subscribe(
+    { exchange: 'bybit', marketType: 'futures', symbol: 'ETHUSDT', timeframe: '5m' },
+    { onCandle: () => {} },
+  );
+  try {
+    assert.match(sockets[0].url, /\/api\/hookchart\/klines/);
+    sockets[0].onclose?.({ code: 1006 });
+    t.mock.timers.tick(2000);
+    assert.match(sockets[1].url, /\/api\/hookchart\/klines/,
+      'one relay hiccup should not fan out to exchange clients');
+    sockets[1].onclose?.({ code: 1006 });
+    t.mock.timers.tick(3000);
+    assert.match(sockets[2].url, /stream\.bybit\.com/,
+      'repeated relay failures use direct exchange data');
+    assert.equal(sockets.length, 3);
+    // No forced interruption of healthy direct WS solely for a relay probe.
+    t.mock.timers.tick(151_000);
+    assert.equal(sockets.length, 3);
+    sockets[2].onclose?.({ code: 1006 });
+    t.mock.timers.tick(3000);
+    assert.match(sockets[3].url, /\/api\/hookchart\/klines/,
+      'after cooldown the NEXT normal reconnect prefers VPS relay again');
+  } finally {
+    stop();
+    t.mock.timers.reset();
+    if (saved) Object.defineProperty(globalThis, 'window', saved);
     else delete (globalThis as any).window;
   }
 });
