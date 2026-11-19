@@ -39,7 +39,7 @@ test('Replay never subscribes to live market or liquidation sessions', () => {
   assert.match(canvas, /archiveMode \? \[\] : visiblePriceMarkers/);
   assert.match(feed, /const sessionSubscription = useMemo\(\(\) => \(replay \|\| lightweight\)/);
   assert.match(feed, /snapshot: \(\) => EMPTY_SESSION_LIQUIDATIONS/);
-  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol\)/);
+  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| !depthEnabled\)/);
   assert.match(canvas, /marketPrints=\{replay \? \[\] : liveFeed\.marketPrints\}/);
   assert.match(canvas, /liquidations=\{replay \? \[\] : liveFeed\.liquidations\}/);
   assert.match(canvas, /showLiqRiskBlock=\{!replay/);

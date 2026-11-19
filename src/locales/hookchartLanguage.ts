@@ -10,6 +10,21 @@ export const hookChartLanguagePacks: Record<SupportedLanguage, Record<string, st
 
 // These controls were added after the supplied packs. Keep the original JSON files intact.
 const additions = [
+  // Shared canvas controls and strategy status: never hardcode one language in JSX.
+  ['Керування масштабом графіка', 'Chart zoom controls', 'Управление масштабом графика', 'Sterowanie skalą wykresu'],
+  ['Збільшити масштаб', 'Zoom in', 'Увеличить масштаб', 'Powiększ wykres'],
+  ['Зменшити масштаб', 'Zoom out', 'Уменьшить масштаб', 'Pomniejsz wykres'],
+  ['Скинути масштаб', 'Reset', 'Сбросить масштаб', 'Resetuj skalę'],
+  ['Вся історія: увімкнено', 'All history: enabled', 'Вся история: включено', 'Cała historia: włączona'],
+  ['Вся завантажена історія поточного таймфрейму', 'All loaded history for this timeframe', 'Вся загруженная история текущего таймфрейма', 'Cała wczytana historia bieżącego interwału'],
+  ['Показати всю історію', 'Show all history', 'Показать всю историю', 'Pokaż całą historię'],
+  ['Згорнути масштабування', 'Collapse zoom controls', 'Свернуть управление масштабом', 'Zwiń sterowanie skalą'],
+  ['Розгорнути масштабування', 'Expand zoom controls', 'Развернуть управление масштабом', 'Rozwiń sterowanie skalą'],
+  ['Бичачий', 'Bullish', 'Бычий', 'Wzrostowy'],
+  ['Ведмежий', 'Bearish', 'Медвежий', 'Spadkowy'],
+  ['Нейтральний', 'Neutral', 'Нейтральный', 'Neutralny'],
+  ['Ризик', 'Risk', 'Риск', 'Ryzyko'],
+
   ['За профілем', 'From profile', 'Из профиля', 'Z profilu'],
   ['Немає даних', 'No data', 'Нет данных', 'Brak danych'],
   ["Оптимізація", "Optimization", "Оптимизация", "Optymalizacja"],
