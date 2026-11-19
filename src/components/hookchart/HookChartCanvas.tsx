@@ -644,6 +644,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const liveFeed = useOriginalHookChartLiveFeed({
     exchange, marketType, symbol, settings: runtimeSettings, candles, replay,
     lightweight: ecoActive || archiveMode, needsFunding: activeStrategy?.config.kind === 'overheat',
+    // Presets using order-book imbalance keep their evidence when the density overlay is off.
+    needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
+      activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
   });
   const potentialDensityCount = liveFeed.densities.filter(density => density.reactionTier === 'potential').length;
   // Only filter the chart. Strategy evaluation and density lists retain the full live book.

@@ -38,6 +38,6 @@ test('real-time HookChart applies the guards without disabling live depth or Rep
   assert.match(shared, /current\.timer = setInterval\(\(\) => publish\(current\), 2000\)/);
   assert.match(feed, /const stopDepth = connectSharedHookChartDepth/);
   assert.match(feed, /return sharedLiquidationViews\.subscribe\(/);
-  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol\)/);
+  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| !depthEnabled\)/);
   assert.match(replay, /markers=\{hookMarkers\} replay/);
 });

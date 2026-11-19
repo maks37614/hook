@@ -73,7 +73,7 @@ test('ECO actually pauses supplementary market feeds and polling, preserving liv
   const feed = source('../src/components/hookchart/useOriginalHookChartLiveFeed.ts');
   const hook = source('../src/components/hookchart/HookChartCanvas.tsx');
   const chart = source('../src/components/TradingViewChart.tsx');
-  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol\)/);
+  assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| !depthEnabled\)/);
   assert.match(feed, /if \(replay \|\| lightweight \|\| !exchangeSymbol \|\| marketType !== 'futures'\)/);
   assert.match(hook, /lightweight: ecoActive/);
   assert.match(hook, /ecoActive \|\| archiveMode \? \[timeframe\] : Array\.from/);
