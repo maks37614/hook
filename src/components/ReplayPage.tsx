@@ -641,7 +641,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         if (requestId === loadRequestIdRef.current) setIsLoadingCandles(false);
       }
     },
-    [symbol, exchange, marketType, timeframe, showToast, t, uiLocale, language]
+    [symbol, exchange, marketType, timeframe, showToast, t, uiLocale, language, setPendingOrders, setPosition]
   );
 
   // Hydration is once per account. Refs keep fresh actions/symbol without

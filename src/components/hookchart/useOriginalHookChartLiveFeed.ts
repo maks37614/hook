@@ -309,14 +309,27 @@ export function useOriginalHookChartLiveFeed({
   }, [exchange, marketType, symbol, replay, lightweight, needsFunding]);
 
   // Display thresholds never mutate the incoming events or the session totals.
-  const visibleLiquidations = useMemo(() => lightweight ? EMPTY_LIQUIDATIONS : filterVisibleLiquidations(liquidations, liquidationCut, settingsRef.current),
-    [lightweight, liquidations, liquidationCut, settings.showLiquidationLong,
-      settings.showLiquidationShort, settings.liquidationLongMinUsd, settings.liquidationShortMinUsd]);
+  // Only the four display filters invalidate the computed liquidation view.
+  // Do not reopen market sockets for a cosmetic threshold change.
+  const { showLiquidationLong, showLiquidationShort, liquidationLongMinUsd,
+    liquidationShortMinUsd } = settings;
+  const visibleLiquidations = useMemo(() => lightweight ? EMPTY_LIQUIDATIONS : filterVisibleLiquidations(
+    liquidations, liquidationCut, {
+      ...settingsRef.current, showLiquidationLong, showLiquidationShort,
+      liquidationLongMinUsd, liquidationShortMinUsd,
+    }),
+    [lightweight, liquidations, liquidationCut, showLiquidationLong,
+      showLiquidationShort, liquidationLongMinUsd, liquidationShortMinUsd]);
   const lastCandlePrice = candles.at(-1)?.c || 0;
   const risk = useMemo(
     // The clock state invalidates this memo at 1m/5m event boundaries.
     // On price/cut changes use real wall-clock time too, never a stale tick.
-    () => lightweight ? EMPTY_CASCADE_RISK : calcCascadeRisk(liquidations, liquidationCut, lastCandlePrice),
+    () => {
+      // A new clock tick invalidates expired liquidation cascades even if
+      // there were no fresh exchange events during the window.
+      void cascadeClock;
+      return lightweight ? EMPTY_CASCADE_RISK : calcCascadeRisk(liquidations, liquidationCut, lastCandlePrice);
+    },
     [lightweight, liquidations, liquidationCut, lastCandlePrice, cascadeClock],
   );
   const liquidationSource = marketType === 'futures'

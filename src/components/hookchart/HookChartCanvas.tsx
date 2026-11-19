@@ -1448,7 +1448,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     }));
     return true;
   }, [exchange, marketType, symbol, timeframe, replay, terminalMode, maxChartCandles, klines.length,
-    historyScope, externalData?.onNeedHistory, archiveMode, archiveOnNeedHistory]);
+    historyScope, archiveMode, archiveOnNeedHistory]);
 
   const visibleOldestTime = candles[0]?.t, visibleCandleCount = candles.length;
   useEffect(() => {

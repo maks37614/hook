@@ -84,7 +84,7 @@ export function FullscreenMultiChart({
     setDockExpanded(true);
     setPickerOpen(false);
     setFeedback(null);
-  }, [primaryKey]);
+  }, []);
 
   // A favorite replaces only its selected chart without starting a duplicate
   // exchange subscription; adding a new chart remains exclusive to the + picker.
@@ -129,7 +129,7 @@ export function FullscreenMultiChart({
     if (!current) return;
     const nextMarket = { ...current, exchange, marketType };
     const collision = fullscreenMarketCollision(
-      fullscreenChartSlots(primaryMarket, blocks, chartOrder), targetId, nextMarket,
+      fullscreenChartSlots(primaryMarketRef.current, blocks, chartOrder), targetId, nextMarket,
     );
     if (collision) {
       onActiveSlotChange?.(collision.id);
@@ -148,7 +148,7 @@ export function FullscreenMultiChart({
   }, [activeSlotId, onActiveSlotChange]);
   const update = useCallback((id: string, patch: Partial<TerminalChartBlock>) => {
     setBlocks(previous => updateFullscreenChart(previous, primaryMarketRef.current, id, patch));
-  }, [primaryKey]);
+  }, []);
 
   // Reset the active selection when a secondary chart disappears.
   useEffect(() => {

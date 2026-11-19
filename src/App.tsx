@@ -1463,7 +1463,7 @@ export default function App() {
   const projectedEarlyCoins = useMemo(() => projectUserCoins(fullEarlyScan?.data ?? [], constructorSettings), [fullEarlyScan?.data, constructorSettings]);
   const activeEarlyCandidate = useMemo(() => selectedEarly
     ? resolveEarlyTpSl(selectedEarly.candidate, constructorSettings, selectedEarly.coin.symbol) : null,
-    [selectedEarly, selectedEarly?.candidate, selectedEarly?.coin.symbol, constructorSettings]);
+    [selectedEarly, constructorSettings]);
   // Details follow the current user profile, including immediate AUTO restoration.
   // Archived historical snapshots are intentionally immutable.
   const activeSelectedPair = useMemo(() => {
