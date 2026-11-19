@@ -467,7 +467,8 @@ test('direct fallback retries VPS relay after cooldown on natural reconnect', t 
     t.mock.timers.tick(151_000);
     assert.equal(sockets.length, 3);
     sockets[2].onclose?.({ code: 1006 });
-    t.mock.timers.tick(3000);
+    // The third failure retains exponential retry backoff (4-5 seconds).
+    t.mock.timers.tick(6000);
     assert.match(sockets[3].url, /\/api\/hookchart\/klines/,
       'after cooldown the NEXT normal reconnect prefers VPS relay again');
   } finally {

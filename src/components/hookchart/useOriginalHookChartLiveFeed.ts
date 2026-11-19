@@ -210,8 +210,8 @@ export function useOriginalHookChartLiveFeed({
       dead = true;
       if (applyBookRef.current === applyBook) applyBookRef.current = null;
       stopDepth();
-      if (depthBookRef.current === depthBook) depthBookRef.current = null;
       stopDepthHoldClock();
+      if (depthBookRef.current === depthBook) depthBookRef.current = null;
       if (depthPublishTimer !== null) clearTimeout(depthPublishTimer);
       depthBook.clear();
     };
