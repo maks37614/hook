@@ -213,7 +213,7 @@ test('Terminal header actions cannot target the wrong symbol in multi-chart mode
 
 test('closed per-chart coin switchers do not rescan the entire Terminal market', () => {
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
-  assert.match(widget, /const filteredCoins = useMemo\(\(\) => \{\s*if \(!isCoinPickerOpen\) return \[\];/);
+  assert.match(widget, /const filteredCoins = useMemo\(\(\) => \{\s*void coinListVersion;\s*if \(!isCoinPickerOpen\) return \[\];/);
   assert.match(widget, /const available = getAllCoins\?\.\(\) \?\? allCoins \?\? \[\]/);
   assert.match(widget, /\}, \[allCoins, getAllCoins, coinSearch, isCoinPickerOpen(?:, coinListVersion)?\]\)/);
 });

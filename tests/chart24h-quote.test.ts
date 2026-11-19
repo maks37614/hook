@@ -40,7 +40,7 @@ test('formations and fullscreen share one-symbol public quote source and hide un
   assert.match(formation,/useChartLive24hQuote\(\{[\s\S]*?symbol: coin.symbol,[\s\S]*?\}, !isFullscreenChartOpen && !showArchivedStatic\)/);
   assert.match(fullscreen,/useChartLive24hQuote\(\{[\s\S]*?symbol: activeCoin.symbol,[\s\S]*?\}, isOpen\)/);
   assert.match(hook,/createScreenerQuoteSocket\(/);
-  assert.match(hook,/socket.updateScopes\(\[\{ exchange:/);
+  assert.match(hook,/socket.updateScopes\(\[\{ exchange, marketType, symbol:/);
   assert.match(formation,/change24h === null \? '\(—\)'/);
   // Fullscreen now supports selecting one of several chart slots. The displayed
   // quote must belong to the selected slot, not the old primary chart.

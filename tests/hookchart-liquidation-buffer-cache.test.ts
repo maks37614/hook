@@ -128,6 +128,6 @@ test('one shared Liq view preserves time-sensitive cascade and adaptive-cut expi
   assert.match(source, /now > entry\.adaptiveExpiresAt/);
   assert.match(source, /nextLiquidationAdaptiveCutExpiry\(rows, now\)/);
   assert.match(hook, /setCascadeClock\(view\.cascadeClock\)/);
-  assert.match(hook, /calcCascadeRisk\(liquidations, liquidationCut, candles\.at\(-1\)\?\.c \|\| 0\)/);
-  assert.match(hook, /\[lightweight, liquidations, liquidationCut, candles\.at\(-1\)\?\.c, cascadeClock\]/);
+  assert.match(hook, /calcCascadeRisk\(liquidations, liquidationCut, lastCandlePrice\)/);
+  assert.match(hook, /\[lightweight, liquidations, liquidationCut, lastCandlePrice, cascadeClock\]/);
 });

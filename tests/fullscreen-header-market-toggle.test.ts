@@ -52,7 +52,7 @@ test('tapping the title changes header focus only, without scrolling or reconnec
   assert.match(page, /headerSlotId !== 'primary'[\s\S]*?setMarketChangeRequest\(/);
   assert.match(page, /toggleFullscreenExchange\(headerMarket\.exchange\)/);
   assert.match(page, /toggleFullscreenMarketType\(headerMarket\.marketType\)/);
-  assert.match(multi, /onSlotsChange\?\.\(fullscreenChartSlots\(primaryMarket, blocks, chartOrder\)\)/);
+  assert.match(multi, /onSlotsChange\?\.\(fullscreenChartSlots\(primaryMarketRef\.current, blocks, chartOrder\)\)/);
   for (const text of [
     'Показати наступний відкритий графік', 'Show next open chart',
     'Pokaż następny otwarty wykres', 'Показать следующий открытый график',
@@ -118,7 +118,7 @@ test('market switching routes through the exact selected chart identity and scop
   assert.match(page, /scopedFullscreenChartKlines\(history, chartHistoryScope\)/);
   assert.match(page, /marketChangeRequest=\{pageMode && !earlyCandidate \? marketChangeRequest : null\}/);
   assert.match(multi, /handledMarketRequestId\.current === marketChangeRequest\.id/);
-  assert.match(multi, /setBlocks\(previous => updateFullscreenChart\(previous, primaryMarket, targetId,/);
+  assert.match(multi, /setBlocks\(previous => updateFullscreenChart\(previous, primaryMarketRef\.current, targetId,/);
   assert.match(multi, /\{ exchange, marketType, formationId: undefined \}/);
   assert.match(page, /currentPrice: exact\?\.currentPrice \?\? 0/);
   assert.match(page, /setTrackedPrice\(null\)/);
@@ -137,7 +137,7 @@ test('after adding charts a mobile-friendly dropdown shows current block, ordere
   assert.match(page, /onClick=\{\(\) => chooseHeaderChart\(slot\.id\)\}/);
   assert.match(page, /node\.dataset\.fullscreenChartId === id/);
   assert.match(page, /aria-current=\{headerSlotId === slot\.id \? 'true' : undefined\}/);
-  assert.match(multi, /onSlotsChange\?\.\(fullscreenChartSlots\(primaryMarket, blocks, chartOrder\)\)/);
+  assert.match(multi, /onSlotsChange\?\.\(fullscreenChartSlots\(primaryMarketRef\.current, blocks, chartOrder\)\)/);
   assert.match(multi, /onActiveSlotChange\?\.\(id\)/);
 });
 

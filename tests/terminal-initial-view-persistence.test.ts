@@ -116,7 +116,7 @@ test('logged-in settings are sent to profile with revision protection; old profi
   assert.match(hook, /columns: config\.columns, blockHeight: config\.blockHeight, config,/);
   assert.match(hook, /serverVersion\.current/);
   assert.match(hook, /syncConflictRef\.current/);
-  assert.match(hook, /if \(\(revision\.current > 0 \|\| lastCommittedWorkspace\.current !== workspace\)/);
+  assert.match(hook, /if \(\(revision\.current > 0 \|\| lastCommittedWorkspace\.current !== workspaceRef\.current\)/);
   assert.match(hook, /if \(revision\.current === 0\)/);
   assert.match(backend, /COALESCE\(profile -> 'terminalSettings' ->> 'version', ''\) = \$3/);
   assert.match(backend, /new AuthFailure\(409,[\s\S]*?'TERMINAL_WORKSPACE_CONFLICT'\)/);

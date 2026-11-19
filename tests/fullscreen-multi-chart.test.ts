@@ -201,8 +201,8 @@ test('fullscreen favorites show a real 24h quote or an unavailable mark, never a
   assert.match(page, /copyTextToClipboard\(normalizeExchangeSymbol\(favCoin\.symbol\)\.toUpperCase\(\)\)/);
   assert.match(page, /onSendMetaScalp\(favCoin\)/);
   assert.match(page, /event\.stopPropagation\(\); void copyFavoriteSymbol\(favCoin\)/);
-  assert.match(multi, /replaceFullscreenChart\(previous, primaryMarket, targetId, coin\)/);
-  assert.match(multi, /fullscreenChartSlots\(primaryMarket, blocks, chartOrder\)/);
+  assert.match(multi, /replaceFullscreenChart\(previous, primaryMarketRef\.current, targetId, coin\)/);
+  assert.match(multi, /fullscreenChartSlots\(primaryMarketRef\.current, blocks, chartOrder\)/);
 });
 
 test('favorites target the active fullscreen chart without adding new charts or duplicating a market', () => {
