@@ -14,7 +14,7 @@ import { installMarketQuoteRoutes, publicQuoteResponseCache } from './server/mar
 import { installFavoriteQuoteRoutes } from './server/favoriteQuotes';
 import { installFullEarlyScanRoutes } from './server/earlyScanRoutes';
 import { fetch24hTradeCount } from './server/chartMarketStats';
-import { analyzeFormationWithAI, evaluateFormationScoreWithAI } from './server/geminiService';
+import { SmartAnalysisGate } from './server/smartAnalysisGate';
 import { generateSmartAnalysis, SmartAnalysisDataUnavailableError } from './server/smartAnalysisService';
 import { coingeckoHolders } from './server/coingeckoHolders';
 import { calculateMarketSentiment, SentimentDataUnavailableError } from './server/sentimentService';
@@ -48,7 +48,7 @@ import {
   commitSurveillanceCheck,
   validateSurveillanceConfig,
 } from './server/surveillanceService';
-import { ExchangeId, MarketType, Timeframe, type Kline, type DetectedFormation } from './src/types';
+import { ExchangeId, MarketType, Timeframe, type Kline } from './src/types';
 import { normalizeLanguage, telegramText } from './src/locales';
 import { normalizeExchangeSymbol, resolveSurveillanceSymbol, searchSurveillanceSymbols } from './src/utils/marketSymbols';
 import { marketTickerFeed } from './server/marketTickerFeed';
@@ -287,23 +287,38 @@ async function startServer() {
     }
   });
 
-  // Smart Analysis endpoint ("Розумний Аналіз")
+  // Public Quant analysis: validate inputs and cap both abuse and concurrent work.
+  // Existing cached results and identical in-flight calculations are shared.
+  // A single app replica runs behind one trusted reverse proxy on the VPS.
+  const smartAnalysisGate = new SmartAnalysisGate();
   app.get('/api/market/smart-analysis', async (req, res) => {
+    const symbol = typeof req.query.symbol === 'string' ? req.query.symbol.trim().toUpperCase() : 'BTCUSDT';
+    const exchange = req.query.exchange ?? 'binance';
+    const marketType = req.query.marketType ?? 'futures';
+    const timeframe = req.query.timeframe ?? '1h';
+    const rawPrice = req.query.price;
+    const currentPrice = typeof rawPrice === 'string' && rawPrice.trim() !== '' ? Number(rawPrice) : undefined;
+    if (!/^[A-Z0-9]{3,36}$/.test(symbol) ||
+        (exchange !== 'binance' && exchange !== 'bybit') ||
+        (marketType !== 'spot' && marketType !== 'futures') ||
+        !['1m', '5m', '15m', '1h', '4h', '1d'].includes(String(timeframe)) ||
+        (rawPrice !== undefined && (currentPrice === undefined ||
+          !Number.isFinite(currentPrice) || currentPrice <= 0))) {
+      return res.status(400).json({ success: false, code: 'INVALID_ANALYSIS_INPUT',
+        error: 'Некоректні параметри розумного аналізу' });
+    }
+    const admission = smartAnalysisGate.enter(req.ip || 'unknown');
+    if (admission.status !== 'ok') {
+      return res.status(admission.status === 'rate_limited' ? 429 : 503)
+        .setHeader('Retry-After', String(admission.retryAfterSeconds))
+        .json({ success: false, code: admission.status === 'rate_limited'
+          ? 'SMART_ANALYSIS_RATE_LIMIT' : 'SMART_ANALYSIS_BUSY',
+          error: 'Розумний аналіз тимчасово зайнятий. Спробуйте пізніше.' });
+    }
     try {
-      const symbol = (req.query.symbol as string) || 'BTCUSDT';
-      const exchange = (req.query.exchange as ExchangeId) || 'binance';
-      const marketType = (req.query.marketType as MarketType) || 'futures';
-      const timeframe = (req.query.timeframe as Timeframe) || '1h';
-      const currentPrice = req.query.price ? parseFloat(req.query.price as string) : undefined;
-
       const analysis = await generateSmartAnalysis({
-        symbol,
-        exchange,
-        marketType,
-        timeframe,
-        currentPrice,
+        symbol, exchange, marketType, timeframe: timeframe as Timeframe, currentPrice,
       });
-
       res.json({ success: true, data: analysis });
     } catch (err: any) {
       if (err instanceof SmartAnalysisDataUnavailableError) {
@@ -313,6 +328,8 @@ async function startServer() {
       console.error('Error generating smart analysis:', err);
       res.status(500).json({ success: false, code: 'SMART_ANALYSIS_ERROR',
         error: 'Внутрішня помилка розумного аналізу. Спробуйте пізніше.' });
+    } finally {
+      admission.release();
     }
   });
 
@@ -435,93 +452,6 @@ async function startServer() {
       res.json({ success: true, ...history });
     } catch {
       res.status(503).json({ success: false, error: 'Open interest history is temporarily unavailable' });
-    }
-  });
-
-  // On-demand independent AI setup score. Authenticated, rate-limited, never
-  // performs any market scan or substitutes a deterministic score for Gemini.
-  // Bound simultaneous external AI calls regardless of logged-in user count.
-  let activeFormationScoreRequests = 0;
-  const maxActiveFormationScoreRequests = 4;
-  app.post('/api/ai/setup-score', requireUserAuth, async (req, res) => {
-    const data = req.body || {};
-    const symbol = typeof data.symbol === 'string' ? data.symbol.toUpperCase() : '';
-    const formation = data.formation as DetectedFormation | undefined;
-    const validFinite = (value: unknown): value is number =>
-      typeof value === 'number' && Number.isFinite(value);
-    if (!/^[A-Z0-9]{3,30}$/.test(symbol) ||
-        !['binance', 'bybit'].includes(data.exchange) ||
-        !['spot', 'futures'].includes(data.marketType) ||
-        !['1m', '5m', '15m', '1h', '4h', '1d'].includes(data.timeframe) ||
-        !formation || typeof formation !== 'object' ||
-        typeof formation.patternKey !== 'string' || formation.patternKey.length > 60 ||
-        !['bullish', 'bearish', 'neutral'].includes(formation.bias) ||
-        !formation.levels || !validFinite(formation.levels.entryPrice) ||
-        !validFinite(formation.levels.targetPrice) || !validFinite(formation.levels.stopLossPrice) ||
-        !validFinite(formation.confidence) || !validFinite(formation.riskRewardRatio) ||
-        !validFinite(data.currentPrice) || !Array.isArray(data.recentCandles) ||
-        data.recentCandles.length > 12) {
-      return res.status(400).json({ success: false, error: 'Недостатньо коректних даних формації' });
-    }
-    const candles = data.recentCandles as Kline[];
-    if (candles.some(c => !c || !validFinite(c.time) ||
-        !validFinite(c.open) || !validFinite(c.high) ||
-        !validFinite(c.low) || !validFinite(c.close) || !validFinite(c.volume))) {
-      return res.status(400).json({ success: false, error: 'Некоректні дані свічок' });
-    }
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
-      return res.status(503).json({ success: false, error: 'AI недоступний: Gemini не налаштовано' });
-    }
-    if (activeFormationScoreRequests >= maxActiveFormationScoreRequests) {
-      return res.status(503).setHeader('Retry-After', '10').json({
-        success: false, error: 'AI зайнятий, спробуйте пізніше',
-      });
-    }
-    const userId = res.locals.userId as string;
-    if (!userWorkQuota.allow(userId, 'formation-ai-score', 10, 60 * 60_000) ||
-        !userWorkThrottle.allow(userId, 'formation-ai-score', 20_000)) {
-      return res.status(429).setHeader('Retry-After', '20').json({
-        success: false, error: 'Повторну оцінку AI можна виконати пізніше',
-      });
-    }
-    activeFormationScoreRequests++;
-    try {
-      const score = await evaluateFormationScoreWithAI({
-        symbol, exchange: data.exchange, marketType: data.marketType,
-        timeframe: data.timeframe, formation, currentPrice: data.currentPrice,
-        recentCandles: candles,
-      });
-      res.setHeader('Cache-Control', 'no-store');
-      return res.json({ success: true, score });
-    } catch (error) {
-      console.warn('AI setup score unavailable:', error instanceof Error ? error.message : 'unknown');
-      return res.status(503).json({ success: false, error: 'AI недоступний, спробуйте пізніше' });
-    } finally {
-      activeFormationScoreRequests--;
-    }
-  });
-
-  // AI Formation analysis endpoint
-  app.post('/api/ai/analyze-formation', async (req, res) => {
-    try {
-      const { symbol, exchange, timeframe, formation, currentPrice, recentCandles } = req.body;
-      if (!symbol || !formation) {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-
-      const analysis = await analyzeFormationWithAI(
-        symbol,
-        exchange || 'binance',
-        timeframe || '1h',
-        formation,
-        currentPrice || formation.levels?.entryPrice || 0,
-        recentCandles || []
-      );
-
-      res.json({ success: true, analysis });
-    } catch (err: any) {
-      console.error('Error analyzing formation with AI:', err);
-      res.status(500).json({ success: false, error: err.message || 'AI analysis failed' });
     }
   });
 

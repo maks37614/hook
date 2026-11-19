@@ -14,7 +14,6 @@
     "test": "node --import ./tests/fixtures/offline-network.mjs --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@rolldown/binding-linux-x64-gnu": "^1.2.11",
     "@rolldown/binding-wasm32-wasi": "^1.2.11",
     "@tailwindcss/vite": "^4.3.3",
