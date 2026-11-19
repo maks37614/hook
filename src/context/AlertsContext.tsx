@@ -92,8 +92,9 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  const historyOwnerUid = user?.uid;
   const fetchHistory = useCallback(async () => {
-    const ownerUid = userRef.current?.uid;
+    const ownerUid = historyOwnerUid;
     if (!ownerUid) { setHistory([]); return; }
     setLoadingHistory(true);
     try {
@@ -105,7 +106,7 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setHistory(items.sort((a, b) => b.triggeredAt - a.triggeredAt));
     } catch (error) { console.warn('[Alerts] History unavailable:', error); }
     finally { setLoadingHistory(false); }
-  }, [user?.uid]);
+  }, [historyOwnerUid]);
 
   const fetchHistoryRef = useRef(fetchHistory);
   fetchHistoryRef.current = fetchHistory;

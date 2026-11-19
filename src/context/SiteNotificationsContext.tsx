@@ -373,15 +373,15 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
 
   // Backfill price alerts from server history after login, without sound.
   useEffect(() => {
-    if (uid === 'guest' || !settingsRef.current.optedIn || !settingsRef.current.enabled || !settingsRef.current.price || !settingsRef.current.enabledAt) return;
+    if (uid === 'guest' || !settings.optedIn || !settings.enabled || !settings.price || !settings.enabledAt) return;
     const existing = new Set(itemsRef.current.map(item => item.id));
     let clearedAt = 0;
     try { clearedAt = Number(localStorage.getItem(siteNotificationClearedAtKey(uid))) || 0; } catch {}
     const collected: SiteNotificationItem[] = [];
     for (const h of history.slice(0, 80)) {
       if (h.userId !== uid || !Number.isFinite(h.triggeredAt)
-          || h.triggeredAt <= Math.max(clearedAt, settingsRef.current.enabledAt)) continue;
-      if (!matchesNotificationScope(settingsRef.current, h, favoritesRef.current, { timeframeIndependent: true })) continue;
+          || h.triggeredAt <= Math.max(clearedAt, settings.enabledAt)) continue;
+      if (!matchesNotificationScope(settings, h, favoritesRef.current, { timeframeIndependent: true })) continue;
       const id = h.alertId ? 'price:' + h.alertId + ':' + String(h.deliveryEpoch ?? 0) : 'price-history:' + h.id;
       if (existing.has(id)) continue;
       existing.add(id);
@@ -392,9 +392,7 @@ export const SiteNotificationsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     if (collected.length) replaceItems([...itemsRef.current, ...collected].sort((a, b) => b.timestamp - a.timestamp));
-  }, [uid, settingsRef.current.optedIn, settingsRef.current.enabled, settingsRef.current.enabledAt, settingsRef.current.price,
-    settingsRef.current.scopeExchange, settingsRef.current.scopeMarket, settingsRef.current.scopeTimeframe, settingsRef.current.scopeSymbols,
-    settingsRef.current.onlyFavorites, history, replaceItems]);
+  }, [uid, settings, history, replaceItems]);
 
   // Surveillance is already monitored by the server. Only new, explicitly
   // enabled per-category events are shown as unread; old events stay silent.
