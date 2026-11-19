@@ -34,7 +34,13 @@ function buildEffect(needle: string) {
     'ResizeObserver','setVisualCanvasWidth','terminalSafeManualPriceViewport','showVolumes',
     'terminalHistoryPhase','viewportAdjustedByUserRef',
   ];
-  const script = `exports.run=(env)=>{const {${vars.join(',')}}=env;(${callback})();};`;
+  // Evaluate the real effect with live render-time refs, matching the actual
+  // HookChart component instead of duplicating its viewport algorithm.
+  const script = `exports.run=(env)=>{const {${vars.join(',')}}=env;
+    const hasVisualProfile=Boolean(env.visualProfile);
+    const visualProfileRef={get current(){return env.visualProfile}};
+    const latestViewportInputs={get current(){return {candles:env.candles,focusFormation:env.focusFormation}}};
+    (${callback})();};`;
   const code = ts.transpileModule(script, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   }).outputText;

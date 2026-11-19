@@ -156,10 +156,10 @@ test('Screener, Formations, Terminal carry visual contexts, Replay passes none',
   assert.match(canvas,/onResetVisual=\{key =>/);
   assert.match(canvas,/visualProfileKey=\{replay \? undefined : terminalInitialViewTarget/);
   assert.match(canvas,/visualContextForTerminalWidth/);
-  assert.match(engine,/if\(!visualProfile\|\|!visualProfileKey\|\|!candles\.length\)return/);
-  assert.match(engine,/if\(visualProfile\|\|rangeRestored\.current\|\|!candles\.length\|\|!initialLogicalRange\)return/);
+  assert.match(engine,/if\(!profile\|\|!visualProfileKey\|\|!latestCandles\.length\)return/);
+  assert.match(engine,/if\(hasVisualProfile\|\|rangeRestored\.current\|\|!candles\.length\|\|!initialLogicalRange\)return/);
   assert.match(engine,/visualAppliedRef\.current===signature/);
-  assert.match(engine,/if\(!terminalMode\|\|visualProfile\|\|!candles\.length/);
+  assert.match(engine,/if\(!terminalMode\|\|hasVisualProfile\|\|!hasHistoryCandles/);
   assert.match(formation,/visualContext="formationsQuick"/);
   assert.match(early,/visualContext="formationsQuick"/);
   // A favorite from another market must not inherit the prior setup's visual context.
