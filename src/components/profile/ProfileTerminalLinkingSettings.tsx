@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, Save, PlugZap, RefreshCw, BookOpen, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -23,14 +23,17 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [guideOpen, setGuideOpen] = useState(true);
+  // Do not reset unsaved drafts on unrelated profile updates.
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   useEffect(() => {
     setGuideOpen(true);
   }, [draft.provider]);
 
   useEffect(() => {
-    setDraft(getUserTerminalLinkSettings(user?.uid, profile));
-    setMeta(getUserMetaScalpSettings(user?.uid, profile));
+    setDraft(getUserTerminalLinkSettings(user?.uid, profileRef.current));
+    setMeta(getUserMetaScalpSettings(user?.uid, profileRef.current));
     setMessage(null);
   }, [user?.uid, profile?.uid]);
 

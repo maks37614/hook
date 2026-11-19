@@ -82,12 +82,13 @@ export function ReplaySpeedPicker({ speed, onSpeedChange }: {
     };
   }, [open, updatePosition]);
 
+  const hasMenuPosition = Boolean(position);
   useEffect(() => {
-    if (open && position) {
+    if (open && hasMenuPosition) {
       listRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')
         ?.focus({ preventScroll: true });
     }
-  }, [open, Boolean(position)]);
+  }, [open, hasMenuPosition]);
 
   const chooseSpeed = (next: number) => {
     onSpeedChange(next);

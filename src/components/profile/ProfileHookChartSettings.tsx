@@ -82,7 +82,7 @@ export function ProfileHookChartSettings() {
     setSaving(false);
     setSaved(false);
     setDraft(normalizeOriginalHookChartPreferences(profile?.uid === user?.uid ? profile?.hookChartPreferences : undefined));
-  }, [user?.uid, profile?.uid]);
+  }, [user?.uid, profile?.uid, profile?.hookChartPreferences]);
 
   // Read account updates (including changes made in another chart/page), but
   // never replace unsaved local input with an older remote profile snapshot.
