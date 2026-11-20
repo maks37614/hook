@@ -244,7 +244,8 @@ api.onSnapshot(value=>{
   const pristine=previous && savedDraftMatches(previous);
   const changed=pristine && JSON.stringify(previous)!==JSON.stringify(value.settings.profiles[active]);
   snap=value;
-  if(changed)render(); else {drawOnboarding();drawStatus();updateRemoteLink();}
+  if(changed)render(); else {drawOnboarding();drawStatus();}
+  updateRemoteLink();
 });
 applyLanguage();
 api.snapshot().then(value=>{
