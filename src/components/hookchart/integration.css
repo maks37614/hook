@@ -1210,6 +1210,23 @@
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
 
+/* The collapsed Liq/cascade chevron must remain discoverable on compact
+   Terminal tiles; it only controls existing HUD DOM and never redraws candles. */
+.hookchart-root.hookchart-terminal .liqRiskHud .liqRiskToggle {
+  width:26px;
+  min-width:26px;
+  height:26px;
+  touch-action:manipulation;
+}
+.hookchart-root.hookchart-terminal .liqRiskHud.collapsed .liqRiskToggle {
+  opacity:1;
+  color:#b9c8d9;
+}
+.hookchart-root.hookchart-terminal .liqRiskHud .liqRiskToggle:focus-visible {
+  outline:2px solid #58b5e7!important;
+  outline-offset:1px;
+}
+
 /* Pointer presentation does not repaint candles or allocate full-DPI bitmaps on idle charts. */
 .hookchart-root .chartCanvasSurface { position:relative; width:100%; height:100%; min-width:0; min-height:0; }
 .hookchart-root .chartCanvasSurface > .chartInteractionCanvas {
