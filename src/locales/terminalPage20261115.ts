@@ -3,6 +3,12 @@ import type { SupportedLanguage } from './types';
 
 export const terminalPagePhraseRows = [
   [
+    "AV 1m TOP 10",
+    "AV 1m TOP 10",
+    "AV 1m TOP 10",
+    "AV 1m TOP 10"
+  ],
+  [
     "Навігація термінала",
     "Terminal navigation",
     "Навигация терминала",
