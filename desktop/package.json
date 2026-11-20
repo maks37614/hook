@@ -1,12 +1,12 @@
 {
   "name": "h00k-desktop",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "h00k Desktop application for Windows trading terminals",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --check main.cjs && node --check preload.cjs && node --check toolbar-preload.cjs && node --test test/*.test.cjs",
+    "test": "node --check main.cjs && node --check desktop-link-client.cjs && node --check preload.cjs && node --check toolbar-preload.cjs && node --test test/*.test.cjs",
     "dist": "electron-builder --win nsis --x64 --publish never",
     "brand-assets": "node scripts/generate-installer-assets.cjs",
     "pretest": "npm run brand-assets && npm run installer-locales",
@@ -23,6 +23,7 @@
     "productName": "h00k Desktop",
     "files": [
       "main.cjs",
+      "desktop-link-client.cjs",
       "standalone-chrome.cjs",
       "site-language-picker.cjs",
       "os-compat.cjs",
