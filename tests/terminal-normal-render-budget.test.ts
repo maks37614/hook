@@ -54,7 +54,11 @@ test('Terminal keeps one live visual refresh path despite multiple coin blocks',
   assert.match(page, /isOnlyChart=\{visibleWorkspaceBlocks\.length === 1\}/);
   assert.match(grid, /isSingleBlock=\{false\}/);
   assert.match(grid, /isOnlyChart=\{isOnlyChart\}/);
-  assert.match(widget, /!isSuspended\s*&& \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| compactFullscreenMode \|\| isNearViewport\)/);
+  assert.match(widget, /const shouldLoadWidgets = !isSuspended && isNearViewport/);
+  assert.match(widget, /useLayoutEffect\(\(\) => \{/);
+  assert.match(widget, /isMaximized \|\| compactFullscreenMode/);
+  assert.doesNotMatch(widget, /isOnlyChart \|\| isNearViewport/,
+    'a single Terminal chart must also suspend when the user cannot see it');
   assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \|\| isOnlyChart \? 1000 : 180\}/);
   assert.doesNotMatch(page, /new WebSocket\(/);
 });
