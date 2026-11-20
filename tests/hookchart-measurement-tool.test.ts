@@ -74,3 +74,10 @@ test('only the selected HTML dock may delete a ruler; old canvas delete hit is r
   assert.doesNotMatch(code, /measurementDeleteClick/);
   assert.doesNotMatch(code, /hit==='delete'/);
 });
+
+// The measuring tool must work on a short tap, a single long drag and re-sizing.
+test('measurement endpoints have generous touch targets and win over the label', () => {
+  const a = { t: 0, p: 100 }, b = { t: 120000, p: 90 };
+  assert.equal(measurementHit(view, a, b, view.x(a.t) + 15, view.y(a.p)), 'start');
+  assert.equal(measurementHit(view, a, b, view.x(b.t) - 15, view.y(b.p)), 'end');
+});

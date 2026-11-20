@@ -79,9 +79,11 @@ export function measurementHit(g: MeasurementView, a: MeasurementPoint, b: Measu
   const x1 = g.x(a.t), x2 = g.x(b.t), y1 = g.y(a.p), y2 = g.y(b.p);
   if (Math.max(x1, x2) < 0 || Math.min(x1, x2) > g.plotW || Math.max(y1, y2) < 0 || Math.min(y1, y2) > g.plotH) return null;
   const label = measurementLabelLayout(g, a, b);
+  // Larger endpoint targets are easier to grab on touch. Prioritize anchors
+  // even if the floating measurements card overlaps a handle.
+  if (Math.hypot(x - x1, y - y1) <= 18) return 'start';
+  if (Math.hypot(x - x2, y - y2) <= 18) return 'end';
   if (x >= label.x && x <= label.x + label.width && y >= label.y && y <= label.y + label.height) return 'body';
-  if (Math.hypot(x - x1, y - y1) <= 13) return 'start';
-  if (Math.hypot(x - x2, y - y2) <= 13) return 'end';
   const left = Math.min(x1, x2), right = Math.max(x1, x2), top = Math.min(y1, y2), bottom = Math.max(y1, y2);
   if (x >= left - 6 && x <= right + 6 && y >= top - 6 && y <= bottom + 6) return 'body';
   const vx = x2 - x1, vy = y2 - y1, sq = vx * vx + vy * vy || 1;

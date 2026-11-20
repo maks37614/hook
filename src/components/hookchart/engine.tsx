@@ -15,6 +15,7 @@ import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, paintChartCrosshair, paintChartRuler } from './chartCursor';
 import { DEFAULT_MAX_CANVAS_DPR, effectiveCanvasDpr } from './canvasDpr';
 import { measurementStats, measurementHit, paintMeasurement, measurementActionPosition } from './measurementTool';
+import { rulerDragThresholdMet, rulerHasRange } from './rulerGestures';
 import { createChartTouchHold, isChartControlTarget } from './touchHold';
 import { CrosshairTimeLabel } from './CrosshairTimeLabel';
 import type { ChartCrosshairStore, CrosshairPosition } from './crosshairState';
@@ -1381,7 +1382,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     }
   });
   if((tool==='trend'||tool==='profile'||tool==='ruler'||tool==='fib'||tool==='ray'||tool==='rect')&&draft&&mouse&&mouse.x>=0&&mouse.x<=g.plotW&&mouse.y>=0&&mouse.y<=g.plotH){
-    const end=snap(mouse.x,mouse.y,g),x1=g.x(draft.t),y1=g.y(draft.p),x2=g.x(end.t),y2=g.y(end.p);q.save();
+    const end=tool==='ruler'?freeDrawingPoint(mouse.x,mouse.y,g):snap(mouse.x,mouse.y,g),x1=g.x(draft.t),y1=g.y(draft.p),x2=g.x(end.t),y2=g.y(end.p);q.save();
     if(tool==='profile'){const lx=Math.min(x1,x2),rx=Math.max(x1,x2);q.fillStyle='rgba(100,126,156,.08)';q.fillRect(lx,0,Math.max(1,rx-lx),g.plotH);q.strokeStyle='rgba(220,229,239,.65)';q.lineWidth=1;q.setLineDash([4,4]);q.strokeRect(lx+.5,.5,Math.max(1,rx-lx),g.plotH-1)}
     else if(tool==='fib'){const lx=Math.min(x1,x2),rx=Math.max(x1,x2),dp=end.p-draft.p;q.font='600 10px system-ui';for(let fi=0;fi<FIB_LEVELS.length;fi++){const r=FIB_LEVELS[fi],price=draft.p+dp*r,yy=g.y(price),col=FIB_COLORS[fi];q.strokeStyle=col;q.globalAlpha=.78;q.lineWidth=r===.5||r===.618?1.1:.8;q.setLineDash([4,3]);q.beginPath();q.moveTo(lx,yy);q.lineTo(rx,yy);q.stroke();q.setLineDash([]);q.globalAlpha=1;q.fillStyle=col;q.fillText(r.toFixed(r===0||r===1?0:3),Math.min(g.plotW-35,rx+4),Math.max(11,yy-2))}q.fillStyle='#dce5ef';for(const [xx,yy] of [[x1,y1],[x2,y2]]){q.beginPath();q.arc(xx,yy,2.5,0,Math.PI*2);q.fill()}}
     else if(tool==='ruler'){
@@ -1397,6 +1398,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       for(const [xx,yy] of [[x1,y1],[x2,y2]]){q.beginPath();q.arc(xx,yy,2.5,0,Math.PI*2);q.fill()}
     }
     q.setLineDash([]);q.restore();
+  }
+  // After the first tap, keep the ruler's start anchor visible on touch screens.
+  if(tool==='ruler'&&draft&&!mouse){
+    const x=g.x(draft.t),y=g.y(draft.p);
+    if(x>=0&&x<=g.plotW&&y>=0&&y<=g.plotH){
+      q.save();q.fillStyle='#ffffff';q.strokeStyle='#34cda7';q.lineWidth=1.5;
+      q.beginPath();q.arc(x,y,5,0,Math.PI*2);q.fill();q.stroke();q.restore();
+    }
   }
   (archiveCapture ? [] : alerts).filter(a=>a.id.startsWith(symbol+':')).forEach(a=>{const yy=g.y(a.p);if(yy<0||yy>g.plotH)return;const col=a.fired?'#5c6673':'#d95763';q.strokeStyle=col;q.lineWidth=1;q.globalAlpha=a.fired?.45:.72;q.setLineDash([3,5]);q.beginPath();q.moveTo(0,yy);q.lineTo(g.plotW,yy);q.stroke();q.setLineDash([]);q.globalAlpha=1;q.fillStyle=col;q.beginPath();q.moveTo(g.plotW-7,yy);q.lineTo(g.plotW-1,yy-4);q.lineTo(g.plotW-1,yy+4);q.closePath();q.fill()});
   // Live current-price guide: a fine dotted ray from the latest candle to the price scale,
@@ -1492,6 +1501,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    pointers.current.set(e.pointerId,{x:z.x,y:z.y});
    scheduleDraw();
    if(pointers.current.size>=2){
+     // The second finger cancels the uncommitted ruler and starts pinch zoom.
+     if(tool==='ruler')setDraft(null);
      magnifierPointer.current=null;transient.current=null;touchCursorVisible.current=false;suppressTouchClick.current=true;
      const a=[...pointers.current.values()];
      drag.current={kind:'pinch',distX:Math.max(1,Math.abs(a[0].x-a[1].x)),bar:vp.fitAll?Math.max(.001,z.g.step):vp.barWidth,anchor:z.g.virtualStart+(a[0].x+a[1].x)/2/z.g.step};
@@ -1511,12 +1522,21 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        cancelTouchHold();scheduleDraw();return;
      }
    }
-   // A drawing point is committed on finger RELEASE, never on the first
-   // touch. Show an immediate magnifier so sliding the fingertip can refine
-   // the candle/time and price without panning or prematurely placing a point.
-   // The ruler's existing endpoint drag/delete handling above stays intact.
+   // One press + drag + release creates a ruler for mouse, pen and touch.
+   // A short tap alone also arms a first point for the optional second tap.
+   // Existing ruler handles have priority above this new-drawing path.
+   if(tool==='ruler'&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
+     const first=draft??freeDrawingPoint(z.x,z.y,z.g);
+     if(!draft)setDraft(first);
+     drag.current={kind:'rulerPlacement',pointerId:e.pointerId,
+       first,hadDraft:!!draft,x:z.x,y:z.y,moved:false};
+     suppressTouchClick.current=e.pointerType!=='mouse';
+     scheduleDraw(true);
+     return;
+   }
+   // Other drawing tools retain their two-stage placement and precision lens.
    if((e.pointerType==='touch'||e.pointerType==='pen')&&
-      ['trend','ray','rect','fib','profile','ruler','level','text'].includes(tool)&&
+      ['trend','ray','rect','fib','profile','level','text'].includes(tool)&&
       zone(z.x,z.y,z.g)==='plot'){
      cancelTouchHold();
      magnifierPointer.current=e.pointerId;
@@ -1602,6 +1622,17 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      scheduleDraw();
      return;
    }
+   if(drag.current?.kind==='rulerPlacement'&&drag.current.pointerId===e.pointerId){
+     e.preventDefault();
+     const d=drag.current;
+     const x=Math.max(0,Math.min(z.g.plotW-1,z.x)),y=Math.max(0,Math.min(z.g.plotH-1,z.y));
+     d.moved=d.moved||rulerDragThresholdMet(d,{x,y});
+     if(d.moved)suppressTouchClick.current=true;
+     mouseRef.current={x,y};
+     pointers.current.set(e.pointerId,{x,y});
+     scheduleDraw(true);
+     return;
+   }
    if(drag.current?.kind==='drawingPlacement'&&drag.current.pointerId===e.pointerId){
      // Pointer capture lets a user slide until the lens shows the exact
      // anchor; clamping avoids spilling the crosshair into the price axis.
@@ -1682,13 +1713,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      gestureUpdate(v=>({...v,autoY:false,manualCenter:center,manualRange:nr}));
      return;
    }
-   if(tool!=='cursor')return;
-   if(d.kind==='pinch'&&pointers.current.size>=2){
+   if(d.kind==='pinch'&&pointers.current.size>=2&&(tool==='cursor'||tool==='ruler')){
      const a=[...pointers.current.values()],distX=Math.max(1,Math.abs(a[0].x-a[1].x)),ratio=terminalMode?distX/(d.distX||1):Math.max(.35,Math.min(3.2,distX/(d.distX||1)));
      const barWidth=Math.max(.12,Math.min(34,d.bar*ratio));
      const midX=(a[0].x+a[1].x)/2;
      gestureUpdate(v=>({...v,fitAll:false,barWidth,...(terminalMode?{rightOffset:candles.length+rightPaddingBars+rightPadding/barWidth-d.anchor-(z.g.plotW-midX)/barWidth}:{})}));return
    }
+   if(tool!=='cursor')return;
    if(d.kind==='touchCursor'){
      const dx=z.x-d.x,dy=z.y-d.y;
      // Hold to inspect without moving the candles; a normal swipe still pans both axes.
@@ -1868,7 +1899,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(!draft){setDraft(p);setSelectedDrawingId(null)}
    else{const id=symbol+':'+uid();setDrawings(a=>[...a,{id,type:tool,pts:[draft,p]}]);setDraft(null);setSelectedDrawingId(id);setDrawingActions({id,...drawingActionsPosition(x,y,g.plotW,g.plotH)});setEditingDrawingId(null)}
  };
- const handleClick=(e:React.MouseEvent<HTMLElement>)=>{if(suppressDrawingClick.current){suppressDrawingClick.current=false;return}if(suppressTouchClick.current){suppressTouchClick.current=false;return}const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height||zone(x,y,g)!=='plot')return;
+ const handleClick=(e:React.MouseEvent<HTMLElement>)=>{if(suppressDrawingClick.current){suppressDrawingClick.current=false;return}if(suppressTouchClick.current){suppressTouchClick.current=false;return}if(tool==='ruler')return;const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height||zone(x,y,g)!=='plot')return;
    // Marker lines are clickable in cursor, alert and eraser modes (mouse or tap).
    // The parent shows a delete confirmation for real Telegram alerts.
    if(onSelectPriceAlert&&(tool==='cursor'||tool==='alert'||tool==='erase')){
@@ -1943,6 +1974,28 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  };
  const handleDoubleClick=(e:React.MouseEvent<HTMLElement>)=>{const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height)return;if(zone(x,y,g)==='price'){viewportAdjustedByUserRef.current=true;manualPriceAxisOverride.current=false;setVp(v=>({...v,autoY:true,manualCenter:null,manualRange:null}))}else reset()};
  const handleTouchEnd=(e:React.PointerEvent<HTMLElement>)=>{
+   if(drag.current?.kind==='rulerPlacement'&&drag.current.pointerId===e.pointerId){
+     const d=drag.current,z=point(e);
+     if(e.type==='pointerup'&&z){
+       const x=Math.max(0,Math.min(z.g.plotW-1,z.x));
+       const y=Math.max(0,Math.min(z.g.plotH-1,z.y));
+       const last=freeDrawingPoint(x,y,z.g);
+       // A drag or second tap commits the ruler; a first short tap only sets
+       // the start marker. Skip zero-length measurements.
+       if((d.moved||d.hadDraft)&&rulerHasRange(d.first,last)){
+         const id=symbol+':'+uid();
+         setDrawings(list=>[...list,{id,type:'ruler',pts:[d.first,last]}]);
+         setDraft(null);setSelectedDrawingId(id);setEditingDrawingId(null);
+         setAlertActions(null);
+         setDrawingActions({id,...drawingActionsPosition(x,y,z.g.plotW,z.g.plotH)});
+       }else if(!d.hadDraft){
+         setDraft(d.first);
+       }
+       suppressTouchClick.current=true;
+     }
+     handlePointerUp(e);
+     return;
+   }
    if(drag.current?.kind==='drawingPlacement'&&drag.current.pointerId===e.pointerId){
      // A canceled pointer must never leave a half-placed drawing or
      // duplicate a point via the browser's synthetic click.
