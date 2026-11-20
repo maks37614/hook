@@ -50,7 +50,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     scheduleDraw:()=>{},editingDrawingId:null,drawings:[],draft:null,tool:'cursor',levelLabelMode:'always',autoLevels:[],timeMarkers:[],
     uid:()=> 'testing', drawingActionsPosition:(x:number,y:number)=>({x,y}),
     snap:(x:number,y:number)=>({t:x*1000,p:110-y/35}),
-    setDraft:()=>{},setDrawingActions:()=>{},
+    setDraft:()=>{},setDrawingActions:()=>{},setAlertActions:()=>{},
     measurementHit,freeDrawingPoint,translateDrawingPoints,resizeHookChartViewport,
     rulerDragThresholdMet,rulerHasRange,isRangeDrawingTool,isPointDrawingTool,
     intervalMs:60000,symbol:'BTCUSDT',setSelectedDrawingId:()=>{},setEditingDrawingId:()=>{},setDrawings:()=>{},
