@@ -55,45 +55,40 @@ export function scalperPixelCenteredHorizontalY(y: number, strokeWidth: number, 
 
 
 /**
- * A cascade tier is active only until the first post-pivot wick reaches or
- * crosses its price. Outermost boundaries may have been established by a later
- * pivot than line.from; use that last price-matching pivot as activation time.
- * The creating candle itself must never invalidate its own level.
- *
- * This is presentation-only: detection, breakout states and historical candles
- * are never modified. The last (potentially live) candle is included so an
- * intrabar sweep hides the level immediately, without waiting for close.
+ * Only lines originating at their actual defining swing wick are valid.
+ * Later contact, sweep or gap through the price expires that exact tier:
+ * a later retest never moves the activation timestamp forward to resurrect it.
+ * This reads only already available OHLC, including the current live bar.
  */
 export function cascadeLineIsActive(
   line: ScalperLine,
-  touches: readonly ScalperPoint[],
+  _touches: readonly ScalperPoint[],
   candles: readonly ScalperCandle[],
   side: 'upper' | 'lower',
 ): boolean {
   const price = line.from.p;
+  const activationTime = line.from.t;
   if (!Number.isFinite(price) || price <= 0 || line.to.p !== price ||
-      !Number.isFinite(line.from.t) || !candles.length) return false;
-  let activatedAt = line.from.t;
-  if (line.role !== 'cascade-step') {
-    const epsilon = Math.max(1e-12, Math.abs(price) * 1e-12);
-    for (const touch of touches) {
-      if (Number.isFinite(touch.t) && Number.isFinite(touch.p) &&
-          Math.abs(touch.p - price) <= epsilon && touch.t > activatedAt) {
-        activatedAt = touch.t;
-      }
-    }
-  }
-  if (candles[candles.length - 1].t < activatedAt) return false;
-  // Scan back only to activation. With the Scalper analyzer's bounded recent
-  // pivots this covers a small number of bars and never starts network work.
+      !Number.isFinite(activationTime) || !candles.length) return false;
+  const lastTime = candles[candles.length - 1].t;
+  if (!Number.isFinite(lastTime) || lastTime < activationTime) return false;
+
+  // Require the historical anchor itself to really be the high/low that
+  // established this tier. Previously an outer boundary could start on a
+  // DIFFERENT pivot's candle, drawing a false level across older candles.
+  const epsilon = Math.max(1e-12, Math.abs(price) * 1e-12);
   for (let i = candles.length - 1; i >= 0; i--) {
     const bar = candles[i];
-    if (!Number.isFinite(bar.t)) return false;
-    if (bar.t <= activatedAt) break;
-    if (!Number.isFinite(bar.h) || !Number.isFinite(bar.l) || bar.h < bar.l) return false;
+    if (!Number.isFinite(bar.t) || !Number.isFinite(bar.h) ||
+        !Number.isFinite(bar.l) || bar.h < bar.l) return false;
+    if (bar.t === activationTime) {
+      return Math.abs((side === 'upper' ? bar.h : bar.l) - price) <= epsilon;
+    }
+    if (bar.t < activationTime) break;
     if (side === 'upper' ? bar.h >= price : bar.l <= price) return false;
   }
-  return true;
+  // No defining historical candle in memory means the ray cannot be verified.
+  return false;
 }
 
 /**
