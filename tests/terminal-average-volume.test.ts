@@ -40,6 +40,27 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
   assert.equal(coins[0].symbol, 'SOLUSDT');
 });
 
+test('AV 1m does not reject a tradable market solely for missing 24h change', () => {
+  const candidate = quote('NEWUSDT', 1_440_000, { change24h: Number.NaN });
+  const all = { exchange: 'all', marketType: 'all' } as const;
+  assert.deepEqual(selectMarketPresetCoins([candidate], 'av_1m', all, 10).map(c => c.symbol), ['NEWUSDT']);
+  assert.deepEqual(selectMarketPresetCoins([candidate], 'top_gainers', all, 10), []);
+});
+
+test('empty market feed triggers a shared quote retry, not a false no-coins conclusion', () => {
+  const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
+  const loader = readFileSync(new URL('../src/utils/marketCoinLoader.ts', import.meta.url), 'utf8');
+  assert.match(loader, /Array\.isArray\(result\.data\) && result\.data\.length > 0/);
+  assert.match(panel, /const \[pendingMarketPreset, setPendingMarketPreset\]/);
+  assert.match(panel, /pendingQuoteSnapshot\.current = snapshot/);
+  assert.match(panel, /onRequestMarketRefresh\?\.\(\)/);
+  assert.match(panel, /applyRef\.current\(matched, pendingMarketPreset\)/);
+  assert.match(page, /onRequestMarketRefresh=\{\(\) => requestMarketRefreshRef\.current\?\.\(true\)\}/);
+  assert.match(page, /exchange === 'binance' \|\| exchange === 'bybit' \? exchange : 'all'/);
+  assert.match(page, /marketType === 'spot' \|\| marketType === 'futures' \? marketType : 'all'/);
+});
+
 test('AV shares existing quote refresh/preset pagination and does not trigger separate market-wide scans', () => {
   const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
   const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
