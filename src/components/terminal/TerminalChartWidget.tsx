@@ -344,6 +344,13 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       ? coin.formations ?? [] : []
   ), [coin, block.symbol, block.exchange, block.marketType, block.timeframe]);
   const chosenFormation = availableFormations.find(item => item.id === block.formationId) ?? null;
+  // A chart's TP / Entry / SL markers are an opt-in display layer. The optional
+  // field lives in the cloud workspace so old and newly added tiles start OFF.
+  const showTradeLevels = block.showTradeLevels === true;
+  const tradeLevelToggle = useMemo(() => ({
+    visible: showTradeLevels,
+    onToggle: () => onUpdateBlock({ showTradeLevels: !showTradeLevels }),
+  }), [showTradeLevels, onUpdateBlock]);
   // Reuse existing scanner results only: no extra analysis or exchange requests per chart.
   const chosenMarkers = useMemo(() => chosenFormation
     ? formationChartMarkers(chosenFormation, { entry: true, target: true, stop: true }, block.timeframe)
@@ -759,6 +766,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
                 formation={chosenFormation || (chartProvider === 'hookchart' && coin?.timeframe === block.timeframe ? activeFormation : undefined)}
                 customMarkers={chosenMarkers}
                 previewMarkers={!!chosenFormation}
+                tradeLevelToggle={tradeLevelToggle}
                 symbol={block.symbol}
                 exchange={block.exchange}
                 marketType={block.marketType}
