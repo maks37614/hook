@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { MarketCoin } from '../src/types';
-import { MARKET_PRESETS, selectMarketPresetCoins, isAvOneMinuteExcludedBase } from '../src/utils/marketPresets';
+import { MARKET_PRESETS, selectMarketPresetCoins, isAvOneMinuteExcludedBase, AV_1M_CUSTOM_EXCLUSIONS } from '../src/utils/marketPresets';
 
 function quote(symbol: string, volumeUsd: number, extra: Partial<MarketCoin> = {}): MarketCoin {
   return {
@@ -160,6 +160,84 @@ test('AV 1m excludes large benchmarks and BTC/ETH price trackers, not unrelated 
     .map(x=>x.symbol), ['AKEUSDT']);
   // No unrelated preset is affected by the exclusions.
   assert.ok(selectMarketPresetCoins(coins,'av',all,Number.POSITIVE_INFINITY).some(x=>x.symbol==='WBTCUSDT'));
+});
+
+test('AV 1m excludes exactly the additional requested base assets on Binance/Bybit Spot/Futures', () => {
+  const excluded = [
+    'SOXS','SPCX','XAG','1000PEPE','NEAR','AMD','GOOGL','TQQQ','MSTR',
+    'SPY','BZ','SNXX','CL','HYPE','SKHYNIX','KORU','SKHY','QQQ',
+  ];
+  assert.equal(excluded.length, 18);
+  assert.deepEqual([...AV_1M_CUSTOM_EXCLUSIONS].sort(), [...excluded].sort(),
+    'all user-specified exclusions must be present');
+  const all = {exchange:'all',marketType:'all'} as const;
+  const markets = [
+    {exchange:'binance' as const,marketType:'futures' as const},
+    {exchange:'binance' as const,marketType:'spot' as const},
+    {exchange:'bybit' as const,marketType:'futures' as const},
+    {exchange:'bybit' as const,marketType:'spot' as const},
+  ];
+  for (const market of markets) {
+    const coins = [
+      ...excluded.map(base => quote(base+'USDT', 500_000_000, market)),
+      quote('AKEUSDT',451_106_979.95045,market),
+      quote('KERNELUSDT',450_000_000,market),
+      quote('NEARXUSDT',435_000_000,market),
+      quote('HYPERUSDT',410_000_000,market),
+      quote('1000PEPE2USDT',380_000_000,market),
+      quote('SKHYXUSDT',310_000_000,market),
+    ];
+    for (const base of excluded) {
+      assert.equal(isAvOneMinuteExcludedBase(base),true,base+' should be excluded');
+      assert.equal(isAvOneMinuteExcludedBase(' '+base.toLowerCase()+' '),true,base+' should be case insensitive');
+    }
+    for (const base of ['AKE','KERNEL','NEARX','HYPER','1000PEPE2','SKHYX']) {
+      assert.equal(isAvOneMinuteExcludedBase(base),false,base+' must remain searchable');
+    }
+    const ranked=selectMarketPresetCoins(coins,'av_1m',all,Number.POSITIVE_INFINITY);
+    assert.deepEqual(ranked.map(row=>row.symbol),
+      ['AKEUSDT','KERNELUSDT','NEARXUSDT','HYPERUSDT','1000PEPE2USDT','SKHYXUSDT'],
+      'exact base exclusions should never hide eligible unrelated markets');
+    assert.deepEqual(selectMarketPresetCoins(coins,'av_1m',market,Number.POSITIVE_INFINITY).map(row=>row.symbol),
+      ranked.map(row=>row.symbol));
+    assert.equal(selectMarketPresetCoins(coins,'av_1m',
+      {exchange:market.exchange==='binance'?'bybit':'binance',marketType:market.marketType},
+      Number.POSITIVE_INFINITY).length,0,'do not leak an exchange');
+    assert.equal(selectMarketPresetCoins(coins,'av',market,Number.POSITIVE_INFINITY).length,
+      coins.length,'other presets are unaffected by AV-only exclusions');
+  }
+});
+
+test('Terminal exchange/market controls filter automatic quote presets, formations and saved lists keep source identities', () => {
+  const page=readFileSync(new URL('../src/components/TerminalPage.tsx',import.meta.url),'utf8');
+  const panel=readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx',import.meta.url),'utf8');
+  const drawer=readFileSync(new URL('../src/components/terminal/TerminalSettingsDrawer.tsx',import.meta.url),'utf8');
+  const core=readFileSync(new URL('../src/utils/marketPresets.ts',import.meta.url),'utf8');
+  assert.match(drawer, /coinSelection\.exchange/);
+  assert.match(drawer, /onUpdateConfig\(\{ coinPresetExchange: event\.target\.value/);
+  assert.match(drawer, /coinSelection\.marketType/);
+  assert.match(drawer, /onUpdateConfig\(\{ coinPresetMarketType: event\.target\.value/);
+  assert.match(page, /config\.coinPresetExchange \?\? preferences\.defaultExchange/);
+  assert.match(page, /config\.coinPresetMarketType \?\? preferences\.defaultMarketType/);
+  assert.match(page, /selection=\{coinPresetSelection\}/);
+  assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
+  assert.match(core, /selection\.exchange !== 'all' && selection\.exchange !== coin\.exchange/);
+  assert.match(core, /selection\.marketType !== 'all' && selection\.marketType !== coin\.marketType/);
+  assert.match(panel, /id === 'formations'\s*\? selectFormationPresetCoins\(formationCoins\)/);
+  assert.match(page, /const handleLoadCoinPreset = \(preset: TerminalSavedPreset\)/);
+  const coins=[
+    quote('AKEUSDT',451_106_979,{exchange:'binance',marketType:'futures'}),
+    quote('XYZUSDT',500_000_000,{exchange:'bybit',marketType:'spot'}),
+    quote('QRSUSDT',600_000_000,{exchange:'binance',marketType:'spot'}),
+  ];
+  for(const preset of ['active','top_gainers','near_highs','av_1m'] as const) {
+    const eligible=preset==='active'?coins.map(c=>({...c,isActiveCoin:true}))
+      :preset==='near_highs'?coins.map(c=>({...c,isNearHigh:true})):coins;
+    assert.deepEqual(selectMarketPresetCoins(eligible,preset,
+      {exchange:'binance',marketType:'futures'},Number.POSITIVE_INFINITY).map(c=>c.symbol),['AKEUSDT']);
+    assert.deepEqual(selectMarketPresetCoins(eligible,preset,
+      {exchange:'bybit',marketType:'spot'},Number.POSITIVE_INFINITY).map(c=>c.symbol),['XYZUSDT']);
+  }
 });
 
 test('AV 1m exposes all ranked coins in paginated groups of up to 50 live charts', () => {
