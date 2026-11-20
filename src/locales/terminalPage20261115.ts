@@ -165,6 +165,12 @@ export const terminalPagePhraseRows = [
     "Zegar i menu sesji handlowych w nagłówku Terminala"
   ],
   [
+    "Середній обсяг торгів за хвилину (USDT), розрахований за оборотом 24г. Від найбільшого до найменшого.",
+    "Average trading volume per minute (USDT) based on 24h turnover, highest first.",
+    "Средний объём торгов в минуту (USDT) по обороту за 24 ч, от большего к меньшему.",
+    "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
+  ],
+  [
     "Топ ріст 24г",
     "Top gainers (24h)",
     "Лидеры роста за 24 ч",
@@ -181,6 +187,36 @@ export const terminalPagePhraseRows = [
     "Active coins by 5-minute volatility, as in Screener",
     "Активные монеты по волатильности за 5 мин, как в Скринере",
     "Aktywne monety według zmienności z 5 min, jak w Skanerze"
+  ],
+  [
+    "Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування",
+    "Coins from the current Formations or early W/M list, preserving filters and sort order",
+    "Монеты из текущего списка Формаций или раннего W/M с учётом фильтров и сортировки",
+    "Monety z bieżącej listy formacji lub wczesnego W/M, z uwzględnieniem filtrów i kolejności"
+  ],
+  [
+    "Завантаження монет зі сторінки Формацій…",
+    "Loading coins from the Formations page…",
+    "Загрузка монет со страницы Формаций…",
+    "Wczytywanie monet ze strony Formacje…"
+  ],
+  [
+    "Сканер формацій зайнятий. Спробуйте знову пізніше.",
+    "The formation scanner is busy. Try again later.",
+    "Сканер формаций занят. Попробуйте позже.",
+    "Skaner formacji jest zajęty. Spróbuj ponownie później."
+  ],
+  [
+    "Не вдалося завантажити формації. Спробуйте знову.",
+    "Could not load formations. Try again.",
+    "Не удалось загрузить формации. Попробуйте снова.",
+    "Nie udało się wczytać formacji. Spróbuj ponownie."
+  ],
+  [
+    "У списку Формацій немає монет за поточними фільтрами.",
+    "No coins match the current Formations filters.",
+    "По текущим фильтрам в списке Формаций нет монет.",
+    "Brak monet pasujących do bieżących filtrów formacji."
   ],
   [
     "Найбільше зростання за 24 години",

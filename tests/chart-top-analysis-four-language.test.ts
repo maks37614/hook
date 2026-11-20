@@ -50,6 +50,11 @@ test('all six labels have localized Ukrainian, English, Russian and Polish forms
   assert.equal(translatePhrase('ru', 'оновлення...'), 'обновление...');
 });
 
+test('above-chart block no longer fetches or displays funding', () => {
+  assert.doesNotMatch(source, /subscribeSharedHookChartFunding|chart-top-funding|Фандинг Binance:|Фандинг Bybit:/);
+  assert.doesNotMatch(view, /Фандинг:/);
+});
+
 test('localization does not change OI polling cadence, chart sizing, or analysis calculations', () => {
   assert.match(source, /const interval = setInterval\(\(\) => \{/);
   assert.match(source, /\}, 10_000\);/);

@@ -43,6 +43,10 @@ interface ReplayChartProps {
   isHistoryLoading: boolean;
   onToggleHistory: () => void;
   isPlaying: boolean;
+  /** The last displayed candle is a reconstructed, not tick-recorded, live-looking bar. */
+  isIntrabarPreview?: boolean;
+  /** Actual verified 1s Binance history, pending fetch, or OHLC approximation. */
+  intrabarSource?: 'seconds' | 'loading' | 'simulated';
   canAdvance: boolean;
   onTogglePlay: () => void;
   onStepForward: () => void;
@@ -68,6 +72,8 @@ export const ReplayChart = forwardRef<ReplayChartHandle, ReplayChartProps>(({
   isHistoryLoading,
   onToggleHistory,
   isPlaying,
+  isIntrabarPreview = false,
+  intrabarSource = 'simulated',
   canAdvance,
   onTogglePlay,
   onStepForward,
@@ -627,6 +633,20 @@ export const ReplayChart = forwardRef<ReplayChartHandle, ReplayChartProps>(({
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-950/70 border border-amber-500/50 text-amber-300 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 {t('replay.chart.chart.mode')}
+              </span>
+            )}
+            {(isPlaying || isIntrabarPreview) && (
+              <span role="note" title={t(intrabarSource === 'seconds'
+                  ? 'replay.static.toolbar.secondDisclaimer'
+                  : intrabarSource === 'loading'
+                    ? 'replay.static.toolbar.secondLoadingHelp'
+                    : 'replay.static.toolbar.intrabarDisclaimer')}
+                className="shrink-0 rounded border border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-200/80">
+                {t(intrabarSource === 'seconds'
+                  ? 'replay.static.toolbar.secondBadge'
+                  : intrabarSource === 'loading'
+                    ? 'replay.static.toolbar.secondLoading'
+                    : 'replay.static.toolbar.intrabarBadge')}
               </span>
             )}
             {isFocusedBadge && (

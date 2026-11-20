@@ -10,7 +10,10 @@ test('switching profiles cancels prior playback and discards in-flight historica
   assert.match(source, /historyRequestIdRef\.current\+\+/);
   assert.match(source, /setAllCandles\(\[\]\)/);
   assert.match(source, /setIsPlaying\(false\)/);
-  assert.match(source, /if \(!isReady\) setIsPlaying\(false\)/);
+  assert.match(source, /if \(!isReady\) \{\s*setIsPlaying\(false\);\s*resetIntrabar\(\)/,
+    'a not-yet-ready profile cancels playback and clears the fractional candle');
+  assert.match(source, /replaySecondCacheRef\.current\.clear\(\)/,
+    'a new account must not reuse historical second buffers from the prior session');
 });
 test('late screenshot operations cannot write into a different signed-in user journal', () => {
   assert.match(source, /screenshotOwnerRef\.current = owner/);

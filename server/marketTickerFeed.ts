@@ -174,6 +174,17 @@ export class MarketTickerFeed {
     return entry.binanceTradeCounts.get(symbol) ?? null;
   }
 
+  /** A valid recent 24h quote from the existing shared ticker cache; never fetch the exchange here. */
+  getCached24hVolumeUsd(exchange: ExchangeId, market: MarketType, symbol: string): number | null {
+    const entry = this.entries.get(`${exchange}:${market}`);
+    if (!entry || entry.updatedAt === null) return null;
+    const age = this.now() - entry.updatedAt;
+    if (age < 0 || age >= 120_000) return null;
+    const position = entry.symbolPositions?.get(symbol);
+    const volume = position === undefined ? undefined : entry.data[position]?.volumeUsd;
+    return typeof volume === 'number' && Number.isFinite(volume) && volume >= 0 ? volume : null;
+  }
+
   /** Preserve original collection times without performing any network work. */
   cached() {
     return Array.from(this.entries.entries()).map(([key, entry]) => ({

@@ -55,7 +55,9 @@ import { useTerminalWorkspace } from '../utils/useTerminalWorkspace';
 import { blocksForMarketPreset, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, MAX_TERMINAL_CHARTS } from '../utils/terminalPresets';
 import { getTerminalPresetPage, pageAfterLimitChange, resolveTerminalPresetPageSize, resolveTerminalWorkspacePageSize } from '../utils/terminalPresetPaging';
 import { terminalGridColumnClasses, terminalResponsiveAutoHeights, terminalResponsiveSpanClasses } from '../utils/terminalResponsiveGrid';
-import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset } from '../utils/marketPresets';
+import { normalizeTerminalTouchGapPx } from '../utils/terminalTouchGap';
+import { enableTerminalGutterTouchScroll } from '../utils/terminalGutterTouchScroll';
+import { MARKET_PRESETS, coinMarketKey, type TerminalMarketPreset, type TerminalPresetCoin } from '../utils/marketPresets';
 import { loadMarketCoins, type MarketCoinSnapshot } from '../utils/marketCoinLoader';
 import { nextTerminalMarketRefreshDelay } from '../utils/desktopTerminalRefresh';
 import { applyTerminalTimeframe } from '../utils/terminalTimeframe';
@@ -76,6 +78,11 @@ import { terminalAnalysisText } from '../utils/terminalAnalysis/presentation';
 
 interface TerminalPageProps {
   coins: ScannedCoin[];
+  /** The already-filtered, already-sorted list displayed on Formations. */
+  formationPresetCoins?: readonly ScannedCoin[];
+  /** Optional one-shot request, only on a click with no visible Formations coins. */
+  onRequestFormationScan?: () => boolean;
+  formationScanStatus?: 'idle' | 'loading' | 'ready' | 'busy' | 'failed';
   watchlist: string[];
   onToggleWatchlist: (symbol: string) => void;
   onSendMetaScalp?: (coin: ScannedCoin) => void;
@@ -87,6 +94,9 @@ interface TerminalPageProps {
 
 export const TerminalPage: React.FC<TerminalPageProps> = ({
   coins: formationCoins,
+  formationPresetCoins = [],
+  onRequestFormationScan,
+  formationScanStatus = 'idle',
   watchlist,
   onToggleWatchlist,
   onSendMetaScalp,
@@ -132,13 +142,20 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     ru: { signIn: 'Войдите в профиль, чтобы сохранять монеты.', unavailable: 'Снимок графика ещё не готов. Дождитесь свечей.', price: 'Цена монеты пока недоступна. Дождитесь котировки.', thirty: 'Сохранение графиков 30s пока недоступно. Выберите 1m или выше.', saved: 'Монета добавлена в Сохранённые формации.' },
   } as const)[language], [language]);
   const { blocks, config, customPresets, setBlocks: updateBlocks, setConfig, setCustomPresets,
-    syncError, syncConflict, backupFailed, retrySync, downloadLocalBackup, importWorkspaceBackup,
-    restoreCloudWorkspace, requestImmediateWorkspaceSync } = useTerminalWorkspace();
+    syncError, retrySync, downloadLocalBackup, importWorkspaceBackup,
+    requestImmediateWorkspaceSync } = useTerminalWorkspace();
   const [activeMarketPreset, setActiveMarketPreset] = useState<TerminalMarketPreset | null>(null);
-  const [presetMatches, setPresetMatches] = useState<MarketCoin[]>([]);
+  const [presetMatches, setPresetMatches] = useState<TerminalPresetCoin[]>([]);
   const [presetPage, setPresetPage] = useState(0);
   const presetPageRef = useRef(0);
   const chartListRef = useRef<HTMLDivElement>(null);
+  // A finger may begin dragging in a narrow gutter without a preparatory tap.
+  // Bind one DOM-only listener to the shared scroll viewport, not each live chart.
+  useEffect(() => {
+    const scrollViewport = chartListRef.current;
+    if (!scrollViewport) return;
+    return enableTerminalGutterTouchScroll(scrollViewport);
+  }, []);
   const [showCoinPresets, setShowCoinPresets] = useState(false);
   const [showHotkeys, setShowHotkeys] = useState(false);
   // Keyboard bindings are scoped per signed-in account (or guest) on this device.
@@ -679,6 +696,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     // Drag bookkeeping should not rerender every live chart in the grid.
     draggedBlockIndexRef.current = index;
   }, []);
+  const handleDragEnd = useCallback(() => {
+    // Drag cancellation must never leave a stale reorder source.
+    draggedBlockIndexRef.current = null;
+  }, []);
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
   }, []);
@@ -796,7 +817,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     }
   };
 
-  const applyPresetPage = useCallback((selected: MarketCoin[], requestedPage: number, pageSize = coinPresetLimit) => {
+  const applyPresetPage = useCallback((selected: TerminalPresetCoin[], requestedPage: number, pageSize = coinPresetLimit) => {
     if (!selected.length) return;
     const { page, coins: pageCoins } = getTerminalPresetPage(selected, requestedPage, pageSize);
     presetPageRef.current = page;
@@ -864,13 +885,15 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     chartListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [applyPresetPage, presetMatches]);
 
-  const handleApplyMarketCoins = useCallback((selected: MarketCoin[]) => {
+  const handleApplyMarketCoins = useCallback((selected: TerminalPresetCoin[]) => {
     if (!selected.length) return;
     // Each 30s market refresh creates new quote objects even if the ordered
     // instrument list is unchanged. Keep the previous ranking identity so
     // the pagination effect doesn't redundantly apply the same page twice.
     setPresetMatches(current => current.length === selected.length
-      && current.every((coin, index) => coinMarketKey(coin) === coinMarketKey(selected[index]))
+      && current.every((coin, index) => coinMarketKey(coin) === coinMarketKey(selected[index])
+        && coin.timeframe === selected[index].timeframe
+        && coin.formationId === selected[index].formationId)
       ? current : selected);
     applyPresetPage(selected, presetPageRef.current);
   }, [applyPresetPage]);
@@ -1030,7 +1053,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     '--terminal-height-tablet': terminalAutoHeights.tablet,
     '--terminal-height-desktop': terminalAutoHeights.desktop,
     '--terminal-height-wide': terminalAutoHeights.wide,
-  } as React.CSSProperties), [terminalAutoHeights]);
+    '--terminal-touch-gap': `${normalizeTerminalTouchGapPx(config.touchGapPx)}px`,
+  } as React.CSSProperties), [terminalAutoHeights, config.touchGapPx]);
 
   const computedHeightStyle = useMemo(() => {
     // First chart is large, with the normal draggable/resizable grid controls.
@@ -1376,12 +1400,11 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="relative flex h-7 w-6 shrink-0 items-center justify-center p-0 sm:h-auto sm:w-auto sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border-0 lg:h-8 lg:w-8 lg:rounded-lg lg:border lg:border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title={t(syncConflict ? 'terminal.drawer.conflictTooltip' : 'terminal.drawer.settingsTooltip')}
+              title={t('terminal.drawer.settingsTooltip')}
               aria-label={t('terminal.drawer.settingsTooltip')}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
-               {syncConflict && <span aria-label={t('terminal.drawer.conflictIndicator')}
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400" />}
+
             </button>
 
             {/* Browser Fullscreen Button */}
@@ -1552,6 +1575,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         <div className="min-h-0 overflow-y-auto">
           <TerminalPresetPanel
             blocks={blocks} watchlist={localWatchlist} presets={customPresets}
+            formationCoins={formationPresetCoins}
+            onRequestFormationScan={onRequestFormationScan}
+            formationScanStatus={formationScanStatus}
             selection={coinPresetSelection} timeframe={timeframe} activePreset={activeMarketPreset} autoUpdate={presetAutoUpdate}
             menuOpen={showCoinPresets}
             snapshot={marketSnapshot} loading={marketLoading} error={marketError}
@@ -1562,7 +1588,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                requestImmediateWorkspaceSync();
                setCustomPresets(current => current.filter(preset => preset.id !== id));
              }}
-            syncError={syncError} syncConflict={syncConflict} onRetrySync={retrySync}
+            syncError={syncError} onRetrySync={retrySync}
             onDownloadLocalBackup={downloadLocalBackup} onImportWorkspaceBackup={handleImportWorkspaceBackup}
             signedIn={Boolean(user)}
           />
@@ -1735,7 +1761,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         </div>
 
         {/* One or many coins share the same grid tiles, controls and live HookChart. */}
-          <div ref={chartListRef} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar">
+          <div ref={chartListRef} data-terminal-scroll-viewport className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar">
             {blocks.length === 0 ? (
               <div data-testid="terminal-empty-layout" className="flex min-h-full flex-col">
                 <div data-testid="terminal-empty-workspace"
@@ -1784,6 +1810,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                       onSendMetaScalp={onSendMetaScalp ? stableSendMetaScalp : undefined}
                       onOpenTelegramAlerts={onOpenTelegramAlerts ? stableOpenTelegram : undefined}
                       onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                     />
@@ -1846,9 +1873,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
 
       {/* Workspace Settings Drawer */}
       <TerminalSettingsDrawer
-        syncConflict={syncConflict} backupFailed={backupFailed}
-        onDownloadLocalBackup={downloadLocalBackup}
-        onRestoreCloudWorkspace={restoreCloudWorkspace}
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onDone={handleDoneWorkspaceSettings}

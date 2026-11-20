@@ -59,7 +59,12 @@ test('account form writes only edited fields and prevents edits during an active
   const source = readFileSync(new URL('../src/components/UserProfileModal.tsx', import.meta.url), 'utf8');
   assert.match(source, /const patch = buildProfileAccountPatch\(/);
   assert.match(source, /touchedFields\.current, user\.email\?\.split\('@'\)\[0\]/);
-  assert.match(source, /if \(Object\.keys\(patch\)\.length === 0\) return/);
+  assert.match(source, /if \(Object\.keys\(patch\)\.length === 0\)/);
+  assert.match(source, /setSaveNotice\(noChangesMessage\)/);
+  assert.ok(source.indexOf('Keep the response next to Save') > source.indexOf('profile-time-zone'));
+  assert.match(source, /role="alert"/);
+  const auth = readFileSync(new URL('../src/context/AuthContext.tsx', import.meta.url), 'utf8');
+  assert.match(auth, /accountFields\.some\(field => clean\[field\] !== undefined && nextProfile\[field\] !== clean\[field\]\)/);
   assert.match(source, /await updateProfileData\(patch\)/);
   assert.doesNotMatch(source, /await updateProfileData\(\{\s*displayName,/);
   const fields = ['profile-display-name', 'profile-default-exchange', 'profile-default-market',

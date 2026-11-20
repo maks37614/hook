@@ -9,12 +9,17 @@ import { CalendarDays, Pencil, Trash2 } from 'lucide-react';
 import { drawingActionsPosition, drawingTextHitDistance, freeDrawingPoint, rayEndPoint, translateDrawingPoints } from './drawingManipulation';
 import { drawTouchMagnifier, magnifierZoomFromPriceDrag, TOUCH_MAGNIFIER_DEFAULT_ZOOM } from './touchMagnifier';
 import { createChartFrameScheduler } from './frameScheduler';
+import { createChartViewportNotifier } from './viewportNotifier';
+import { sameTimeAxisInputs } from './timeAxisMemo';
 import { createAutoPocZoneCache } from './autoPoc';
+import { closestActiveDensityPrices, rankAutoLevelsForPrice } from './chartPanPrecompute';
 import { createVolumeProfileHistogramCache } from './volumeProfileHistogram';
+import { createChartVisibleWindowCache } from './visibleWindowCache';
 import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, paintChartCrosshair, paintChartRuler } from './chartCursor';
 import { DEFAULT_MAX_CANVAS_DPR, effectiveCanvasDpr } from './canvasDpr';
-import { measurementStats, measurementHit, paintMeasurement } from './measurementTool';
+import { measurementStats, measurementHit, paintMeasurement, measurementActionPosition } from './measurementTool';
+import { rulerDragThresholdMet, rulerHasRange, isRangeDrawingTool, isPointDrawingTool } from './rulerGestures';
 import { createChartTouchHold, isChartControlTarget } from './touchHold';
 import { CrosshairTimeLabel } from './CrosshairTimeLabel';
 import type { ChartCrosshairStore, CrosshairPosition } from './crosshairState';
@@ -23,7 +28,8 @@ import { aggregateMarketPrintsByCandle, filterMarketPrintCandleBuckets } from '.
 import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
-import { scalperLabel, type ScalperScene } from './scalperMode';
+import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLineStyle } from './scalperMode';
+import { scalperRenderedLineEndX } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -34,7 +40,7 @@ import { paintObservedLiquidationHeatmap, type LiquidationHeatmapBin, type Liqui
 import { liquidationTextPosition } from './liquidationDisplay';
 import { hasObservedLiquidationCascade, liquidationHudPreferenceKey, LIQUIDATION_HUD_PREFERENCE_EVENT, readLiquidationHudExpanded, saveLiquidationHudExpanded } from './liquidationHudPreferences';
 import { paintHistoricalLiqRecurrence, type HistoricalRecurrenceBand } from './historicalLiqRecurrence';
-import { terminalCandlePriceRange, terminalSafeVerticalZoomRange, terminalSafeManualPriceViewport, terminalViewportHistoryPhase } from './terminalAutoScale';
+import { terminalCandlePriceRange, terminalSafeVerticalZoomRange, terminalSafeManualPriceViewport, terminalViewportHistoryPhase, terminalReadableCandleExtrema } from './terminalAutoScale';
 import { latestCandleResetViewport } from './resetViewport';
 import { visibleArchivedDensityScene } from '../../utils/archiveChartSnapshot';
 import { HOOKCHART_PRICE_SCALE_WIDTH, HOOKCHART_PRICE_LABEL_HEIGHT, hookChartPlotWidth, layoutPriceScaleLabels } from './priceScale';
@@ -375,18 +381,23 @@ export function ChartTimeAxis({candles,tf,timezone,language='uk',viewport,rightP
  return <div className="chartTimeAxis" ref={ref}><div className="chartTimePlot" style={{width:plotW}}>{accepted.map((t,i)=><div key={`${t.x}-${i}`} className={`chartTimeTick ${t.major?'major ':''}align-${t.align}`} style={{left:t.x}}><i/><span>{t.label}</span></div>)}{crosshair&&<CrosshairTimeLabel store={crosshair} plotWidth={plotW} timezone={timezone} language={language} seconds={barMs<60000}/>}</div><div className="chartTimeScaleSpacer" ref={countdownRef} style={{width:AX}} aria-hidden={countdownRef?undefined:true}/></div>
 }
 
-// This axis is independent of live depth, liquidation and funding updates.
-export const MemoChartTimeAxis=React.memo(ChartTimeAxis);
+// The time axis uses horizontal viewport geometry only. Vertical price scale
+// gestures must not make it rescan history or rebuild time labels.
+// Horizontal pan/zoom and time-data changes still rebuild it normally.
+export const MemoChartTimeAxis=React.memo(ChartTimeAxis,sameTimeAxisInputs);
 
 export type Viewport={barWidth:number;rightOffset:number;autoY:boolean;manualCenter:number|null;manualRange:number|null;fitAll?:boolean;yZoom?:number;candleFit?:boolean};
 export type ViewportGesture='pan'|'zoom'|'price'|'focus';
 
-export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawings,alerts,setAlerts,onCreatePriceAlert,onSelectPriceAlert,densities,marketPrints,liquidations,autoLevels,levelLabelMode,levelLabelColor='#2090F0',levelLabelSize=9,levelLineWidth=.3,levelLabelStyle='text',levelLineStyle='solid',crosshairLineWidth=DEFAULT_CROSSHAIR_LINE_WIDTH,maxCanvasDpr=DEFAULT_MAX_CANVAS_DPR,horizontalDrawingLineWidth=0.4,trendDrawingLineWidth=0.4,scalperTrendLineWidth=0.9,rightPadding=0,rightPaddingBars=0,roundGrid=false,roundness=2,gridHorizontal=false,gridVertical=false,showMarketPrintSums=false,showMarketPrintArrows=true,marketPrintArrowSize=4,marketPrintFontSize=10,marketPrintMinUsd=0,showVolumes=true,showLiquidations=true,showLiquidationCandleSums=true,showLiquidationDetailSums=true,showLiquidationArrows=true,liquidationArrowSize=5,liquidationSumFontSize=10,liquidationDetailFontSize=9,showLiquidationLong=true,showLiquidationShort=true,sessionLiquidationsUsd=0,cascadeRisk,liquidationCut=0,liquidationSource='',liquidationStreamLive=false,liquidationLastEventAt=null,liquidationHeatmap=null,modeledLiquidationBands=null,timezone='Europe/Warsaw',language='uk',showDensityLines=true,showDensityLabels=true,showDensityAmounts=true,highlightDensityReaction=false,autoSR=false,showSRLabels=true,autoPrevDay=false,autoDayOpen=false,autoVWAP=false,autoLocalHL=false,autoRoundLevels=false,autoPOC=false,autoChannel=false,autoStops=false,showLiqRiskBlock=true,liquidationHudOwner,channelModel=null,strategyResult=null,scalperResult=null,marketRecurrenceMarks=[],showScalperLabels=true,hideTimeJump=false,hideBarCountdown=hideTimeJump,controlsContainer,countdownContainer,candleLongColor='#0ECB81',candleShortColor='#F6465D',densityLineColor='#7B61FF',densityLabelColor='#C4B5FD',densityLineWidth=.5,densityLineStyle='solid',densityLabelSize=8,onViewportChange,onViewportGesture,onCrosshairChange,onCrosshairPriceChange,onNeedHistory,markers=[],timeMarkers=[],splitVolumes=false,transientRuler=false,backgroundColor=CHART_THEME.bg,gridColor,controlRef,initialViewport,initialLogicalRange,archivedOverlayScene,densityReferenceTime,visualProfile,visualProfileKey,visualProfileCaptureVersion=0,terminalMode=false,terminalAutoScale=false,terminalHistoryReady=false,terminalFitAllRequest=0,formationAutoScale=false,keyboardMagnifierActive=false,expandPriceScaleToMarkers=false,focusFormation,textLabel='Нотатка'}:{candles:Candle[],symbol:string,tf:string,interactionScope?:string,tool:string,drawings:Drawing[],setDrawings:React.Dispatch<React.SetStateAction<Drawing[]>>,alerts:Alert[],setAlerts:React.Dispatch<React.SetStateAction<Alert[]>>,onCreatePriceAlert?:(price:number)=>void,onSelectPriceAlert?:(markerId:string,action?:'edit'|'delete')=>void,densities:Density[],marketPrints:MarketPrint[],liquidations:Liquidation[],autoLevels:AutoLevel[],levelLabelMode:'always'|'hover'|'off',levelLabelColor?:string,levelLabelSize?:number,levelLineWidth?:number,levelLabelStyle?:'text'|'filled'|'outline',levelLineStyle?:'solid'|'dash'|'dot',crosshairLineWidth?:number,maxCanvasDpr?:number,horizontalDrawingLineWidth?:number,trendDrawingLineWidth?:number,scalperTrendLineWidth?:number,rightPadding?:number,rightPaddingBars?:number,roundGrid?:boolean,roundness?:number,gridHorizontal?:boolean,gridVertical?:boolean,showMarketPrintSums?:boolean,showMarketPrintArrows?:boolean,marketPrintArrowSize?:number,marketPrintFontSize?:number,marketPrintMinUsd?:number,showVolumes?:boolean,showLiquidations?:boolean,showLiquidationCandleSums?:boolean,showLiquidationDetailSums?:boolean,showLiquidationArrows?:boolean,liquidationArrowSize?:number,liquidationSumFontSize?:number,liquidationDetailFontSize?:number,showLiquidationLong?:boolean,showLiquidationShort?:boolean,sessionLiquidationsUsd?:number,cascadeRisk:CascadeRisk,liquidationCut?:number,liquidationSource?:string,liquidationStreamLive?:boolean,liquidationLastEventAt?:number|null,liquidationHeatmap?:LiquidationHeatmapChartData|null,modeledLiquidationBands?:readonly HistoricalRecurrenceBand[]|null,timezone?:string,language?:SupportedLanguage,showDensityLines?:boolean,showDensityLabels?:boolean,showDensityAmounts?:boolean,highlightDensityReaction?:boolean,autoSR?:boolean,showSRLabels?:boolean,autoPrevDay?:boolean,autoDayOpen?:boolean,autoVWAP?:boolean,autoLocalHL?:boolean,autoRoundLevels?:boolean,autoPOC?:boolean,autoChannel?:boolean,autoStops?:boolean,showLiqRiskBlock?:boolean,liquidationHudOwner?:string,channelModel?:AutoChannelModel|null,strategyResult?:StrategyResult|null,scalperResult?:ScalperScene|null,marketRecurrenceMarks?:readonly MarketRecurrenceMark[],showScalperLabels?:boolean,hideTimeJump?:boolean,hideBarCountdown?:boolean,controlsContainer?:HTMLElement|null,countdownContainer?:HTMLElement|null,candleLongColor?:string,candleShortColor?:string,densityLineColor?:string,densityLabelColor?:string,densityLineWidth?:number,densityLineStyle?:'solid'|'dash'|'dot',densityLabelSize?:number,onViewportChange?:(v:Viewport)=>void,onViewportGesture?:(v:Viewport,kind:ViewportGesture)=>void,onCrosshairChange?:(position:CrosshairPosition|null)=>void,onCrosshairPriceChange?:(price:number)=>void,onNeedHistory?:(targetTs:number)=>Promise<boolean>;markers?:ChartMarkerInfo[];timeMarkers?:HookTimeMarker[];splitVolumes?:boolean;transientRuler?:boolean;backgroundColor?:string;gridColor?:string;controlRef?:React.Ref<HookChartHandle>;initialViewport?:Viewport;initialLogicalRange?:{from:number;to:number};archivedOverlayScene?:ArchivedAutoOverlayScene;densityReferenceTime?:number;visualProfile?:VisualChartProfile;visualProfileKey?:string;visualProfileCaptureVersion?:number;terminalMode?:boolean;terminalAutoScale?:boolean;terminalHistoryReady?:boolean;terminalFitAllRequest?:number;formationAutoScale?:boolean;keyboardMagnifierActive?:boolean;expandPriceScaleToMarkers?:boolean;focusFormation?:DetectedFormation|null;textLabel?:string}){
+export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawings,alerts,setAlerts,onCreatePriceAlert,onSelectPriceAlert,densities,marketPrints,liquidations,autoLevels,levelLabelMode,levelLabelColor='#2090F0',levelLabelSize=9,levelLineWidth=.3,levelLabelStyle='text',levelLineStyle='solid',crosshairLineWidth=DEFAULT_CROSSHAIR_LINE_WIDTH,maxCanvasDpr=DEFAULT_MAX_CANVAS_DPR,horizontalDrawingLineWidth=0.4,trendDrawingLineWidth=0.4,scalperTrendLineWidth=0.9,rightPadding=0,rightPaddingBars=0,roundGrid=false,roundness=2,gridHorizontal=false,gridVertical=false,showMarketPrintSums=false,showMarketPrintArrows=true,marketPrintArrowSize=4,marketPrintFontSize=10,marketPrintMinUsd=0,showVolumes=true,showLiquidations=true,showLiquidationCandleSums=true,showLiquidationDetailSums=true,showLiquidationArrows=true,liquidationArrowSize=5,liquidationSumFontSize=10,liquidationDetailFontSize=9,showLiquidationLong=true,showLiquidationShort=true,sessionLiquidationsUsd=0,cascadeRisk,liquidationCut=0,liquidationSource='',liquidationStreamLive=false,liquidationLastEventAt=null,liquidationHeatmap=null,modeledLiquidationBands=null,timezone='Europe/Warsaw',language='uk',showDensityLines=true,showDensityLabels=true,showDensityAmounts=true,highlightDensityReaction=false,autoSR=false,showSRLabels=true,autoPrevDay=false,autoDayOpen=false,autoVWAP=false,autoLocalHL=false,autoRoundLevels=false,autoPOC=false,autoChannel=false,autoStops=false,showLiqRiskBlock=true,liquidationHudOwner,channelModel=null,strategyResult=null,scalperResult=null,marketRecurrenceMarks=[],scalperLineStyle='auto',showScalperTouchPoints=true,showScalperLabels=true,hideTimeJump=false,hideBarCountdown=hideTimeJump,controlsContainer,countdownContainer,candleLongColor='#0ECB81',candleShortColor='#F6465D',densityLineColor='#7B61FF',densityLabelColor='#C4B5FD',densityLineWidth=.5,densityLineStyle='solid',densityLabelSize=8,onViewportChange,onViewportGesture,onCrosshairChange,onCrosshairPriceChange,onNeedHistory,markers=[],timeMarkers=[],splitVolumes=false,transientRuler=false,backgroundColor=CHART_THEME.bg,gridColor,controlRef,initialViewport,initialLogicalRange,archivedOverlayScene,densityReferenceTime,visualProfile,visualProfileKey,visualProfileCaptureVersion=0,terminalMode=false,terminalAutoScale=false,terminalHistoryReady=false,terminalFitAllRequest=0,formationAutoScale=false,keyboardMagnifierActive=false,expandPriceScaleToMarkers=false,focusFormation,textLabel='Нотатка'}:{candles:Candle[],symbol:string,tf:string,interactionScope?:string,tool:string,drawings:Drawing[],setDrawings:React.Dispatch<React.SetStateAction<Drawing[]>>,alerts:Alert[],setAlerts:React.Dispatch<React.SetStateAction<Alert[]>>,onCreatePriceAlert?:(price:number)=>void,onSelectPriceAlert?:(markerId:string,action?:'edit'|'delete')=>void,densities:Density[],marketPrints:MarketPrint[],liquidations:Liquidation[],autoLevels:AutoLevel[],levelLabelMode:'always'|'hover'|'off',levelLabelColor?:string,levelLabelSize?:number,levelLineWidth?:number,levelLabelStyle?:'text'|'filled'|'outline',levelLineStyle?:'solid'|'dash'|'dot',crosshairLineWidth?:number,maxCanvasDpr?:number,horizontalDrawingLineWidth?:number,trendDrawingLineWidth?:number,scalperTrendLineWidth?:number,rightPadding?:number,rightPaddingBars?:number,roundGrid?:boolean,roundness?:number,gridHorizontal?:boolean,gridVertical?:boolean,showMarketPrintSums?:boolean,showMarketPrintArrows?:boolean,marketPrintArrowSize?:number,marketPrintFontSize?:number,marketPrintMinUsd?:number,showVolumes?:boolean,showLiquidations?:boolean,showLiquidationCandleSums?:boolean,showLiquidationDetailSums?:boolean,showLiquidationArrows?:boolean,liquidationArrowSize?:number,liquidationSumFontSize?:number,liquidationDetailFontSize?:number,showLiquidationLong?:boolean,showLiquidationShort?:boolean,sessionLiquidationsUsd?:number,cascadeRisk:CascadeRisk,liquidationCut?:number,liquidationSource?:string,liquidationStreamLive?:boolean,liquidationLastEventAt?:number|null,liquidationHeatmap?:LiquidationHeatmapChartData|null,modeledLiquidationBands?:readonly HistoricalRecurrenceBand[]|null,timezone?:string,language?:SupportedLanguage,showDensityLines?:boolean,showDensityLabels?:boolean,showDensityAmounts?:boolean,highlightDensityReaction?:boolean,autoSR?:boolean,showSRLabels?:boolean,autoPrevDay?:boolean,autoDayOpen?:boolean,autoVWAP?:boolean,autoLocalHL?:boolean,autoRoundLevels?:boolean,autoPOC?:boolean,autoChannel?:boolean,autoStops?:boolean,showLiqRiskBlock?:boolean,liquidationHudOwner?:string,channelModel?:AutoChannelModel|null,strategyResult?:StrategyResult|null,scalperResult?:ScalperScene|null,marketRecurrenceMarks?:readonly MarketRecurrenceMark[],scalperLineStyle?:ScalperLineStyle,showScalperTouchPoints?:boolean,showScalperLabels?:boolean,hideTimeJump?:boolean,hideBarCountdown?:boolean,controlsContainer?:HTMLElement|null,countdownContainer?:HTMLElement|null,candleLongColor?:string,candleShortColor?:string,densityLineColor?:string,densityLabelColor?:string,densityLineWidth?:number,densityLineStyle?:'solid'|'dash'|'dot',densityLabelSize?:number,onViewportChange?:(v:Viewport)=>void,onViewportGesture?:(v:Viewport,kind:ViewportGesture)=>void,onCrosshairChange?:(position:CrosshairPosition|null)=>void,onCrosshairPriceChange?:(price:number)=>void,onNeedHistory?:(targetTs:number)=>Promise<boolean>;markers?:ChartMarkerInfo[];timeMarkers?:HookTimeMarker[];splitVolumes?:boolean;transientRuler?:boolean;backgroundColor?:string;gridColor?:string;controlRef?:React.Ref<HookChartHandle>;initialViewport?:Viewport;initialLogicalRange?:{from:number;to:number};archivedOverlayScene?:ArchivedAutoOverlayScene;densityReferenceTime?:number;visualProfile?:VisualChartProfile;visualProfileKey?:string;visualProfileCaptureVersion?:number;terminalMode?:boolean;terminalAutoScale?:boolean;terminalHistoryReady?:boolean;terminalFitAllRequest?:number;formationAutoScale?:boolean;keyboardMagnifierActive?:boolean;expandPriceScaleToMarkers?:boolean;focusFormation?:DetectedFormation|null;textLabel?:string}){
  const ref=useRef<HTMLCanvasElement>(null),interactionRef=useRef<HTMLCanvasElement>(null),box=useRef<HTMLDivElement>(null);
  // One cache per chart. It is invalidated by new immutable candles or a viewport change.
  const autoPocCache = useRef(createAutoPocZoneCache());
  // Reuse price bins on pointer movement; screen coordinates still update.
  const volumeProfileCache = useMemo(createVolumeProfileHistogramCache, []);
+ // Pan/zoom often moves by a few pixels without entering another candle.
+ // Retain the same visible rows and OHLC extremes until the bar range changes.
+ const visibleWindowCache = useMemo(()=>createChartVisibleWindowCache<Candle>(), []);
  // Only the painted representation is deduplicated. Underlying markers
  // still contain Entry and the neckline separately for TP/SL and archives.
  const paintedMarkers = useMemo(() => coalesceNecklinePriceMarkers(markers), [markers]);
@@ -406,6 +417,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const lastVisualGapRef=useRef(rightPaddingBars);
  const [visualCanvasWidth,setVisualCanvasWidth]=useState(0);
  const gestureKindRef=useRef<ViewportGesture|null>(null);
+ // The shared axis / indicator panels need the latest viewport at display
+ // frequency, not one parent React commit per high-rate pointer event.
+ const viewportNotifier=useMemo(()=>createChartViewportNotifier<Viewport,ViewportGesture>(),[]);
  const setGestureVp=(update:React.SetStateAction<Viewport>,kind:ViewportGesture)=>{
    if(kind!=='focus')fitAllScopeRef.current=null;
    gestureKindRef.current=kind;
@@ -414,10 +428,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    setVp(update);
  };
  useEffect(()=>{
-   onViewportChange?.(vp);
    const kind=gestureKindRef.current;
-   if(kind){gestureKindRef.current=null;onViewportGesture?.(vp,kind)}
- },[vp,onViewportChange,onViewportGesture]);
+   gestureKindRef.current=null;
+   const notification={viewport:vp,kind,onChange:onViewportChange,onGesture:onViewportGesture};
+   if(kind&&kind!=='focus')viewportNotifier.request(notification);
+   else viewportNotifier.flush(notification);
+ },[vp,onViewportChange,onViewportGesture,viewportNotifier]);
+ useEffect(()=>()=>viewportNotifier.cancel(),[viewportNotifier]);
  // Request older exchange candles only when a user approaches the left edge.
  // Do not prefetch every Terminal card: up to 50 charts may be mounted.
  const olderHistoryAttempt = useRef<{ key:string; at:number; pending:boolean } | null>(null);
@@ -637,11 +654,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const drag=useRef<any>(null),geom=useRef<any>(null),pointers=useRef(new Map<number,{x:number,y:number}>()),lastTap=useRef(0),mouseRef=useRef<{x:number,y:number}|null>(null),drawRef=useRef<()=>void>(()=>{}),interactionDrawRef=useRef<()=>void>(()=>{});
  const frames=useRef<ReturnType<typeof createChartFrameScheduler>|null>(null);
  const chartOnScreen=useRef(true);
+ // Captured chart gestures keep their original canvas position until the page
+ // scrolls or the chart resizes, avoiding a layout read on every pointermove.
+ const activePointerRect=useRef<DOMRect|null>(null);
  if(!frames.current)frames.current=createChartFrameScheduler({scene:()=>{const start=chartDiagnosticsEnabled()?performance.now():0;drawRef.current();if(start)recordChartPaint(performance.now()-start)},interaction:()=>interactionDrawRef.current()});
  const resetInteraction=()=>{
    const owner=box.current,ids=[...pointers.current.keys()];
    cancelTouchHold();magnifierPointer.current=null;magnifierPriceDrag.current=null;magnifierZoom.current=TOUCH_MAGNIFIER_DEFAULT_ZOOM;touchCursorVisible.current=false;suppressTouchClick.current=false;
-   mouseRef.current=null;transient.current=null;hoveredMeasurement.current=null;drag.current=null;geom.current=null;lastTap.current=0;pointers.current.clear();
+   mouseRef.current=null;transient.current=null;hoveredMeasurement.current=null;drag.current=null;geom.current=null;lastTap.current=0;pointers.current.clear();activePointerRect.current=null;
    if(box.current?.style)box.current.style.cursor='';
    // Clear ownership before releasing capture: a lost-capture event must not
    // revive an interaction belonging to a previous coin, timeframe or tool.
@@ -718,22 +738,45 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
 
    return out
  },[candles,tf,roundness,calculateDayOverlays,calculateSupportResistance,autoLocalHL,autoRoundLevels,autoStops,autoChannel,channelModel,archivedOverlayScene]);
+ // Precompute market-dependent orderings once per change in depth/close/levels,
+ // not on each viewport frame while a user moves the chart.
+ const lastCloseForPan=candles.at(-1)?.c;
+ const cachedNearDensityPrices=useMemo(
+   ()=>lastCloseForPan===undefined?[]:closestActiveDensityPrices(densities,lastCloseForPan),
+   [densities,lastCloseForPan],
+ );
+ // The legacy midpoint fallback remains for charts whose last price is zero.
+ const rankedAutoLevelsForPan=useMemo(
+   ()=>lastCloseForPan?rankAutoLevelsForPrice(autoLevels,lastCloseForPan):null,
+   [autoLevels,lastCloseForPan],
+ );
  const AX=HOOKCHART_PRICE_SCALE_WIDTH,TX=0;
  const geometry=()=>{
   const c=ref.current;if(!c||!candles.length)return null;
   const r=c.getBoundingClientRect(),plotW=hookChartPlotWidth(r.width),priceX=plotW,plotH=Math.max(40,r.height-TX);
   const {step,virtualEnd,virtualStart}=hookChartHorizontalRange(candles.length,plotW,vp,rightPaddingBars,rightPadding);
   const dataStart=Math.max(0,Math.floor(virtualStart)-2),dataEnd=Math.min(candles.length,Math.ceil(virtualEnd)+2);
-  const data=dataEnd>dataStart?candles.slice(dataStart,dataEnd):[];
-  const scaleData=data.length?data:candles.slice(-Math.min(80,candles.length));
+  const visibleWindow=visibleWindowCache.get(candles,dataStart,dataEnd);
+  const data=visibleWindow.rows;
+  const scaleWindow=data.length?visibleWindow:visibleWindowCache.get(candles,Math.max(0,candles.length-80),candles.length);
+  const scaleData=scaleWindow.rows;
   // Do not let distant support/resistance markers flatten candles in Formations.
   // A price-axis gesture must take priority over automatic Terminal fitting.
   // Otherwise the manual viewport changes while rendering still uses the
   // auto-fit range, making mobile drags appear broken.
   const candleAutoScale=(terminalAutoScale&&!manualPriceAxisOverride.current)
     ||(formationAutoScale&&vp.autoY)||(vp.autoY&&vp.candleFit===true);
-  let lo=Infinity,hi=-Infinity;for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
-  if(!candleAutoScale&&vp.autoY&&candles.length&&densities.length){const cp=candles.at(-1)!.c;const near=[...densities].filter(d=>d.active&&Math.abs(d.p-cp)/Math.max(cp,1e-12)<=.03).sort((a,b)=>Math.abs(a.p-cp)-Math.abs(b.p-cp)).slice(0,4);for(const d of near){if(d.p<lo)lo=d.p;if(d.p>hi)hi=d.p}}
+  // Avoid letting one flash wick flatten the compact Terminal price scale.
+  // No source candle, chart overlay, or backend value is changed.
+  const readableExtrema=terminalMode&&candleAutoScale?terminalReadableCandleExtrema(scaleData):null;
+  // Same minimum/maximum as the original per-event scan, now cached by the
+  // immutable candle input and integer visible range.
+  let lo=readableExtrema?.low??scaleWindow.low,hi=readableExtrema?.high??scaleWindow.high;
+  if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
+  if(!candleAutoScale&&vp.autoY&&candles.length&&cachedNearDensityPrices.length){
+    // Exact same nearest four levels / 3% gate; only the selection is cached.
+    for(const price of cachedNearDensityPrices){if(price<lo)lo=price;if(price>hi)hi=price}
+  }
   if(!candleAutoScale&&(terminalMode||expandPriceScaleToMarkers)&&vp.autoY){for(const marker of markers){if(Number.isFinite(marker.price)&&marker.price>0){lo=Math.min(lo,marker.price);hi=Math.max(hi,marker.price)}}}
   if(candleAutoScale){
     // Price-only auto fit: reserve the bottom volume band and a visible gap.
@@ -868,9 +911,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  useEffect(()=>{
    const c=ref.current;
    if(!c)return;
-   const ro=new ResizeObserver(()=>scheduleDraw());
+   const invalidatePointerRect=()=>{activePointerRect.current=null};
+   const ro=new ResizeObserver(()=>{invalidatePointerRect();scheduleDraw()});
    const onVisible=()=>{if(document.visibilityState==='visible'&&chartOnScreen.current)frames.current?.flush()};
-   const onResize=()=>scheduleDraw();
+   const onResize=()=>{invalidatePointerRect();scheduleDraw()};
    let intersection:IntersectionObserver|null=null;
    if(typeof IntersectionObserver!=='undefined'){
      intersection=new IntersectionObserver(entries=>{
@@ -885,12 +929,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    ro.observe(c);
    document.addEventListener('visibilitychange',onVisible);
    window.addEventListener('resize',onResize,{passive:true});
+   window.addEventListener('scroll',invalidatePointerRect,true);
    window.visualViewport?.addEventListener('resize',onResize,{passive:true});
    scheduleDraw();
    return()=>{
      intersection?.disconnect();ro.disconnect();
      document.removeEventListener('visibilitychange',onVisible);
      window.removeEventListener('resize',onResize);
+     window.removeEventListener('scroll',invalidatePointerRect,true);
      window.visualViewport?.removeEventListener('resize',onResize);
      frames.current?.cancel();
    };
@@ -956,7 +1002,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     interactionDrawRef.current();
     return;
   }
- const mouse=mouseRef.current,dpr=effectiveCanvasDpr(window.devicePixelRatio,maxCanvasDpr),w=Math.max(1,g.r.width),h=Math.max(1,g.r.height),pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(c.width!==pw||c.height!==ph){c.width=pw;c.height=ph}const q=c.getContext('2d',{alpha:false})!;const scaleX=pw/w,scaleY=ph/h;q.setTransform(scaleX,0,0,scaleY,0,0);q.imageSmoothingEnabled=false;q.globalCompositeOperation='source-over';q.lineCap='butt';q.lineJoin='miter';const strokeX=(v:number)=>(Math.round(v*scaleX)+.5)/scaleX,strokeY=(v:number)=>(Math.round(v*scaleY)+.5)/scaleY,hairX=1/scaleX,hairY=1/scaleY,hair=Math.max(hairX,hairY);q.clearRect(0,0,w,h);q.fillStyle=backgroundColor;q.fillRect(0,0,w,h);
+ const mouse=mouseRef.current,dpr=effectiveCanvasDpr(window.devicePixelRatio,maxCanvasDpr),w=Math.max(1,g.r.width),h=Math.max(1,g.r.height),pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(c.width!==pw||c.height!==ph){c.width=pw;c.height=ph}const q=c.getContext('2d',{alpha:false})!;const scaleX=pw/w,scaleY=ph/h;q.setTransform(scaleX,0,0,scaleY,0,0);q.imageSmoothingEnabled=false;q.globalCompositeOperation='source-over';q.lineCap='butt';q.lineJoin='miter';const strokeX=(v:number)=>(Math.round(v*scaleX)+.5)/scaleX,strokeY=(v:number)=>(Math.round(v*scaleY)+.5)/scaleY,hairX=1/scaleX,hairY=1/scaleY,hair=Math.max(hairX,hairY);// Most charts use a solid hex background. Painting an opaque full-canvas
+  // rect already overwrites every pixel: avoid an extra DPR-scaled clear pass.
+  // Preserve the old clear-then-paint behavior for potentially translucent CSS colors.
+  q.globalAlpha=1;
+  if(!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(backgroundColor))q.clearRect(0,0,w,h);
+  q.fillStyle=backgroundColor;q.fillRect(0,0,w,h);
   // Clip all candles, drawings, volume and overlays to the region left of the price scale.
   q.save();q.beginPath();q.rect(0,0,g.plotW,g.plotH);q.clip();
   // TradingView-style adaptive price scale: tick spacing follows the current Y range.
@@ -1089,9 +1140,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     q.save();q.beginPath();q.rect(0,volumeTopY,g.plotW,volumeBandH+2);q.clip();
     q.strokeStyle='rgba(135,147,164,.12)';q.lineWidth=hair;q.beginPath();q.moveTo(0,strokeY(volumeTopY));q.lineTo(g.plotW,strokeY(volumeTopY));q.stroke();
     q.save();q.setTransform(1,0,0,1,0,0);q.globalAlpha=.82;
+    const volumeStepPx=Math.max(2,Math.round(g.step*scaleX));
+    const volumeBarPx=Math.max(1,Math.min(volumeStepPx-1,Math.round(g.step*.72*scaleX)));
+    const volumeBasePx=Math.round(volumeBaseY*scaleY);
     for(let i=0;i<g.data.length;i++){
-      const k=g.data[i],rawX=g.candleX(i),centerPx=Math.round(rawX*scaleX),stepPx=Math.max(2,Math.round(g.step*scaleX)),barPx=Math.max(1,Math.min(stepPx-1,Math.round(g.step*.72*scaleX)));
-      const hhPx=Math.max(2,Math.round(((k.v/maxV)*(volumeBandH-5))*scaleY)),leftPx=Math.round(centerPx-barPx/2),basePx=Math.round(volumeBaseY*scaleY);
+      const k=g.data[i],rawX=g.candleX(i),centerPx=Math.round(rawX*scaleX),barPx=volumeBarPx;
+      const hhPx=Math.max(2,Math.round(((k.v/maxV)*(volumeBandH-5))*scaleY)),leftPx=Math.round(centerPx-barPx/2),basePx=volumeBasePx;
       if(splitVolumes&&Number.isFinite(k.tb)){
         const buyPx=Math.round(hhPx*Math.min(1,Math.max(0,(k.tb||0)/Math.max(k.v,1e-30))));
         q.fillStyle=candleLongColor;q.fillRect(leftPx,basePx-buyPx,barPx,buyPx);
@@ -1106,9 +1160,11 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   const chartRank=tfRank[tf]||1;
   const allowedLevel=(l:AutoLevel)=>chartRank===3?l.tf==='1d':chartRank===2?(l.tf==='4h'||l.tf==='1d'):true;
   const currentPrice=candles.at(-1)?.c||((g.hi+g.lo)/2);
-  const rawLevels=autoLevels.filter(l=>allowedLevel(l)&&l.p>=g.lo&&l.p<=g.hi);
+  // Sorting every frame produced the same order until price or levels change.
+  // A price-range filter preserves stable rank among visible levels.
+  const rawLevels=(rankedAutoLevelsForPan||autoLevels).filter(l=>allowedLevel(l)&&l.p>=g.lo&&l.p<=g.hi);
   const quota:{[k:string]:number}=chartRank===3?{'1d':6}:chartRank===2?{'4h':4,'1d':4}:{'5m':3,'15m':3,'30m':3,'1h':3,'4h':3,'1d':3};
-  const rankedLevels=[...rawLevels].sort((a,b)=>{
+  const rankedLevels=rankedAutoLevelsForPan?rawLevels:[...rawLevels].sort((a,b)=>{
     const quality=(l:AutoLevel)=>l.strength*.72+tfPriority(l.tf)*6+(l.broken?-18:0)+Math.max(0,12-Math.abs(l.p-currentPrice)/Math.max(currentPrice,1e-12)*220);
     return quality(b)-quality(a)
   });
@@ -1140,7 +1196,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.fillText(txt,lx+pad,top+labelH/2);q.restore();
     }
   });
-   if(showDensityLines||showDensityLabels)densities.filter(d=>d.p>=g.lo&&d.p<=g.hi).forEach(d=>{
+   if(showDensityLines||showDensityLabels)for(const d of densities){
+     // Same inclusive price gate and original order, without a temporary
+     // visible-depth array on every full DPR Canvas paint.
+     if(!(d.p>=g.lo&&d.p<=g.hi))continue;
      const yy=g.y(d.p), origin=g.x(d.first);
      const xx=origin>g.plotW?Math.max(0,g.plotW-g.step):Math.max(0,origin);
      const age=Math.max(0,Math.floor((now-d.first)/1000));
@@ -1167,7 +1226,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        q.fillStyle=labelColor;q.globalAlpha=d.active?(strong ? .75 : 1):.55;
        q.fillText(txt,lx,Math.max(12,yy-5));q.globalAlpha=1;
      }
-   });
+   }
   if(showMarketPrintSums && marketPrints.length){
     // One per-candle summary, not the three largest individual bursts.
     // Keep BUY and SELL separate inside the same label and avoid text collisions
@@ -1263,6 +1322,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   if(strategyResult&&!archiveCapture){const events=strategyResult.events.slice().sort((a,b)=>a.t-b.t);q.save();for(const e of events){if(e.zone){const y0=g.y(e.zone.high),y1=g.y(e.zone.low),top=Math.max(0,Math.min(y0,y1)),bot=Math.min(g.plotH,Math.max(y0,y1));if(bot>top){q.fillStyle=e.direction==='bullish'?'rgba(38,166,154,.055)':e.direction==='bearish'?'rgba(239,83,80,.055)':'rgba(123,145,171,.045)';q.fillRect(0,top,g.plotW,Math.max(1,bot-top))}}if(e.lines)for(const ln of e.lines){const x0=g.x(ln.t0),x1=g.x(ln.t1),y0=g.y(ln.p0),y1=g.y(ln.p1);q.strokeStyle='#8aa4c3';q.globalAlpha=.78;q.lineWidth=1;q.setLineDash([5,4]);q.beginPath();q.moveTo(x0,y0);q.lineTo(x1,y1);q.stroke()}const xx=g.x(e.t),yy=e.p!=null?g.y(e.p):NaN;if(xx<0||xx>g.plotW||!Number.isFinite(yy)||yy<0||yy>g.plotH)continue;const col=e.type==='OVERHEAT'?'#f0a45d':e.type==='FAILED_BREAKOUT'?'#ef6b73':e.direction==='bullish'?'#56c5aa':e.direction==='bearish'?'#e8787e':'#91a4bd';q.globalAlpha=.95;q.fillStyle=col;q.beginPath();q.arc(xx,yy,2.6,0,Math.PI*2);q.fill();q.font='700 9px system-ui';const text=`${translateHookChartPhrase(language,e.label)} ${e.score}`,tw=q.measureText(text).width,tx=Math.max(3,Math.min(g.plotW-tw-3,xx+5)),ty=Math.max(11,Math.min(g.plotH-4,yy+(e.direction==='bearish'?14:-7)));q.lineWidth=3;q.strokeStyle=CHART_THEME.bg;q.strokeText(text,tx,ty);q.fillStyle=col;q.fillText(text,tx,ty)}q.setLineDash([]);q.globalAlpha=1;q.restore()}
   // Opt-in scalp geometry belongs to the market scene, not the user's drawings.
   // Strictly bounded: at most two structures, four lines and sixteen touch dots.
+  // All Scalper-only circular markers (filled contacts and outlined breakout rings)
+  // are presentation gated by one preference, never by separate saved layers.
   // Only the automatic trend-line setup uses the independent Scalper width.
   const scalperTrendStrokeWidth=Math.max(0.2,Math.min(5,Number.isFinite(scalperTrendLineWidth)?scalperTrendLineWidth:0.9));
   if (scalperResult?.setups.length) {
@@ -1277,19 +1338,42 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         const y0 = g.y(line.from.p), y1 = g.y(line.to.p);
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
-        q.setLineDash(setup.status === 'confirmed' ? [] : [4,4]);
-        q.lineWidth = setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
+        q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
+        q.lineWidth = line.role === 'cascade-step' ? 0.7
+          : setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
         q.strokeStyle = color;
-        q.moveTo(x0, y0); q.lineTo(x1, y1); q.stroke();
+        // Project horizontal cascade tiers and the breakout boundary all
+        // the way to the price-scale divider, independently of future candles.
+        // Preserve the detector's original time/price coordinates.
+        const renderedEndX = scalperRenderedLineEndX(setup.kind, line, x1, g.plotW);
+        const cascadeRay = setup.kind === 'cascade' && renderedEndX === g.plotW
+          && line.from.p === line.to.p;
+        if (cascadeRay && x0 > g.plotW) continue; // Do not paint before the pivot exists.
+        q.moveTo(cascadeRay ? Math.max(0, x0) : x0, y0);
+        q.lineTo(renderedEndX, y1);
+        q.stroke();
+        if (cascadeRay && y1 >= 0 && y1 <= g.plotH) {
+          // With a dashed style the last dash can be a gap, looking as though
+          // the cascade stops short of the scale. Finish with a tiny solid tip.
+          q.setLineDash([]);
+          q.beginPath();
+          q.moveTo(Math.max(0, g.plotW - 2), y1);
+          q.lineTo(g.plotW, y1);
+          q.stroke();
+        }
       }
       q.setLineDash([]);
-      for (const touch of setup.touches) {
+      if (showScalperTouchPoints) for (const touch of setup.touches) {
         const x = g.x(touch.t), y = g.y(touch.p);
         if (!Number.isFinite(x) || !Number.isFinite(y) || x < -3 || x > g.plotW + 3 || y < -3 || y > g.plotH + 3) continue;
         q.beginPath(); q.arc(x,y,2.3,0,Math.PI*2);
         q.fillStyle = color; q.fill();
       }
-      if (setup.breakout) {
+      // The outlined breakout ring is also a Scalper point. It must follow
+      // the same per-profile visibility switch as filled wick-contact dots.
+      // Only the canvas annotation is hidden: keep the detected breakout and
+      // its status, line geometry and optional text intact.
+      if (showScalperTouchPoints && setup.breakout) {
         const x = g.x(setup.breakout.t), y = g.y(setup.breakout.p);
         if (Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= g.plotW && y >= 0 && y <= g.plotH) {
           q.beginPath(); q.arc(x,y,4,0,Math.PI*2);
@@ -1315,6 +1399,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   drawHookTimeMarkers(q,g,timeMarkers,mouse);
   const priceTags:{price:number;label:string;bg:string;fg:string;y:number;current?:boolean}[]=[];
   const priceTag=(price:number,label:string,bg:string,fg='#ffffff')=>{const yy=g.y(price);if(yy>=0&&yy<=g.plotH)priceTags.push({price,label,bg,fg,y:yy})};
+  // Mark the actionable outer tier at its actual price on the right axis.
+  // One badge per cascade, rather than one per closely packed inner shelf,
+  // keeps compact Terminal charts and price-scale labels readable.
+  if (scalperResult?.setups.length) for (const setup of scalperResult.setups) {
+    if (setup.kind !== 'cascade') continue;
+    const boundary = setup.lines.find(line => line.role === 'upper' || line.role === 'lower');
+    if (!boundary || boundary.from.p !== boundary.to.p || g.x(boundary.from.t) > g.plotW) continue;
+    const color = setup.status === 'failed' ? '#f0a66d'
+      : setup.status === 'confirmed' ? '#57c9a4'
+      : setup.status === 'possible' ? '#ead178' : '#8baac8';
+    priceTag(boundary.from.p, '', color, '#101722');
+  }
   for(const marker of paintedMarkers){
     const isSupportResistance=marker.type==='support'||marker.type==='resistance';
     if(isSupportResistance&&!autoSR)continue;
@@ -1398,12 +1494,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.restore();
     }
   });
-  if((tool==='trend'||tool==='profile'||tool==='ruler'||tool==='fib'||tool==='ray'||tool==='rect')&&draft&&mouse&&mouse.x>=0&&mouse.x<=g.plotW&&mouse.y>=0&&mouse.y<=g.plotH){
-    const end=snap(mouse.x,mouse.y,g),x1=g.x(draft.t),y1=g.y(draft.p),x2=g.x(end.t),y2=g.y(end.p);q.save();
+  const previewAnchor=drag.current?.kind==='drawingRangePlacement'?drag.current.first:draft;
+  if(isRangeDrawingTool(tool)&&previewAnchor&&mouse&&mouse.x>=0&&mouse.x<=g.plotW&&mouse.y>=0&&mouse.y<=g.plotH){
+    const end=tool==='ruler'?freeDrawingPoint(mouse.x,mouse.y,g):snap(mouse.x,mouse.y,g),x1=g.x(previewAnchor.t),y1=g.y(previewAnchor.p),x2=g.x(end.t),y2=g.y(end.p);q.save();
     if(tool==='profile'){const lx=Math.min(x1,x2),rx=Math.max(x1,x2);q.fillStyle='rgba(100,126,156,.08)';q.fillRect(lx,0,Math.max(1,rx-lx),g.plotH);q.strokeStyle='rgba(220,229,239,.65)';q.lineWidth=1;q.setLineDash([4,4]);q.strokeRect(lx+.5,.5,Math.max(1,rx-lx),g.plotH-1)}
     else if(tool==='fib'){const lx=Math.min(x1,x2),rx=Math.max(x1,x2),dp=end.p-draft.p;q.font='600 10px system-ui';for(let fi=0;fi<FIB_LEVELS.length;fi++){const r=FIB_LEVELS[fi],price=draft.p+dp*r,yy=g.y(price),col=FIB_COLORS[fi];q.strokeStyle=col;q.globalAlpha=.78;q.lineWidth=r===.5||r===.618?1.1:.8;q.setLineDash([4,3]);q.beginPath();q.moveTo(lx,yy);q.lineTo(rx,yy);q.stroke();q.setLineDash([]);q.globalAlpha=1;q.fillStyle=col;q.fillText(r.toFixed(r===0||r===1?0:3),Math.min(g.plotW-35,rx+4),Math.max(11,yy-2))}q.fillStyle='#dce5ef';for(const [xx,yy] of [[x1,y1],[x2,y2]]){q.beginPath();q.arc(xx,yy,2.5,0,Math.PI*2);q.fill()}}
     else if(tool==='ruler'){
-      paintMeasurement(q,g,draft,end,measurementStats(candles,draft,end,intervalMs),language,false,false);
+      paintMeasurement(q,g,previewAnchor,end,measurementStats(candles,previewAnchor,end,intervalMs),language,false,false);
     }else{
       q.strokeStyle='#dce5ef';q.lineWidth=tool==='trend'?trendStrokeWidth:1.25;q.setLineDash([4,3]);
       if(tool==='rect')q.strokeRect(x1,y1,x2-x1,y2-y1);
@@ -1415,6 +1512,26 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       for(const [xx,yy] of [[x1,y1],[x2,y2]]){q.beginPath();q.arc(xx,yy,2.5,0,Math.PI*2);q.fill()}
     }
     q.setLineDash([]);q.restore();
+  }
+  // A first tap leaves a visible first anchor for every two-point tool.
+  if(isRangeDrawingTool(tool)&&draft&&!mouse){
+    const x=g.x(draft.t),y=g.y(draft.p);
+    if(x>=0&&x<=g.plotW&&y>=0&&y<=g.plotH){
+      q.save();q.fillStyle='#ffffff';q.strokeStyle='#34cda7';q.lineWidth=1.5;
+      q.beginPath();q.arc(x,y,5,0,Math.PI*2);q.fill();q.stroke();q.restore();
+    }
+  }
+  // Light preview for single-point tools while positioning by a finger.
+  if(drag.current?.kind==='drawingPointPlacement'&&mouse&&mouse.x>=0&&mouse.x<=g.plotW&&mouse.y>=0&&mouse.y<=g.plotH){
+    const point=snap(mouse.x,mouse.y,g),yy=g.y(point.p);
+    q.save();q.strokeStyle=tool==='alert'?'#d95763':'#60a5fa';q.fillStyle=q.strokeStyle;q.lineWidth=1;q.setLineDash([4,4]);
+    if(tool==='text'){
+      q.setLineDash([]);q.font='600 11px system-ui';
+      q.fillText(textLabel||'Note',Math.max(2,mouse.x),Math.max(12,mouse.y));
+    }else{
+      q.beginPath();q.moveTo(0,yy);q.lineTo(g.plotW,yy);q.stroke();
+    }
+    q.restore();
   }
   (archiveCapture ? [] : alerts).filter(a=>a.id.startsWith(symbol+':')).forEach(a=>{const yy=g.y(a.p);if(yy<0||yy>g.plotH)return;const col=a.fired?'#5c6673':'#d95763';q.strokeStyle=col;q.lineWidth=1;q.globalAlpha=a.fired?.45:.72;q.setLineDash([3,5]);q.beginPath();q.moveTo(0,yy);q.lineTo(g.plotW,yy);q.stroke();q.setLineDash([]);q.globalAlpha=1;q.fillStyle=col;q.beginPath();q.moveTo(g.plotW-7,yy);q.lineTo(g.plotW-1,yy-4);q.lineTo(g.plotW-1,yy+4);q.closePath();q.fill()});
   // Live current-price guide: a fine dotted ray from the latest candle to the price scale,
@@ -1442,15 +1559,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // Date/time axis is rendered as a dedicated synchronized row below indicator panels.
  };
  drawRef.current=draw;
- // Grid cards can commit repeatedly between two browser frames (price, depth,
- // liquidations and account UI). Their newest scene wins, so coalesce all
- // commits into one RAF paint instead of blocking React's commit phase with
- // a full Canvas redraw each time. Fullscreen/Replay still paint immediately.
+ // Every HookChart can receive multiple market/viewport commits per display frame.
+ // Paint the freshest complete scene once per RAF, including the standalone chart:
+ // synchronous fullscreen/Replay paints used to block mouse drag and zoom input.
+ // The actual candles remain drawn at the selected native Canvas DPR.
  useLayoutEffect(()=>{
    if(document.visibilityState==='hidden'||!chartOnScreen.current){frames.current?.cancel();return}
-   if(terminalMode)frames.current?.request(true);
-   else frames.current?.flush();
- },[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,markers,timeMarkers,splitVolumes,backgroundColor,gridColor,levelLabelMode,levelLabelColor,levelLabelSize,levelLineWidth,levelLabelStyle,levelLineStyle,crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperTrendLineWidth,symbol,tf,draft,selectedDrawingId,editingDrawingId,tool,rightPadding,rightPaddingBars,roundGrid,roundness,gridHorizontal,gridVertical,showMarketPrintSums,showMarketPrintArrows,marketPrintArrowSize,marketPrintFontSize,marketPrintMinUsd,showVolumes,showLiquidations,showLiquidationCandleSums,showLiquidationDetailSums,showLiquidationArrows,liquidationArrowSize,liquidationSumFontSize,liquidationDetailFontSize,liquidationHeatmap,modeledLiquidationBands,showDensityLines,showDensityLabels,showDensityAmounts,highlightDensityReaction,candleLongColor,candleShortColor,densityLineColor,densityLabelColor,densityLineWidth,densityLineStyle,densityLabelSize,autoSR,showSRLabels,autoPrevDay,autoDayOpen,autoVWAP,autoLocalHL,autoRoundLevels,autoPOC,autoStops,autoChannel,channelModel,strategyResult,scalperResult,showScalperLabels,marketRecurrenceMarks,cascadeRisk.score,cascadeRisk.level,cascadeRisk.total5,cascadeRisk.count5,liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive]);
+   frames.current?.request(true);
+ },[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,markers,timeMarkers,splitVolumes,backgroundColor,gridColor,levelLabelMode,levelLabelColor,levelLabelSize,levelLineWidth,levelLabelStyle,levelLineStyle,crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperTrendLineWidth,symbol,tf,draft,selectedDrawingId,editingDrawingId,tool,rightPadding,rightPaddingBars,roundGrid,roundness,gridHorizontal,gridVertical,showMarketPrintSums,showMarketPrintArrows,marketPrintArrowSize,marketPrintFontSize,marketPrintMinUsd,showVolumes,showLiquidations,showLiquidationCandleSums,showLiquidationDetailSums,showLiquidationArrows,liquidationArrowSize,liquidationSumFontSize,liquidationDetailFontSize,liquidationHeatmap,modeledLiquidationBands,showDensityLines,showDensityLabels,showDensityAmounts,highlightDensityReaction,candleLongColor,candleShortColor,densityLineColor,densityLabelColor,densityLineWidth,densityLineStyle,densityLabelSize,autoSR,showSRLabels,autoPrevDay,autoDayOpen,autoVWAP,autoLocalHL,autoRoundLevels,autoPOC,autoStops,autoChannel,channelModel,strategyResult,scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels,marketRecurrenceMarks,cascadeRisk.score,cascadeRisk.level,cascadeRisk.total5,cascadeRisk.count5,liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive]);
  useEffect(()=>{
    const cancel=()=>{resetInteractionRef.current();scheduleDraw()};
    const visibility=()=>{if(document.visibilityState==='hidden')cancel()};
@@ -1459,10 +1575,15 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  },[]);
  const point=(e:React.PointerEvent<HTMLElement>)=>{
    if(!candles.length)return null;
-   const r=ref.current?.getBoundingClientRect();if(!r)return null;
+   // Hover must follow layout changes immediately; captured drags use their
+   // pointer-down rectangle, invalidated by scroll/resize above.
+   const captured=pointers.current.has(e.pointerId);
+   const r=(captured?activePointerRect.current:null)
+     ||ref.current?.getBoundingClientRect();if(!r)return null;
+   if(captured&&!activePointerRect.current)activePointerRect.current=r;
    const cached=geom.current,g=cached&&cached.r.width===r.width&&cached.r.height===r.height?cached:geometry();
    if(!g)return null;
-   return{g,x:e.clientX-r.left,y:e.clientY-r.top};
+   return{g,x:e.clientX-r.left,y:e.clientY-r.top,rect:r};
  };
  const handlePointerDown=(e:React.PointerEvent<HTMLElement>)=>{
    if(isChartControlTarget(e.target))return;
@@ -1472,6 +1593,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    terminalNavigation.current=true;
    if(terminalMode||e.pointerType==='touch'||e.pointerType==='pen')e.preventDefault();
    e.currentTarget.setPointerCapture(e.pointerId);
+   activePointerRect.current=z.rect;
    // A second finger on the right price scale adjusts ONLY the active lens.
    // Keep the first finger's crosshair and the main chart viewport untouched.
    if(e.pointerType==='touch'&&magnifierPointer.current!==null
@@ -1510,6 +1632,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    pointers.current.set(e.pointerId,{x:z.x,y:z.y});
    scheduleDraw();
    if(pointers.current.size>=2){
+     // A second finger cancels unfinished geometry, then pinches normally.
+     if(isRangeDrawingTool(tool))setDraft(null);
      magnifierPointer.current=null;transient.current=null;touchCursorVisible.current=false;suppressTouchClick.current=true;
      const a=[...pointers.current.values()];
      drag.current={kind:'pinch',distX:Math.max(1,Math.abs(a[0].x-a[1].x)),bar:vp.fitAll?Math.max(.001,z.g.step):vp.barWidth,anchor:z.g.virtualStart+(a[0].x+a[1].x)/2/z.g.step};
@@ -1518,31 +1642,44 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    // Measurements can be resized from either endpoint or moved by dragging their
    // shaded range / label. Keep ordinary plotting and pinch gestures unchanged.
    if((tool==='cursor'||tool==='ruler')&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
-     const found=[...drawings].reverse().find(d=>d.type==='ruler'&&d.id.startsWith(symbol+':')&&d.pts[1]&&measurementHit(z.g,d.pts[0],d.pts[1],z.x,z.y));
+     // Hit topmost ruler first without allocating a reversed drawings array.
+     // The hit kind is reused to decide which endpoint is being dragged.
+     let found:Drawing|undefined;
+     let hit:ReturnType<typeof measurementHit>=null;
+     for(let i=drawings.length-1;i>=0;i--){
+       const item=drawings[i];
+       if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+       const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+       if(candidate){found=item;hit=candidate;break}
+     }
      if(found){
-       const hit=measurementHit(z.g,found.pts[0],found.pts[1],z.x,z.y);
        hoveredMeasurement.current=found.id;
        if(typeof drawingActions!=='undefined')selectDrawingAt(found,z.x,z.y,z.g);
        else setSelectedDrawingId(found.id);
        setEditingDrawingId(null);
-       if(hit==='delete'){drag.current={kind:'measurementDeleteClick'};scheduleDraw();return}
        drag.current={kind:'measurementDrag',drawingId:found.id,pointIndex:hit==='start'?0:hit==='end'?1:null,x:z.x,y:z.y,pts:found.pts.slice(0,2).map(p=>({...p})),moved:false};
        cancelTouchHold();scheduleDraw();return;
      }
    }
-   // A drawing point is committed on finger RELEASE, never on the first
-   // touch. Show an immediate magnifier so sliding the fingertip can refine
-   // the candle/time and price without panning or prematurely placing a point.
-   // The ruler's existing endpoint drag/delete handling above stays intact.
-   if((e.pointerType==='touch'||e.pointerType==='pen')&&
-      ['trend','ray','rect','fib','profile','ruler','level','text'].includes(tool)&&
-      zone(z.x,z.y,z.g)==='plot'){
-     cancelTouchHold();
-     magnifierPointer.current=e.pointerId;
-     magnifierZoom.current=TOUCH_MAGNIFIER_DEFAULT_ZOOM;
-     magnifierPriceDrag.current=null;
-     suppressTouchClick.current=true;
-     drag.current={kind:'drawingPlacement',pointerId:e.pointerId,inspecting:true};
+   // All two-point tools behave like the ruler: press, drag, release.
+   // A short tap still sets the first anchor for a second tap. No tool adds
+   // a magnifier or steals a chart gesture from a different active tool.
+   if(isRangeDrawingTool(tool)&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
+     const first=draft??(tool==='ruler'?freeDrawingPoint(z.x,z.y,z.g):snap(z.x,z.y,z.g));
+     drag.current={kind:'drawingRangePlacement',tool,pointerId:e.pointerId,
+       first,hadDraft:!!draft,x:z.x,y:z.y,moved:false};
+     suppressTouchClick.current=e.pointerType!=='mouse';
+     scheduleDraw(true);
+     return;
+   }
+   // Horizontal level, text, and price alert have ONE anchor. Position it
+   // precisely under the finger at release (tap or drag), never on press.
+   if(isPointDrawingTool(tool)&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
+     const existingAlertId=tool==='alert'&&onSelectPriceAlert
+       ? hitAlertAt(z.x,z.y,z.g)?.id??null : null;
+     drag.current={kind:'drawingPointPlacement',tool,pointerId:e.pointerId,
+       x:z.x,y:z.y,moved:false,existingAlertId};
+     suppressTouchClick.current=e.pointerType!=='mouse';
      scheduleDraw(true);
      return;
    }
@@ -1621,14 +1758,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      scheduleDraw();
      return;
    }
-   if(drag.current?.kind==='drawingPlacement'&&drag.current.pointerId===e.pointerId){
-     // Pointer capture lets a user slide until the lens shows the exact
-     // anchor; clamping avoids spilling the crosshair into the price axis.
+   if((drag.current?.kind==='drawingRangePlacement'||drag.current?.kind==='drawingPointPlacement')
+      &&drag.current.pointerId===e.pointerId){
+     // One captured pointer owns the entire draw gesture, even if it leaves
+     // the candle plot. Clamp only the final point, not chart pan/zoom.
      e.preventDefault();
+     const d=drag.current;
      const x=Math.max(0,Math.min(z.g.plotW-1,z.x)),y=Math.max(0,Math.min(z.g.plotH-1,z.y));
+     d.moved=d.moved||rulerDragThresholdMet(d,{x,y});
+     if(d.moved)suppressTouchClick.current=true;
      mouseRef.current={x,y};
      pointers.current.set(e.pointerId,{x,y});
-     scheduleDraw(!!draft);
+     scheduleDraw(true);
      return;
    }
    if(transientRuler&&e.shiftKey&&!transient.current){const m=mouseRef.current||z;transient.current={t:z.g.timeAtX(m.x),p:z.g.p(m.y)}}
@@ -1639,11 +1780,21 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(transient.current){e.preventDefault();return}
    const d=drag.current;
    if(!d&&(tool==='cursor'||tool==='ruler')){
-     const hit=zone(z.x,z.y,z.g)==='plot'?[...drawings].reverse().find(item=>item.type==='ruler'&&item.id.startsWith(symbol+':')&&item.pts[1]&&measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y)):undefined;
-     const action=hit?measurementHit(z.g,hit.pts[0],hit.pts[1],z.x,z.y):null;
+     let hit:Drawing|undefined;
+     let action:ReturnType<typeof measurementHit>=null;
+     if(zone(z.x,z.y,z.g)==='plot'){
+       // Hover is a hot path: do not copy/reverse all drawing objects or
+       // measure the same ruler twice just to identify its drag action.
+       for(let i=drawings.length-1;i>=0;i--){
+         const item=drawings[i];
+         if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+         const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+         if(candidate){hit=item;action=candidate;break}
+       }
+     }
      if(hoveredMeasurement.current!==(hit?.id||null)){hoveredMeasurement.current=hit?.id||null;scheduleDraw()}
      if(hit&&typeof drawingActions!=='undefined'&&hit.id!==selectedDrawingId)selectDrawingAt(hit,z.x,z.y,z.g);
-     if(box.current?.style)box.current.style.cursor=action==='delete'?'pointer':action==='start'||action==='end'?'crosshair':action==='body'?'move':'';
+     if(box.current?.style)box.current.style.cursor=action==='start'||action==='end'?'crosshair':action==='body'?'move':'';
    }
    if(!d&&tool==='cursor'&&e.pointerType==='mouse'&&zone(z.x,z.y,z.g)==='plot'){
      const hit=drawings.some(item=>item.type!=='ruler')?hitDrawing(z.x,z.y,z.g):null;
@@ -1651,7 +1802,6 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      if(!hit&&alerts.length){const marker=hitAlertAt(z.x,z.y,z.g);if(marker&&marker.id!==alertActions?.id)selectAlertAt(marker.id,z.x,z.y,z.g);}
    }
    if(!d)return;
-   if(d.kind==='measurementDeleteClick')return;
    if(d.kind==='measurementDrag'){
      const dx=z.x-d.x,dy=z.y-d.y;
      if(Math.hypot(dx,dy)<3&&!d.moved)return;
@@ -1702,13 +1852,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      gestureUpdate(v=>({...v,autoY:false,manualCenter:center,manualRange:nr}));
      return;
    }
-   if(tool!=='cursor')return;
-   if(d.kind==='pinch'&&pointers.current.size>=2){
+   if(d.kind==='pinch'&&pointers.current.size>=2&&(tool==='cursor'||isRangeDrawingTool(tool)||isPointDrawingTool(tool))){
      const a=[...pointers.current.values()],distX=Math.max(1,Math.abs(a[0].x-a[1].x)),ratio=terminalMode?distX/(d.distX||1):Math.max(.35,Math.min(3.2,distX/(d.distX||1)));
      const barWidth=Math.max(.12,Math.min(34,d.bar*ratio));
      const midX=(a[0].x+a[1].x)/2;
      gestureUpdate(v=>({...v,fitAll:false,barWidth,...(terminalMode?{rightOffset:candles.length+rightPaddingBars+rightPadding/barWidth-d.anchor-(z.g.plotW-midX)/barWidth}:{})}));return
    }
+   if(tool!=='cursor')return;
    if(d.kind==='touchCursor'){
      const dx=z.x-d.x,dy=z.y-d.y;
      // Hold to inspect without moving the candles; a normal swipe still pans both axes.
@@ -1749,6 +1899,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    pointers.current.delete(e.pointerId);
    if(e.currentTarget.hasPointerCapture?.(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
    if(!pointers.current.size){
+     activePointerRect.current=null;
      drag.current=null;
      if(e.pointerType==='touch'||e.pointerType==='pen'){
        touchCursorVisible.current=false;
@@ -1888,7 +2039,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(!draft){setDraft(p);setSelectedDrawingId(null)}
    else{const id=symbol+':'+uid();setDrawings(a=>[...a,{id,type:tool,pts:[draft,p]}]);setDraft(null);setSelectedDrawingId(id);setDrawingActions({id,...drawingActionsPosition(x,y,g.plotW,g.plotH)});setEditingDrawingId(null)}
  };
- const handleClick=(e:React.MouseEvent<HTMLElement>)=>{if(suppressDrawingClick.current){suppressDrawingClick.current=false;return}if(suppressTouchClick.current){suppressTouchClick.current=false;return}const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height||zone(x,y,g)!=='plot')return;
+ const handleClick=(e:React.MouseEvent<HTMLElement>)=>{if(suppressDrawingClick.current){suppressDrawingClick.current=false;return}if(suppressTouchClick.current){suppressTouchClick.current=false;return}if(isRangeDrawingTool(tool)||isPointDrawingTool(tool))return;const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height||zone(x,y,g)!=='plot')return;
    // Marker lines are clickable in cursor, alert and eraser modes (mouse or tap).
    // The parent shows a delete confirmation for real Telegram alerts.
    if(onSelectPriceAlert&&(tool==='cursor'||tool==='alert'||tool==='erase')){
@@ -1902,9 +2053,6 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(tool==='cursor'||tool==='ruler'){
      const measurement=[...drawings].reverse().find(d=>d.type==='ruler'&&d.id.startsWith(symbol+':')&&d.pts[1]&&measurementHit(g,d.pts[0],d.pts[1],x,y));
      if(measurement){
-       if(measurementHit(g,measurement.pts[0],measurement.pts[1],x,y)==='delete'&&hoveredMeasurement.current===measurement.id){
-         setDrawings(list=>list.filter(d=>d.id!==measurement.id));setSelectedDrawingId(null);setEditingDrawingId(null);hoveredMeasurement.current=null;scheduleDraw();return;
-       }
        selectDrawingAt(measurement,x,y,g);setEditingDrawingId(null);return;
      }
    }
@@ -1936,12 +2084,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // A reset should focus the current candles, not force distant DOM levels or
   // TP/SL markers into the price range. Preserve Terminal's formation anchor.
   setVp(terminalMode
-    ? {...terminalHookViewport(candles,width,focusFormation,rightPaddingBars),yZoom:1,candleFit:true}
+    ? {...(focusFormation?terminalHookViewport(candles,width,focusFormation,rightPaddingBars):candleView),yZoom:1,candleFit:true}
     : formationAutoScale?candleView
     : visualProfile?candleView
     : {barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:false});
  };
- const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true}),'focus')};
+ const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true,...(terminalMode?{candleFit:true}:{})}),'focus')};
  const fitAllHistoryRef=useRef(fitAllHistory);
  fitAllHistoryRef.current=fitAllHistory;
  // The Terminal drawer's Apply button uses exactly the same action as the
@@ -1966,16 +2114,40 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      ...v,...resizeHookChartViewport(candles.length,plotW,v,factor,v.fitAll?plotW/2:plotW,rightPaddingBars,rightPadding),
    }),'zoom');
  };
- const handleDoubleClick=(e:React.MouseEvent<HTMLElement>)=>{const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height)return;if(zone(x,y,g)==='price'){viewportAdjustedByUserRef.current=true;manualPriceAxisOverride.current=false;setVp(v=>({...v,autoY:true,manualCenter:null,manualRange:null}))}else reset()};
+ const handleDoubleClick=(e:React.MouseEvent<HTMLElement>)=>{const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height)return;if(zone(x,y,g)==='price'){viewportAdjustedByUserRef.current=true;manualPriceAxisOverride.current=false;setVp(v=>({...v,autoY:true,manualCenter:null,manualRange:null,yZoom:1,candleFit:terminalMode?true:v.candleFit}))}else reset()};
  const handleTouchEnd=(e:React.PointerEvent<HTMLElement>)=>{
-   if(drag.current?.kind==='drawingPlacement'&&drag.current.pointerId===e.pointerId){
-     // A canceled pointer must never leave a half-placed drawing or
-     // duplicate a point via the browser's synthetic click.
-     const z=point(e);
-     if(z&&zone(Math.max(0,Math.min(z.g.plotW-1,z.x)),Math.max(0,Math.min(z.g.plotH-1,z.y)),z.g)==='plot'){
-       const x=Math.max(0,Math.min(z.g.plotW-1,z.x)),y=Math.max(0,Math.min(z.g.plotH-1,z.y));
+   if((drag.current?.kind==='drawingRangePlacement'||drag.current?.kind==='drawingPointPlacement')
+      &&drag.current.pointerId===e.pointerId){
+     const d=drag.current,z=point(e);
+     if(e.type==='pointerup'&&z){
+       const x=Math.max(0,Math.min(z.g.plotW-1,z.x));
+       const y=Math.max(0,Math.min(z.g.plotH-1,z.y));
+       const last=d.tool==='ruler'?freeDrawingPoint(x,y,z.g):snap(x,y,z.g);
+       if(d.kind==='drawingRangePlacement'){
+         if((d.moved||d.hadDraft)&&rulerHasRange(d.first,last)){
+           const id=symbol+':'+uid();
+           setDrawings(list=>[...list,{id,type:d.tool,pts:[d.first,last]}]);
+           setDraft(null);setSelectedDrawingId(id);setEditingDrawingId(null);
+           setAlertActions(null);
+           setDrawingActions({id,...drawingActionsPosition(x,y,z.g.plotW,z.g.plotH)});
+         }else if(!d.hadDraft){
+           setDraft(d.first);setSelectedDrawingId(null);setDrawingActions(null);
+         }
+       }else if(d.tool==='alert'){
+         // Preserve the existing delete-confirmation behavior when tapping
+         // an alert marker, but dragging places a new level at release.
+         if(d.existingAlertId&&!d.moved&&onSelectPriceAlert)onSelectPriceAlert(d.existingAlertId,'delete');
+         else if(onCreatePriceAlert)onCreatePriceAlert(last.p);
+         else setAlerts(rows=>[...rows,{id:symbol+':'+uid(),p:last.p,kind:'level',created:Date.now()}]);
+       }else{
+         const id=symbol+':'+uid();
+         setDrawings(rows=>[...rows,{id,type:d.tool,pts:[last],text:d.tool==='text'?textLabel:''}]);
+         setSelectedDrawingId(id);setEditingDrawingId(null);setAlertActions(null);
+         setDrawingActions({id,...drawingActionsPosition(x,y,z.g.plotW,z.g.plotH)});
+       }
        suppressTouchClick.current=true;
-       placeDrawingPoint(x,y,z.g);
+     }else if(d.kind==='drawingRangePlacement'){
+       setDraft(null);
      }
      handlePointerUp(e);
      return;
@@ -2077,12 +2249,17 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    return null;
  };
  archiveScreenshotRef.current=takeArchiveScreenshot;
- // The externally exposed actions remain stable while always reading current
- // market geometry. A new candle must not repeatedly detach and assign the ref.
  const chartControlActionsRef=useRef({fitAllHistory,reset,zoomButton});
  chartControlActionsRef.current={fitAllHistory,reset,zoomButton};
- useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:()=>chartControlActionsRef.current.fitAllHistory(),zoomToLatest:()=>chartControlActionsRef.current.reset(),focusLatest:()=>{fitAllScopeRef.current=null;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false}))},zoom:(factor:number)=>chartControlActionsRef.current.zoomButton(factor)}),[]);
+ useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:()=>chartControlActionsRef.current.fitAllHistory(),zoomToLatest:()=>chartControlActionsRef.current.reset(),focusLatest:()=>{fitAllScopeRef.current=null;manualPriceAxisOverride.current=false;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:terminalMode?true:v.candleFit}))},zoom:(factor:number)=>chartControlActionsRef.current.zoomButton(factor)}),[]);
  const actionDrawing=drawingActions?.id===selectedDrawingId?drawings.find(d=>d.id===selectedDrawingId&&d.id.startsWith(symbol+':')):null;
+ // Ruler actions belong to its measurement label, not to the point last tapped.
+ // Compute only for the selected ruler and reuse the same geometry as its canvas.
+ const rulerActionPosition=actionDrawing?.type==='ruler'&&actionDrawing.pts[1]&&drawingActions
+   ? (()=>{
+       const g=geometry();
+       return g?measurementActionPosition(g,actionDrawing.pts[0],actionDrawing.pts[1]):null;
+     })() : null;
  const barCountdown=!hideBarCountdown?<ChartBarCountdown tf={tf} intervalMs={intervalMs} lastBarStart={candles.at(-1)?.t}/>:null;
  const scaleControls=(<div role="toolbar" aria-label={translateHookChartPhrase(language,"Керування масштабом графіка")} className={'chartScaleDock '+(zoomPanelOpen?'expanded':'collapsed')}>
    {countdownContainer===undefined&&barCountdown}
@@ -2095,8 +2272,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
   onAuxClick={e=>{if(e.button===1&&!isChartControlTarget(e.target))e.preventDefault()}}
   onPointerUp={e=>{if(pointers.current.has(e.pointerId))handleTouchEnd(e)}}
-  onPointerCancel={e=>{if(pointers.current.has(e.pointerId))handlePointerUp(e)}}
-  onLostPointerCapture={e=>{if(pointers.current.has(e.pointerId))handlePointerUp(e)}}
+  onPointerCancel={e=>{if(pointers.current.has(e.pointerId)){if(drag.current?.kind==='drawingRangePlacement')setDraft(null);handlePointerUp(e)}}}
+  onLostPointerCapture={e=>{if(pointers.current.has(e.pointerId)){if(drag.current?.kind==='drawingRangePlacement')setDraft(null);handlePointerUp(e)}}}
   onContextMenu={e=>{if(isChartControlTarget(e.target))return;e.preventDefault();if(touchCursorVisible.current||touchHold.current?.pending())return;setDraft(null);setSelectedDrawingId(null);setEditingDrawingId(null);setDrawingActions(null);setAlertActions(null)}}
   onPointerLeave={()=>{if(!pointers.current.size&&!touchCursorVisible.current){mouseRef.current=null;transient.current=null;hoveredMeasurement.current=null;if(box.current?.style)box.current.style.cursor='';scheduleDraw()}}}>
   {strategyResult&&<div className="strategyHud"><div><b>{strategyResult.presetName}</b><span className={strategyResult.directionScore>0?'bull':strategyResult.directionScore<0?'bear':'neutral'}>{translateHookChartPhrase(language,strategyResult.directionScore>0?'Бичачий':strategyResult.directionScore<0?'Ведмежий':'Нейтральний')} {Math.abs(strategyResult.directionScore)}</span><span>{translateHookChartPhrase(language,'Ризик')} {strategyResult.riskScore}</span></div><small>{strategyResult.hint}</small><em>{strategyResult.context}</em></div>}
@@ -2138,9 +2315,9 @@ LONG: $${formatUsd(cascadeRisk.longUsd)} · SHORT: $${formatUsd(cascadeRisk.shor
   </div>}
   {controlsContainer?createPortal(scaleControls,controlsContainer):controlsContainer===undefined?scaleControls:null}
   {countdownContainer&&createPortal(barCountdown,countdownContainer)}
-  {actionDrawing&&drawingActions&&tool==='cursor'&&
-    <div className="chartDrawingActions" role="toolbar" aria-label={translateHookChartPhrase(language,'Дії з інструментом графіка')}
-      style={{left:drawingActions.x,top:drawingActions.y}} onPointerDown={e=>e.stopPropagation()}>
+  {actionDrawing&&drawingActions&&(tool==='cursor'||(tool==='ruler'&&actionDrawing.type==='ruler'))&&
+    <div className={'chartDrawingActions'+(rulerActionPosition?' measurement-actions':'')} role="toolbar" aria-label={translateHookChartPhrase(language,'Дії з інструментом графіка')}
+      style={{left:rulerActionPosition?.x??drawingActions.x,top:rulerActionPosition?.y??drawingActions.y}} onPointerDown={e=>e.stopPropagation()}>
       <button type="button" title={translateHookChartPhrase(language,'Редагувати межі інструмента')} aria-label={translateHookChartPhrase(language,'Редагувати інструмент')}
         aria-pressed={editingDrawingId===actionDrawing.id} className={editingDrawingId===actionDrawing.id?'active':''}
         onClick={e=>{e.stopPropagation();setEditingDrawingId(id=>id===actionDrawing.id?null:actionDrawing.id)}}>

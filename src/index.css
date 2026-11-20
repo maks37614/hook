@@ -807,6 +807,16 @@ html[data-site-font="inter-light"] #root :is(button, input, select, textarea):no
 .terminal-workspace-grid {
   --terminal-chart-height: var(--terminal-height-mobile);
 }
+
+/* Terminal touch scrolling: HookChart canvases intentionally consume gestures for
+ * chart navigation (touch-action: none). Give fingers a usable scroll surface
+ * BETWEEN tiles instead; preserve canvas pinch/pan behavior and desktop gaps. */
+@media (pointer: coarse) {
+  .terminal-workspace-grid {
+    gap: var(--terminal-touch-gap, 20px);
+    touch-action: pan-y;
+  }
+}
 @media (min-width: 768px) {
   .terminal-workspace-grid {
     --terminal-chart-height: var(--terminal-height-tablet);

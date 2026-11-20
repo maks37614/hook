@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import type { MarketCoin, TerminalChartBlock } from '../src/types';
-import { matchesMarketPreset, selectMarketPresetCoins } from '../src/utils/marketPresets';
+import type { MarketCoin, ScannedCoin, TerminalChartBlock } from '../src/types';
+import { MARKET_PRESETS, matchesMarketPreset, selectFormationPresetCoins, selectMarketPresetCoins } from '../src/utils/marketPresets';
 import { blocksForMarketPreset, blocksForSavedFavorites, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, normalizeTerminalPresets, terminalStorageKey, TERMINAL_PRESETS_STORAGE_KEY } from '../src/utils/terminalPresets';
 import { loadTerminalWorkspace, parseTerminalWorkspaceBackup } from '../src/utils/useTerminalWorkspace';
 
@@ -14,6 +14,67 @@ const coin = (symbol: string, change24h: number, values: Partial<MarketCoin> = {
 });
 const all = { exchange: 'all', marketType: 'all' } as const;
 const key = (item: MarketCoin) => `${item.symbol}:${item.exchange}:${item.marketType}`;
+
+test('Formations preset uses the exact visible list, preserving order, timeframe and formation markers', () => {
+  assert.ok(MARKET_PRESETS.some(preset => preset.id === 'formations' && preset.label === 'Формації'));
+  const scanned = (symbol: string, extra: Partial<ScannedCoin> = {}): ScannedCoin => ({
+    symbol, baseAsset: symbol.replace('USDT', ''), quoteAsset: 'USDT',
+    exchange: 'binance', marketType: 'futures',
+    currentPrice: 10, priceChange24h: 0, highPrice24h: 11, lowPrice24h: 9,
+    volume24hUsd: 100000, formations: [], timeframe: '5m', lastUpdated: 1,
+    exchangeUrl: '', ...extra,
+  });
+  const visible = [
+    scanned('SOLUSDT', { exchange: 'bybit', marketType: 'spot',
+      formations: [{ id: 'visible-formation' }] as ScannedCoin['formations'], timeframe: '15m' }),
+    scanned('BTCUSDT', { timeframe: '1h', formations: [{ id: 'btc-pattern' }] as ScannedCoin['formations'] }),
+    scanned('SOLUSDT', { exchange: 'bybit', marketType: 'spot',
+      formations: [{ id: 'duplicate' }] as ScannedCoin['formations'] }),
+    scanned('BTCUSDT', { marketType: 'spot', timeframe: '4h',
+      formations: [{ id: 'btc-spot-pattern' }] as ScannedCoin['formations'] }),
+    scanned('BROKENUSDT', { currentPrice: 0 }),
+  ];
+  const selected = selectFormationPresetCoins(visible);
+  assert.deepEqual(selected.map(c => c.symbol + ':' + c.exchange + ':' + c.marketType),
+    ['SOLUSDT:bybit:spot', 'BTCUSDT:binance:futures', 'BTCUSDT:binance:spot']);
+  assert.deepEqual(selected.map(c => c.timeframe), ['15m', '1h', '4h']);
+  assert.deepEqual(selected.map(c => c.formationId), ['visible-formation', 'btc-pattern', 'btc-spot-pattern']);
+  assert.deepEqual(selectFormationPresetCoins([]), []);
+
+  const opened = blocksForMarketPreset([], selected, '1m');
+  assert.deepEqual(opened.map(c => c.timeframe), ['15m', '1h', '4h']);
+  assert.deepEqual(opened.map(c => c.formationId), ['visible-formation', 'btc-pattern', 'btc-spot-pattern']);
+  const userBlock = { ...opened[0], colSpan: 2 as const, heightPx: 420 };
+  const after = blocksForMarketPreset([userBlock], [{ ...selected[0], formationId: 'updated-formation' }], '1m');
+  assert.equal(after[0].id, userBlock.id);
+  assert.equal(after[0].heightPx, 420);
+  assert.equal(after[0].formationId, 'updated-formation');
+  assert.equal(blocksForMarketPreset(after, [{ ...selected[0], formationId: 'updated-formation' }], '30s'), after);
+});
+
+test('Terminal Formations preset is wired to existing filtered results without extra scanning', () => {
+  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
+  assert.match(app, /earlyMode\s*\? earlyItems\.map\(item => item\.coin\)/);
+  assert.match(app, /groupedItems\.map\(group => \(\{ \.\.\.group\.coin, formations: group\.formations \}\)\)/);
+  assert.match(app, /formationPresetCoins=\{terminalFormationPresetCoins\}/);
+  assert.match(terminal, /formationCoins=\{formationPresetCoins\}/);
+  assert.match(panel, /selectFormationPresetCoins\(formationCoins\)/);
+  assert.match(panel, /id === 'formations'\s*\? selectFormationPresetCoins/);
+  assert.match(panel, /preset\.id !== 'formations' && loading/);
+  assert.match(panel, /onActivePresetChange\(id\);\s*onApplyCoins\(readyCoins\[id\]\)/);
+  assert.match(app, /onRequestFormationScan=\{requestTerminalFormationScan\}/);
+  assert.match(app, /formationScanStatus=\{terminalFormationScanStatus\}/);
+  assert.match(app, /if \(earlyMode\) return false/);
+  assert.match(terminal, /onRequestFormationScan=\{onRequestFormationScan\}/);
+  assert.match(panel, /onRequestFormationScan\?\.\(\)/);
+  assert.match(panel, /pendingFormationPreset/);
+  assert.match(panel, /applyRef\.current\(readyCoins\.formations\)/);
+  const locale = readFileSync(new URL('../src/locales/terminalPage20261115.ts', import.meta.url), 'utf8');
+  assert.ok(locale.includes('No coins match the current Formations filters.'));
+  assert.ok(locale.includes('Monety z bieżącej listy formacji'));
+});
 
 test('terminal gainers and losers use the screener categories and correct 24h ranking', () => {
   const data = [coin('FLATUSDT', 0), coin('AUSDT', 8), coin('BUSDT', -2), coin('CUSDT', 20), coin('DUSDT', -15)];
@@ -270,11 +331,12 @@ test('hidden Terminal market-presets menu only ranks the active category while p
   assert.match(page, /menuOpen=\{showCoinPresets\}/);
   assert.match(panel, /const ids = menuOpen \? MARKET_PRESETS\.map\(preset => preset\.id\)/);
   assert.match(panel, /: activePreset && autoUpdate \? \[activePreset\] : \[\]/);
-  assert.match(panel, /if \(activePreset && autoUpdate && !error && !snapshot\.warning && readyCoins\[activePreset\]\.length\)/);
+  assert.match(panel, /activePreset && autoUpdate && readyCoins\[activePreset\]\.length/);
+  assert.match(panel, /activePreset === 'formations' \|\| \(!error && !snapshot\.warning\)/);
   assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
 });
 
-test('Terminal reload recovers conflicting local charts rather than overwriting them with the cloud', () => {
+test('Terminal reload always trusts the cloud, even when an obsolete browser conflict backup exists', () => {
   const uid = 'terminal-conflict-recovery-test';
   const entries = new Map<string, string>();
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -295,18 +357,12 @@ test('Terminal reload recovers conflicting local charts rather than overwriting 
       blocks: [{ id: 'local', symbol: 'ETHUSDT', exchange: 'bybit', marketType: 'spot', timeframe: '5m', colSpan: 1 }],
       presets: [],
     }));
-    const local = loadTerminalWorkspace(uid, cloud);
-    assert.equal(local.blocks.length, 1);
-    assert.equal(local.blocks[0].symbol, 'ETHUSDT');
-    assert.equal(local.blocks[0].exchange, 'bybit');
-    assert.equal(local.config.columns, 3);
-    entries.delete(conflictKey);
-    const remote = loadTerminalWorkspace(uid, cloud);
-    assert.equal(remote.blocks[0].symbol, 'BTCUSDT');
-    assert.equal(remote.config.columns, 2);
+    const restored = loadTerminalWorkspace(uid, cloud);
+    assert.equal(restored.blocks.length, 1);
+    assert.equal(restored.blocks[0].symbol, 'BTCUSDT');
+    assert.equal(restored.config.columns, 2);
     entries.set(conflictKey, JSON.stringify({ blocks: 'invalid' }));
-    const corrupted = loadTerminalWorkspace(uid, cloud);
-    assert.equal(corrupted.blocks[0].symbol, 'BTCUSDT');
+    assert.equal(loadTerminalWorkspace(uid, cloud).blocks[0].symbol, 'BTCUSDT');
   } finally {
     if (original) Object.defineProperty(globalThis, 'localStorage', original);
     else Reflect.deleteProperty(globalThis, 'localStorage');

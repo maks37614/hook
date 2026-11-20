@@ -1,10 +1,19 @@
-import type { MarketCoin, ScreenerPresetFilter } from '../types';
+import type { MarketCoin, ScannedCoin, ScreenerPresetFilter, Timeframe } from '../types';
 import type { MarketSelection } from './marketCoinLoader';
 
-export type TerminalMarketPreset = Exclude<ScreenerPresetFilter, 'all'>;
+export type QuoteMarketPreset = Exclude<ScreenerPresetFilter, 'all'>;
+export type TerminalMarketPreset = QuoteMarketPreset | 'formations' | 'av';
+export type TerminalQuoteMarketPreset = QuoteMarketPreset | 'av';
+/** Enough information to open a chart; scanner-only form metadata is optional. */
+export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quoteAsset' | 'exchange' | 'marketType'> & {
+  timeframe?: Timeframe;
+  formationId?: string;
+};
 
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
+  { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
+  { id: 'av', label: 'AV', description: 'Середній обсяг торгів за хвилину (USDT), розрахований за оборотом 24г. Від найбільшого до найменшого.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },
@@ -46,20 +55,22 @@ export function coinMarketKey(coin: { symbol: string; exchange: string; marketTy
   return `${coin.exchange}:${coin.marketType}:${coin.symbol.toUpperCase()}`;
 }
 
-export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalMarketPreset, selection: MarketSelection, limit: number): MarketCoin[] {
+export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuoteMarketPreset, selection: MarketSelection, limit: number): MarketCoin[] {
   const seen = new Set<string>();
   const result = coins.filter(coin => {
     const key = coinMarketKey(coin);
     if (seen.has(key) || !Number.isFinite(coin.price) || coin.price <= 0 || !Number.isFinite(coin.change24h)) return false;
     if (selection.exchange !== 'all' && selection.exchange !== coin.exchange) return false;
     if (selection.marketType !== 'all' && selection.marketType !== coin.marketType) return false;
-    if (!matchesMarketPreset(coin, preset)) return false;
+    if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0)) return false;
+    if (preset !== 'av' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
     return true;
   });
   result.sort((a, b) => {
     let difference = 0;
     switch (preset) {
+      case 'av': difference = b.volumeUsd - a.volumeUsd; break; // AV = 24h USD turnover / 1,440 minutes.
       case 'active': difference = getCoinVol5m(b) - getCoinVol5m(a); break;
       case 'top_gainers': difference = b.change24h - a.change24h; break;
       case 'top_losers': difference = a.change24h - b.change24h; break;
@@ -71,4 +82,34 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalMar
   // A market preset needs the complete ranked universe. Only chart rendering is paginated.
   if (limit === Number.POSITIVE_INFINITY) return result;
   return result.slice(0, Number.isFinite(limit) ? Math.max(0, Math.min(36, Math.floor(limit))) : 0);
+}
+
+/**
+ * Reuse exactly the list already visible in Formations, including its order and
+ * selected formation. No quote fetch or additional pattern scan is allowed here.
+ * Terminal market-preset exchange filters intentionally do not override the
+ * filters the trader already applied on the Formations page.
+ */
+export function selectFormationPresetCoins(visible: readonly ScannedCoin[]): TerminalPresetCoin[] {
+  const seen = new Set<string>();
+  const result: TerminalPresetCoin[] = [];
+  for (const coin of visible) {
+    if (!coin || !coin.symbol || !coin.baseAsset || !coin.quoteAsset ||
+        !['binance', 'bybit'].includes(coin.exchange) ||
+        !['spot', 'futures'].includes(coin.marketType) ||
+        !Number.isFinite(coin.currentPrice) || coin.currentPrice <= 0) continue;
+    const key = coinMarketKey(coin);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
+      symbol: coin.symbol,
+      baseAsset: coin.baseAsset,
+      quoteAsset: coin.quoteAsset,
+      exchange: coin.exchange,
+      marketType: coin.marketType,
+      timeframe: coin.timeframe,
+      formationId: coin.formations?.[0]?.id,
+    });
+  }
+  return result;
 }

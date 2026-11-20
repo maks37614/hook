@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, Save, PlugZap, RefreshCw, BookOpen, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { DesktopRemoteLinkSettings } from './DesktopRemoteLinkSettings';
+import { desktopRemoteLinkEnabled, desktopRemoteLinkStatus } from '../../utils/desktopRemoteLink';
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase } from '../../locales';
 import { findActiveMetaScalpPort, getUserMetaScalpSettings, type MetaScalpSettings } from '../../utils/metaScalpService';
@@ -10,8 +12,43 @@ import {
   type TerminalLinkSettings, type TerminalProvider, type TerminalLinkSource,
 } from '../../utils/terminalLinkService';
 
+const MANUAL_LINK_TITLES = {
+  uk: '5. Ручна лінковка та захист від повторних команд',
+  en: '5. Manual linking and duplicate-command protection',
+  pl: '5. Ręczne łączenie i ochrona przed powtarzaniem poleceń',
+  ru: '5. Ручная линковка и защита от повторных команд',
+} as const;
+const MANUAL_LINK_MESSAGES = {
+  uk: 'Термінал змінює монету лише після натискання кнопки лінковки. Відкриття графіка, повний екран та сповіщення не перемикають монету автоматично.',
+  en: 'The terminal changes symbols only after you press a linking button. Opening charts, fullscreen mode and notifications never switch symbols automatically.',
+  pl: 'Terminal zmienia instrument tylko po naciśnięciu przycisku łączenia. Wykresy, pełny ekran i powiadomienia nie przełączają go automatycznie.',
+  ru: 'Терминал меняет монету только после нажатия кнопки линковки. Открытие графика, полный экран и уведомления не переключают монету автоматически.',
+} as const;
 const inputClass = 'rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none';
 const GROUP_SOURCES: TerminalLinkSource[] = LINK_SOURCES.map(source => source.id);
+const REMOTE_TEST_LABELS = {
+  uk: {
+    ready: 'h00k Desktop підключено до вашого акаунта. Для перевірки MetaScalp натисніть «Тест BTCUSDT».',
+    offline: 'h00k Desktop не підключено. Запустіть програму, увійдіть у той самий акаунт і ввімкніть приймання команд.',
+    error: 'Не вдалося перевірити з’єднання з h00k Desktop.',
+  },
+  en: {
+    ready: 'h00k Desktop is connected to your account. Use “Test BTCUSDT” to verify MetaScalp.',
+    offline: 'h00k Desktop is offline. Start it, sign into the same account and enable incoming ticker commands.',
+    error: 'Could not check the connection to h00k Desktop.',
+  },
+  pl: {
+    ready: 'h00k Desktop jest połączony z Twoim kontem. Użyj „Test BTCUSDT”, aby sprawdzić MetaScalp.',
+    offline: 'h00k Desktop jest odłączony. Uruchom go, zaloguj się na to samo konto i włącz odbiór poleceń.',
+    error: 'Nie udało się sprawdzić połączenia z h00k Desktop.',
+  },
+  ru: {
+    ready: 'h00k Desktop подключён к аккаунту. Нажмите «Тест BTCUSDT», чтобы проверить MetaScalp.',
+    offline: 'h00k Desktop отключён. Запустите его, войдите в тот же аккаунт и включите приём команд.',
+    error: 'Не удалось проверить соединение с h00k Desktop.',
+  },
+} as const;
+
 
 export const ProfileTerminalLinkingSettings: React.FC = () => {
   const { user, profile, updateProfileData } = useAuth();
@@ -83,7 +120,7 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
         terminalLinkSettings: next,
         metaScalpSettings: { ...meta,
           enabled: next.provider === 'metascalp' ? next.enabled : meta.enabled,
-          autoSwitchOnClick: next.switchOnChartOpen,
+          autoSwitchOnClick: false,
           binding: normalizeMetaScalpGroup(meta.binding) || '001',
         },
       });
@@ -99,7 +136,11 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
     setTesting(true);
     setMessage(null);
     try {
-      if (draft.provider === 'metascalp') {
+      if (draft.provider === 'metascalp' && desktopRemoteLinkEnabled(user?.uid)) {
+        const labels = REMOTE_TEST_LABELS[language as keyof typeof REMOTE_TEST_LABELS] ?? REMOTE_TEST_LABELS.uk;
+        const online = await desktopRemoteLinkStatus();
+        setMessage({ ok: online, text: online ? labels.ready : labels.offline });
+      } else if (draft.provider === 'metascalp') {
         const port = await findActiveMetaScalpPort(meta.port);
         setMessage(port !== null
           ? { ok: true, text: 'MetaScalp знайдено на локальному порту {port}. Це перевірка з’єднання без перемикання монети.', port }
@@ -110,6 +151,9 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
       } else {
         setMessage({ ok: false, text: 'Для Vataga перевірка API поки недоступна. Потрібна офіційна специфікація локального протоколу.' });
       }
+    } catch {
+      const labels = REMOTE_TEST_LABELS[language as keyof typeof REMOTE_TEST_LABELS] ?? REMOTE_TEST_LABELS.uk;
+      setMessage({ ok: false, text: labels.error });
     } finally { setTesting(false); }
   };
 
@@ -137,7 +181,7 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
       <div>
         <h3 className="flex items-center gap-2 text-base font-semibold text-white"><PlugZap size={19} className="text-cyan-400" /> Лінковка з торговими терміналами</h3>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">
-          Вкажіть один термінал для відкриття монет з h00k. Дані надсилаються лише у локальну програму на вашому комп’ютері.
+          Вкажіть один термінал для відкриття монет з h00k. Дані надсилаються в локальну програму або через h00k Desktop, залежно від вибраного режиму.
           Торгові заявки, паролі, API-ключі й рівні Entry/SL/TP не передаються.
         </p>
       </div>
@@ -163,6 +207,8 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
           </label>
         )}
       </section>
+
+      {selected === 'metascalp' && <DesktopRemoteLinkSettings uid={user?.uid} language={language} />}
 
       {selected !== 'none' && (
         <>
@@ -301,26 +347,10 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
           )}
 
           <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-            <h4 className="text-sm font-semibold text-slate-100">5. Автоматизація та захист від випадкових перемикань</h4>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-200">
-              <input type="checkbox" className="mt-0.5 accent-cyan-500" checked={draft.switchOnChartOpen}
-                onChange={e => change({ switchOnChartOpen: e.target.checked })}/>
-              <span>Перемикати інструмент під час відкриття графіка з h00k
-                <span className="mt-0.5 block text-[11px] text-slate-400">Якщо вимкнути, працюватимуть тільки кнопки ручної лінковки.</span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-200">
-              <input type="checkbox" checked={draft.autoSignals && selected !== 'vataga'}
-                disabled={selected === 'vataga'} className="mt-0.5 accent-cyan-500"
-                onChange={e => change({ autoSignals: e.target.checked })}/>
-              <span>Автоматично перемикати за новими сповіщеннями
-                <span className="mt-0.5 block text-[11px] text-slate-400">
-                  Вимкнено за замовчуванням. Лише нові події з увімкненого Центру сповіщень, які мають тикер, біржу та ринок.
-                  Може перемкнути стакан під час вашої роботи — використовуйте обережно.
-                  {selected === 'vataga' && ' ' + translatePhrase(language, 'Автоматизація Vataga недоступна до реалізації прямого API.')}
-                </span>
-              </span>
-            </label>
+            <h4 className="text-sm font-semibold text-slate-100">{MANUAL_LINK_TITLES[language as keyof typeof MANUAL_LINK_TITLES] ?? MANUAL_LINK_TITLES.uk}</h4>
+            <p className="text-xs text-slate-300">
+              {MANUAL_LINK_MESSAGES[language as keyof typeof MANUAL_LINK_MESSAGES] ?? MANUAL_LINK_MESSAGES.uk}
+            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-xs text-slate-300">Захисний інтервал між командами
                 <select className={inputClass + ' w-full'} value={draft.cooldownMs} onChange={e => change({ cooldownMs: Number(e.target.value) })}>

@@ -32,6 +32,60 @@ command protocol is not. Ticker-linking is intentionally not claimed or attempte
 until a verified API specification is available. The existing website MetaScalp
 and Tiger local integrations are kept untouched.
 
+## MetaScalp linking from a tablet (opt-in)
+
+1. On Windows, start MetaScalp and h00k Desktop. In MetaScalp, assign the
+   desired order books, trade feed and charts to a matching link group
+   **001–500** (e.g. **002**). The special "Active window" link mode is
+   not the same as selecting a named group in MetaScalp.
+2. In h00k Desktop click **Separate window**, sign in to your h00k.top
+   account (email/password), then enable **Receive ticker selections from
+   tablet** in Desktop settings. The remote-control feature is off by default.
+3. Sign into the **same** account at h00k.top on the tablet. In Profile →
+   Terminal linking select MetaScalp and the matching group (e.g. 002).
+   Turn on **Send to h00k Desktop instead of local MetaScalp** on that tablet.
+4. Select a coin via an existing site ticker-link action. The tablet uses
+   a protected account route, and the Electron main process forwards only
+   symbol, exchange, market and binding to the running Windows MetaScalp API.
+5. The routing rule is identical for **all named groups 001–500**, and
+   depends on the number of order-book panels in the selected group:
+   - **One order book** (with or without linked charts): send MetaScalp's
+     original `POST /api/change-ticker` with the **website-selected**
+     exchange and market (`BINANCE:BTCUSDT.p` for futures,
+     `BINANCE:BTCUSDT` for spot).
+   - **Two or more order books**: read `GET /api/ui/state` and switch
+     each linked order book (and connected charts) with
+     `PUT /api/ui/documents/{externalId}/ticker`, providing only the
+     symbol. Each book keeps its existing connection: **Binance stays
+     Binance, Bybit stays Bybit**, and Spot/Futures remains unchanged
+     regardless of which exchange was selected on h00k.top.
+     Unconnected/empty charts are ignored, so they cannot block the books.
+     This also applies when two panels report the same connection ID.
+   The same rule also works for a normal h00k.top page opened directly
+   on the Windows computer. MetaScalp versions without the UI inventory
+   endpoint fall back to original named-group behavior.
+
+These changes affect **ticker selection only**, not orders, positions,
+trading or terminal link settings. If the instrument does not actually
+exist in Spot on the configured exchange, the Spot book cannot display it.
+The per-panel API confirms accepting the command, not the rendered result.
+If the requested ticker is listed on Binance but not on Bybit, the Bybit
+book may stay unchanged (likewise for Spot vs Futures); h00k does not
+invent a different market symbol or change exchange connections.
+
+The tablet web browser cannot safely access the Windows process's localhost.
+For browser compatibility this design uses h00k.top HTTPS as a lightweight
+**control-only relay**: a single 20-second long-poll per enabled Desktop
+(maximum two per user on the backend), plus one brief POST for each clicked
+symbol. It is not LAN peer-to-peer even when both devices share Wi-Fi.
+No exchange market streams, orders, API keys, or local-server ports are
+exposed. Desktop gets its h00k login via the existing Electron website
+session partition; a login in an unrelated Windows browser does not count.
+The server keeps only a recent, at-most-one ticker command per account in
+memory; it is not a durable queue. The accepted status means queued for
+delivery, not independently verified in MetaScalp. On Windows, run a real
+end-to-end acceptance check with live MetaScalp before relying on this link.
+
 ## Installer size, disk usage and resource safety
 
 There are **two different Windows downloads**:

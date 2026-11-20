@@ -21,9 +21,9 @@ export interface TerminalLinkSettings {
   provider: TerminalProvider;
   enabled: boolean;
   sources: Record<TerminalLinkSource, boolean>;
-  /** Deliberate user clicks / existing chart-selection behavior, not unsolicited alerts. */
+  /** Retired chart auto-switch field, retained for old profile schemas. */
   switchOnChartOpen: boolean;
-  /** Opt-in: switch on fresh notifications that identify their symbol, exchange and market. */
+  /** Retired notification auto-switch field, retained for old profile schemas. */
   autoSignals: boolean;
   /** Only meaningful when an actual 0-100 quality score is available. */
   minQuality: number;
@@ -42,7 +42,7 @@ const DEFAULT_SOURCES: Record<TerminalLinkSource, boolean> = {
 
 export const DEFAULT_TERMINAL_LINK_SETTINGS: TerminalLinkSettings = {
   provider: 'metascalp', enabled: true, sources: DEFAULT_SOURCES,
-  switchOnChartOpen: true, autoSignals: false, minQuality: 0, cooldownMs: 1200,
+  switchOnChartOpen: false, autoSignals: false, minQuality: 0, cooldownMs: 1200,
   tigerPort: 7819, tigerGroup: 'A', metaScalpGroups: {}, tigerGroups: {},
 };
 
@@ -62,8 +62,9 @@ export function normalizeTerminalLinkSettings(saved?: Partial<TerminalLinkSettin
   return {
     ...DEFAULT_TERMINAL_LINK_SETTINGS, ...saved, provider, sources: boolSources,
     enabled: !vatagaPaused && saved?.enabled !== false,
-    switchOnChartOpen: saved?.switchOnChartOpen !== false,
-    autoSignals: !vatagaPaused && saved?.autoSignals === true, // Explicit opt-in only.
+    // Never restore historical automatic changes to external terminals.
+    switchOnChartOpen: false,
+    autoSignals: false,
     minQuality: Number.isFinite(quality) ? Math.min(100, Math.max(0, Math.round(quality))) : 0,
     cooldownMs: Number.isFinite(cooldown) ? Math.max(0, Math.min(60000, Math.round(cooldown))) : 1200,
     tigerPort: Number.isInteger(port) && port > 0 && port < 65536 ? port : 7819,
@@ -106,12 +107,9 @@ export function getUserTerminalLinkSettings(
   profile?: Pick<UserProfile, 'uid' | 'terminalLinkSettings' | 'metaScalpSettings'> | null
 ): TerminalLinkSettings {
   if (!userId || profile?.uid !== userId) return normalizeTerminalLinkSettings({ provider: 'none', enabled: false });
-  // Preserve previous MetaScalp auto-switch choice for accounts created before this feature.
+  // Preserve old accounts' manual MetaScalp connection, not their auto-switch option.
   if (!profile.terminalLinkSettings) {
-    return normalizeTerminalLinkSettings({
-      switchOnChartOpen: profile.metaScalpSettings?.autoSwitchOnClick !== false,
-      enabled: profile.metaScalpSettings?.enabled !== false,
-    });
+    return normalizeTerminalLinkSettings({ enabled: profile.metaScalpSettings?.enabled !== false });
   }
   return normalizeTerminalLinkSettings(profile.terminalLinkSettings);
 }

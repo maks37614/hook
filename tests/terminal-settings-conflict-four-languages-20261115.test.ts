@@ -35,52 +35,35 @@ test('Terminal settings and conflict recovery strings exist for all four languag
   assert.equal(translateKey('pl', 'terminal.drawer.restoreCloud'), 'Przywróć wersję z chmury');
 });
 
-test('Settings and preset panels render localized conflict warnings and controls', () => {
+test('Terminal settings keep translations but no longer expose local/cloud conflict options', () => {
   const drawer = read('../src/components/terminal/TerminalSettingsDrawer.tsx');
   const presets = read('../src/components/terminal/TerminalPresetPanel.tsx');
   const page = read('../src/components/TerminalPage.tsx');
   const locale = read('../src/locales/index.ts');
   assert.match(locale, /\.\.\.terminalSettingsDrawerStrings\[language\]/);
-  assert.match(drawer, /backupFailed \? 'terminal\.drawer\.conflictBackupFailed' : 'terminal\.drawer\.conflictDetails'/);
-  assert.match(drawer, /terminal\.drawer\.downloadBackup/);
-  assert.match(drawer, /terminal\.drawer\.restoreCloud/);
   assert.match(drawer, /terminal\.drawer\.presetChartsPerPage/);
   assert.match(drawer, /terminal\.drawer\.initialViewHelp/);
-  assert.match(presets, /terminal\.drawer\.syncPresetConflict/);
+  assert.doesNotMatch(drawer, /terminal\.drawer\.conflictDetails|terminal\.drawer\.restoreCloud|syncConflict/);
   assert.match(presets, /terminal\.drawer\.syncPresetFailed/);
-  assert.match(presets, /terminal\.drawer\.syncDownload/);
-  assert.match(page, /terminal\.drawer\.conflictTooltip/);
-  assert.match(page, /terminal\.drawer\.conflictIndicator/);
+  assert.doesNotMatch(presets, /terminal\.drawer\.syncPresetConflict|syncConflict/);
+  assert.doesNotMatch(page, /terminal\.drawer\.conflictTooltip|terminal\.drawer\.conflictIndicator/);
   assert.doesNotMatch(drawer, /(?:title|aria-label|placeholder)="[^"]*[А-Яа-яІіЇїЄєҐґ]/);
   assert.doesNotMatch(drawer, />[^<>{}\n]*[А-Яа-яІіЇїЄєҐґ][^<>{}\n]*</);
-});
 
-test('Conflict banner is available in Ukrainian without replacing or clearing charts', () => {
   const config = { layoutPreset: 'custom' as const, columns: 2 as const,
     autoFitScreen: true, showClock: true, blocks: [], showFormations: true,
     blockHeight: 'medium' as const };
   const html = renderToStaticMarkup(React.createElement(TerminalSettingsDrawer, {
     isOpen: true, onClose: () => {}, config,
     coinSelection: { exchange: 'binance', marketType: 'futures' },
-    coinLimit: 12, totalBlocks: 12, syncConflict: true,
+    coinLimit: 12, totalBlocks: 12,
     onUpdateConfig: () => {}, onApplyGlobalTimeframe: () => {},
     onApplyPreset: () => {}, onResetWorkspace: () => {},
-    onDownloadLocalBackup: () => {}, onRestoreCloudWorkspace: () => {},
   }));
-  assert.match(html, /Локальна робоча область відрізняється/);
-  assert.match(html, /Завантажити JSON-копію/);
-  assert.match(html, /Повернути хмарну версію/);
-  assert.match(html, /role="alert"/);
+  assert.doesNotMatch(html, /Локальна робоча область відрізняється/);
+  assert.doesNotMatch(html, /Завантажити JSON-копію|Повернути хмарну версію/);
   assert.match(html, /Графіки: 12/);
   assert.match(html, /Показувати годинник/);
-  const backupFailed = renderToStaticMarkup(React.createElement(TerminalSettingsDrawer, {
-    isOpen: true, onClose: () => {}, config,
-    coinSelection: { exchange: 'binance', marketType: 'futures' },
-    coinLimit: 12, totalBlocks: 12, syncConflict: true, backupFailed: true,
-    onUpdateConfig: () => {}, onApplyGlobalTimeframe: () => {},
-    onApplyPreset: () => {}, onResetWorkspace: () => {},
-  }));
-  assert.match(backupFailed, /Не вдалося зберегти резервну копію/);
 });
 
 test('JSON recovery preserves international pair symbols without accepting separators or malformed data', () => {

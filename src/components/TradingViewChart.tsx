@@ -32,7 +32,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { interpolate, translatePhrase } from '../locales';
 import { localizeFormationRuntime } from '../utils/localizeFormationRuntime';
 import { useChartProvider } from '../utils/useChartProvider';
-import { coalesceNecklinePriceMarkers, defaultFormationNecklineVisible, filterFormationNeckline, filterVisibleTradeMarkers, formationChartMarkers, hasCompleteTradeLevelSet, hasFormationNeckline, isOlderLiveCandle, mergeLiveCandle, mergeLiveChartHistory, toggleCombinedTradeLevels, withCalculatedNecklineMarker, withNewerTradePrice } from '../utils/hookchartData';
+import { coalesceNecklinePriceMarkers, defaultFormationNecklineVisible, filterFormationNeckline, filterVisibleTradeMarkers, formationChartMarkers, hasCompleteTradeLevelSet, hasFormationNeckline, isOlderLiveCandle, mergeLiveCandle, mergeLiveChartHistory, mergeMissingExchangeKlines, toggleCombinedTradeLevels, withCalculatedNecklineMarker, withNewerTradePrice } from '../utils/hookchartData';
 import { CHART_NECKLINE_VISIBILITY_EVENT, chartNecklineScopeKey, chartNecklineStorageKey, readChartNecklineOverride, saveChartNecklineOverride } from '../utils/chartNecklineVisibility';
 import { CHART_TRADE_LEVELS_EVENT, chartTradeLevelStorageKey, normalizeChartTradeLevelVisibility, readChartTradeLevels, saveChartTradeLevels, type ChartTradeLevelVisibility } from '../utils/chartTradeLevelPreferences';
 import { HookChart } from './HookChart';
@@ -70,6 +70,8 @@ interface TradingViewChartProps {
   customMarkers?: ChartMarkerInfo[];
   /** Provisional W/M levels are a chart preview, independent of saved TP/SL visibility. */
   previewMarkers?: boolean;
+  /** Per-Terminal-block display override. Never updates the account-wide TP/SL preference. */
+  tradeLevelToggle?: { visible: boolean; onToggle: () => void };
   /** Optional controller from early W/M's own prediction-level toolbar. */
   earlyNecklineToggle?: { visible: boolean; available: boolean; onToggle: () => void };
   /** Always render the native HookChart in fullscreen, regardless of legacy provider settings. */
@@ -198,6 +200,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   isSavingArchive,
   customMarkers,
   previewMarkers = false,
+  tradeLevelToggle,
   earlyNecklineToggle,
   forceHookChart = false,
   savedChartParams,
@@ -379,6 +382,40 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   useEffect(() => () => liveCandles.clear(), [liveCandles, chartProvider]);
 
   const hasParentHistory = klines.length > 1 || (historyManagedByParent && klines.length > 0);
+  const gapRecoveryReadyRef = useRef(false);
+  gapRecoveryReadyRef.current = hasParentHistory || initialHistoryLoaded;
+  const gapRecoveryRef = useRef({ pending: false, attemptedAt: 0 });
+  const recoverKlineGap = useCallback((from: number, to: number, reconcileClosedBar = false) => {
+    const seconds = ({
+      '1m': 60, '5m': 300, '15m': 900,
+      '1h': 3600, '4h': 14400, '1d': 86400,
+    } as Record<string, number>)[timeframe];
+    if (!seconds || !gapRecoveryReadyRef.current ||
+        (to - from <= seconds && !reconcileClosedBar)) return;
+    // Do not issue a request for every chart or every tick. Only a new,
+    // measurable missing-bar gap can trigger one small, shared history page.
+    const state = gapRecoveryRef.current;
+    const now = Date.now();
+    if (state.pending || now - state.attemptedAt < 60_000) return;
+    const missing = Math.ceil((to - from) / seconds) - 1;
+    if (missing > 96) return; // Large offline periods need a fresh full history load.
+    state.pending = true;
+    state.attemptedAt = now;
+    const limit = Math.min(120, Math.max(24, missing + 8));
+    void fetchSharedHistoricalKlines({
+      exchange, marketType, symbol, timeframe: timeframe as Timeframe, limit,
+      // A gap-specific history cursor bypasses a possibly stale "latest"
+      // snapshot while still allowing short browser/server request coalescing.
+      endTime: to * 1000,
+    }).then(rows => {
+      // The newest live candle remains authoritative; only insert missing
+      // verified bars strictly between the two observed timestamps.
+      if (rows.length) setEffectiveKlines(current =>
+        mergeMissingExchangeKlines(current, rows, from, to));
+    }).catch(() => {
+      // Missing data is safer than inventing OHLC during an exchange outage.
+    }).finally(() => { state.pending = false; });
+  }, [exchange, marketType, symbol, timeframe]);
   const receiveHistory = useCallback((rows: Kline[]) => {
     const last = rows.at(-1);
     if (!last) return;
@@ -561,16 +598,22 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   // its neckline button merely because the other trade levels are previewed.
   const earlyPreviewOwnsNeckline = previewMarkers && !formation;
   const [earlyNecklineVisible, setEarlyNecklineVisible] = useState(true);
+  const terminalTradeLevelsVisible = tradeLevelToggle?.visible;
   const availableHookMarkers = useMemo(() => {
-    const visibility = { entry: showEntryLevel, target: showTargetLevel, stop: showStopLevel };
+    const visibility = terminalTradeLevelsVisible === undefined
+      ? { entry: showEntryLevel, target: showTargetLevel, stop: showStopLevel }
+      : { entry: terminalTradeLevelsVisible, target: terminalTradeLevelsVisible, stop: terminalTradeLevelsVisible };
     const markers = customMarkers?.length
       ? withCalculatedNecklineMarker(formation, customMarkers, timeframe as Timeframe)
       : formationChartMarkers(formation, visibility, timeframe as Timeframe);
-    const displayed = previewMarkers ? markers : filterVisibleTradeMarkers(markers, visibility);
+    // Early W/M predictions retain their own preview visibility. Terminal
+    // previews are *not* exempt from each card's explicit TP/SL switch.
+    const displayed = previewMarkers && terminalTradeLevelsVisible === undefined
+      ? markers : filterVisibleTradeMarkers(markers, visibility);
     return displayed.map(marker => ({ ...marker,
       label: marker.label ? localizeFormationRuntime(language, marker.label) : marker.label,
     }));
-  }, [customMarkers, formation, showEntryLevel, showTargetLevel, showStopLevel, timeframe, previewMarkers, language]);
+  }, [customMarkers, formation, showEntryLevel, showTargetLevel, showStopLevel, terminalTradeLevelsVisible, timeframe, previewMarkers, language]);
   const necklineAvailable = hasFormationNeckline(availableHookMarkers);
   const effectiveNecklineVisible = earlyPreviewOwnsNeckline
     ? (earlyNecklineToggle?.visible ?? earlyNecklineVisible) : showNeckline;
@@ -640,11 +683,12 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   }, [liveCandles, liveUiIntervalMs]);
 
   const handleLiveTick = useCallback(
-    (candle: Kline, mode: 'ws' | 'rest') => {
+    (candle: Kline, mode: 'ws' | 'rest', reconnectNeedsReconcile = false) => {
       if (chartProvider !== 'hookchart' && !candleSeriesRef.current) return;
       const previousCandle = currentCandleRef.current;
       if (previousCandle && isOlderLiveCandle(candle, previousCandle)) return;
       const opensBar = !!previousCandle && candle.time > previousCandle.time;
+      if (opensBar) recoverKlineGap(previousCandle.time, candle.time, reconnectNeedsReconcile);
       if (opensBar && previousCandle.time !== lastNotifiedClosedRef.current) {
         lastNotifiedClosedRef.current = previousCandle.time;
         // A new exchange candle is the conservative, provider-independent
@@ -738,7 +782,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
         });
       }
     },
-    [onLivePriceUpdate, chartProvider, showNavigationControls, hideSymbolAndPrice, liveCandles, liveUiIntervalMs, terminalEcoMode, terminalRefreshMs]
+    [onLivePriceUpdate, chartProvider, showNavigationControls, hideSymbolAndPrice, liveCandles, liveUiIntervalMs, terminalEcoMode, terminalRefreshMs, recoverKlineGap]
   );
 
   // Initialize the selected renderer; both share the same exchange feeds.
@@ -1052,6 +1096,8 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     if (terminalTradeCandles) return;
     let disposed = false;
     let wsConnected = false;
+    let hadActiveKlineFeed = false;
+    let reconcileOnReconnect = false;
     const streamClock = { lastExchangePriceAt: 0, lastStreamTickReceivedAt: 0 };
     liveStreamClockRef.current = streamClock;
     let lastKlineReceivedAt = 0;
@@ -1065,6 +1111,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
       {
         onStatus: connected => {
           if (disposed) return;
+          if (!connected && wsConnected && hadActiveKlineFeed) reconcileOnReconnect = true;
           wsConnected = connected;
           setIsLiveConnected(connected);
           if (connected) { setLiveMode('ws'); fallbackFailures = 0; }
@@ -1073,6 +1120,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           if (disposed) return;
           const receivedAt = Date.now();
           lastKlineReceivedAt = receivedAt;
+          hadActiveKlineFeed = true;
           const eventAt = Number(candle.eventTime) || receivedAt;
           const current = currentCandleRef.current;
           if (current && isOlderLiveCandle(candle, current)) return;
@@ -1086,7 +1134,13 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
             : candle;
           if (!current || candle.time > current.time) streamClock.lastExchangePriceAt = eventAt;
           else streamClock.lastExchangePriceAt = Math.max(streamClock.lastExchangePriceAt, eventAt);
-          liveTickHandlerRef.current(corrected, 'ws');
+          // An interrupted candle can remain partial even when the next
+          // timestamp is adjacent. Restore its final exchange OHLC once.
+          const reconcileClosedBar = reconcileOnReconnect &&
+            !!current && candle.time > current.time;
+          if (reconcileOnReconnect && current && candle.time >= current.time)
+            reconcileOnReconnect = false;
+          liveTickHandlerRef.current(corrected, 'ws', reconcileClosedBar);
         },
       },
     );
@@ -1177,7 +1231,11 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
 
   // One control always changes all three plotted levels together, regardless
   // of chart provider, page or fullscreen state.
-  const combinedTradeLevels = {
+  const combinedTradeLevels = tradeLevelToggle ? {
+    visible: tradeLevelToggle.visible,
+    available: hasTradeLevels,
+    onToggle: tradeLevelToggle.onToggle,
+  } : {
     visible: showEntryLevel && showTargetLevel && showStopLevel,
     available: hasTradeLevels,
     onToggle: () => applyTradeLevels(toggleCombinedTradeLevels({
@@ -1394,7 +1452,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           terminalEcoMode={terminalEcoMode}
           markers={hookMarkers} expandPriceScaleToMarkers={previewMarkers} savedChartParams={savedChartParams} onTimeframeChange={onTimeframeChange}
           onCrosshairPriceChange={onCrosshairPriceChange}
-          tradeLevelToggle={previewMarkers ? undefined : combinedTradeLevels}
+          tradeLevelToggle={tradeLevelToggle || !previewMarkers ? combinedTradeLevels : undefined}
           necklineToggle={necklineToolbarToggle}
           toolbarActions={hookchartToolbarActions} toolbarOverlays={hookchartToolbarOverlays}
           chartActions={showNavigationControls ? chartActions : null} />

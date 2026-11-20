@@ -20,6 +20,30 @@ test('profile time-zone choices include UTC, Kyiv and valid zones outside the po
   assert.equal(new Set(choices.map(choice => choice.value)).size, choices.length);
 });
 
+test('Russian time zones are explicit, localized and show the correct UTC direction', () => {
+  const russianZones = [
+    'Europe/Kaliningrad', 'Europe/Moscow', 'Europe/Samara',
+    'Asia/Yekaterinburg', 'Asia/Omsk', 'Asia/Novosibirsk',
+    'Asia/Krasnoyarsk', 'Asia/Irkutsk', 'Asia/Yakutsk',
+    'Asia/Vladivostok', 'Asia/Magadan', 'Asia/Kamchatka',
+    'Asia/Anadyr', 'Asia/Sakhalin',
+    'Europe/Kirov', 'Europe/Volgograd', 'Europe/Astrakhan',
+    'Europe/Saratov', 'Europe/Ulyanovsk',
+    'Asia/Barnaul', 'Asia/Tomsk', 'Asia/Novokuznetsk',
+    'Asia/Chita', 'Asia/Khandyga', 'Asia/Ust-Nera', 'Asia/Srednekolymsk',
+  ];
+  const choices = getTimeZoneChoices('Europe/Moscow', 'ru');
+  for (const zone of russianZones) {
+    assert.ok(choices.some(choice => choice.value === zone), `missing ${zone}`);
+  }
+  assert.match(choices.find(choice => choice.value === 'Europe/Moscow')!.label, /Москва \(UTC\+3\)/);
+  assert.match(getTimeZoneChoices('Europe/Moscow', 'en').find(choice => choice.value === 'Europe/Moscow')!.label, /Moscow/);
+  assert.match(getTimeZoneChoices('Europe/Moscow', 'pl').find(choice => choice.value === 'Europe/Moscow')!.label, /Moskwa/);
+  const reversed = getTimeZoneChoices('Etc/GMT+3', 'ru').find(choice => choice.value === 'Etc/GMT+3');
+  assert.ok(reversed?.label.includes('UTC-3'), 'POSIX Etc/GMT+3 must not be mistaken for Moscow');
+  assert.equal(new Set(choices.map(choice => choice.value)).size, choices.length);
+});
+
 test('active sessions include the open boundary and advance exactly at the close', () => {
   const before = getSessionWindow(session('london'), new Date('2026-01-05T07:59:59Z'));
   assert.equal(before.active, false);

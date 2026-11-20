@@ -1,4 +1,5 @@
 import type { ExchangeId, MarketType, UserProfile } from '../types';
+import { desktopRemoteLinkEnabled, sendTickerViaDesktop } from './desktopRemoteLink';
 
 export interface MetaScalpSettings {
   enabled: boolean;
@@ -12,7 +13,7 @@ export const DEFAULT_METASCALP_SETTINGS: MetaScalpSettings = {
   enabled: true,
   port: 17845,
   binding: '001',
-  autoSwitchOnClick: true,
+  autoSwitchOnClick: false,
   soundFeedback: true,
 };
 
@@ -24,7 +25,7 @@ export function getStoredMetaScalpSettings(userId?: string): MetaScalpSettings {
     const saved = localStorage.getItem(`${STORAGE_KEY}_${userId}`);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_METASCALP_SETTINGS, ...parsed };
+      return { ...DEFAULT_METASCALP_SETTINGS, ...parsed, autoSwitchOnClick: false };
     }
   } catch (e) {
     console.error('Failed to load MetaScalp settings from localStorage:', e);
@@ -35,7 +36,7 @@ export function getStoredMetaScalpSettings(userId?: string): MetaScalpSettings {
 export function saveStoredMetaScalpSettings(settings: MetaScalpSettings, userId?: string): void {
   if (!userId) return;
   try {
-    localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify(settings));
+    localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify({ ...settings, autoSwitchOnClick: false }));
   } catch (e) {
     console.error('Failed to save MetaScalp settings:', e);
   }
@@ -46,7 +47,7 @@ export function getUserMetaScalpSettings(
   profile?: Pick<UserProfile, 'uid' | 'metaScalpSettings'> | null
 ): MetaScalpSettings {
   if (userId && profile?.uid === userId && profile.metaScalpSettings) {
-    return { ...DEFAULT_METASCALP_SETTINGS, ...profile.metaScalpSettings };
+    return { ...DEFAULT_METASCALP_SETTINGS, ...profile.metaScalpSettings, autoSwitchOnClick: false };
   }
   return getStoredMetaScalpSettings(userId);
 }
@@ -107,6 +108,96 @@ export async function findActiveMetaScalpPort(preferredPort = 17845): Promise<nu
   return null;
 }
 
+interface LinkedMetaScalpPanel { externalId: string; connectionId: number; kind: 'orderBook' | 'chart' }
+const META_DOCUMENT_GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/** A group can contain spot and futures books; never turn either connection into the other. */
+export function linkedMetaScalpPanels(state: unknown, binding: string):
+  { documents: LinkedMetaScalpPanel[]; orderBookCount: number; error?: string } | null {
+  if (!state || typeof state !== 'object') return null;
+  const inventory = state as { windows?: unknown; standaloneCharts?: unknown };
+  if (!Array.isArray(inventory.windows) || !Array.isArray(inventory.standaloneCharts)) return null;
+  const documents: unknown[] = [...inventory.standaloneCharts];
+  for (const window of inventory.windows) {
+    if (!window || typeof window !== 'object') continue;
+    const tabs = (window as { tabs?: unknown }).tabs;
+    if (!Array.isArray(tabs)) continue;
+    for (const tab of tabs) {
+      const items = tab && typeof tab === 'object' ? (tab as { documents?: unknown }).documents : null;
+      if (Array.isArray(items)) documents.push(...items);
+    }
+  }
+  const bindingNumber = Number(binding);
+  const candidates = documents.filter(d => d && typeof d === 'object'
+    && (d as { linkNumber?: number }).linkNumber === bindingNumber
+    && ['orderBook','chart'].includes((d as {kind?: string}).kind || '')) as {
+    externalId: string; connectionId: number; kind: 'orderBook' | 'chart';
+  }[];
+  if (candidates.length > 16) return { documents: [], orderBookCount: 0, error: 'TOO_MANY_PANELS' };
+  const found: LinkedMetaScalpPanel[] = [];
+  const seen = new Set<string>();
+  for (const doc of candidates) {
+    // An empty chart can have a group number but no exchange connection;
+    // ignore it rather than blocking working Binance/Bybit order books.
+    // Never guess a missing connection for an order book.
+    if (doc.kind === 'chart' && (doc.connectionId === null || doc.connectionId === undefined))
+      continue;
+    if (typeof doc.externalId !== 'string' || !META_DOCUMENT_GUID.test(doc.externalId)
+      || !Number.isSafeInteger(doc.connectionId) || doc.connectionId <= 0)
+      return { documents: [], orderBookCount: 0, error: 'UNBOUND_PANEL' };
+    const externalId = doc.externalId.toLowerCase();
+    if (seen.has(externalId)) continue;
+    seen.add(externalId);
+    found.push({ externalId, connectionId: doc.connectionId, kind: doc.kind });
+  }
+  return { documents: found, orderBookCount: found.filter(doc => doc.kind === 'orderBook').length };
+}
+
+/** Only local read-only inventory plus document-specific ticker writes. */
+async function sendMixedMetaScalpGroup(port: number, binding: string, symbol: string):
+  Promise<{ success: boolean; message: string } | null> {
+  const base = `http://127.0.0.1:${port}`;
+  const stateController = new AbortController();
+  const stateTimer = setTimeout(() => stateController.abort(), 1200);
+  let state: unknown;
+  try {
+    const response = await fetch(base + '/api/ui/state', {
+      method: 'GET', mode: 'cors', cache: 'no-store', signal: stateController.signal,
+    });
+    if (!response.ok) return null; // Older MetaScalp: normal named-binding fallback.
+    state = await response.json();
+  } catch { return null; }
+  finally { clearTimeout(stateTimer); }
+  const matched = linkedMetaScalpPanels(state, binding);
+  if (!matched) return null;
+  if (matched.error) return { success: false, message: 'MetaScalp: некоректні панелі у групі ' + binding + '.' };
+  const docs = matched.documents;
+  // A single order book must follow the site-selected market, regardless
+  // of how many charts share its group. Two or more order books in ANY
+  // binding group retain their own Spot/Futures market connections.
+  if (matched.orderBookCount < 2) return null;
+  const results = await Promise.all(docs.map(async doc => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1600);
+    try {
+      const response = await fetch(base + '/api/ui/documents/' + doc.externalId + '/ticker', {
+        method: 'PUT', mode: 'cors', signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        // No exchange or connectionId override: every panel keeps its
+        // original Binance/Bybit and Spot/Futures connection in MetaScalp.
+        body: JSON.stringify({ ticker: symbol.trim().toUpperCase() }),
+      });
+      const data = await response.json().catch(() => null);
+      return response.ok && data?.status === 'ok';
+    } catch { return false; }
+    finally { clearTimeout(timeout); }
+  }));
+  const succeeded = results.filter(Boolean).length;
+  return succeeded === docs.length
+    ? { success: true, message: `MetaScalp: ${symbol.toUpperCase()} надіслано до ${succeeded} панелей групи ${binding} зі збереженням Spot/Futures.` }
+    : { success: false, message: `MetaScalp: оновлено ${succeeded} з ${docs.length} панелей групи ${binding}. Перевірте підключення.` };
+}
+
 export interface SendToMetaScalpResult {
   success: boolean;
   message: string;
@@ -131,11 +222,24 @@ export async function sendTickerToMetaScalp(
   const binding = settings.binding || '001';
   const ticker = formatMetaScalpTicker(symbol, exchange, marketType);
 
+  // Tablet mode is an explicit per-device opt-in. Never scan the tablet's
+  // localhost (where MetaScalp cannot be running) or send orders over this link.
+  if (desktopRemoteLinkEnabled()) {
+    const response = await sendTickerViaDesktop({ symbol, exchange, marketType, binding });
+    return {
+      success: response.success, message: response.message, ticker, binding,
+    };
+  }
+
   const payload = { tickerPattern: ticker, binding };
   const activePort = await findActiveMetaScalpPort(port);
   let message = 'MetaScalp не знайдено. Запустіть термінал на цьому комп’ютері та дозвольте сайту доступ до локальної мережі.';
 
   if (activePort !== null) {
+    const mixed = await sendMixedMetaScalpGroup(activePort, binding, symbol);
+    if (mixed) return {
+      success: mixed.success, message: mixed.message, ticker, binding, portUsed: activePort,
+    };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1800);
     try {

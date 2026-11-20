@@ -11,7 +11,7 @@ function view(mode: 'signup' | 'signin', resetToken: string | null = null) {
   const auth: NonNullable<React.ContextType<typeof AuthContext>> = {
     user: null, profile: null, loading: false,
     signInWithEmail: noop, registerWithEmail: noop, resendVerification: noop,
-    requestPasswordReset: noop, resetPassword: noop, updateProfileData: noop, updateTerminalWorkspace: async () => null,
+    requestPasswordReset: noop, resetPassword: noop, updateProfileData: noop, updateTerminalWorkspace: async () => null, refreshProfile: async () => ({ uid: 'chart-render-test' }),
     logout: noop, logoutAll: noop, listSessions: async () => [], revokeSession: noop,
     resetToken, authError: null, authErrorCode: null, authNotice: null, clearAuthError: () => {},
   };

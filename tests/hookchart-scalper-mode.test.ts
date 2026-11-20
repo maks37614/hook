@@ -4,7 +4,7 @@ import test from 'node:test';
 import { performance } from 'node:perf_hooks';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createScalperAnalyzer, scalperLabel, type ScalperCandle } from '../src/components/hookchart/scalperMode';
+import { createScalperAnalyzer, scalperLabel, scalperLineDash, type ScalperCandle } from '../src/components/hookchart/scalperMode';
 import { translateHookChartPhrase } from '../src/locales/hookchartLanguage';
 import { OriginalHookChartSettings, normalizeOriginalHookChartPreferences } from '../src/components/hookchart/OriginalHookChartSettings';
 import { terminalEcoPreferences } from '../src/components/hookchart/terminalEcoPreferences';
@@ -31,6 +31,83 @@ test('scalper defaults OFF, persists only explicit true, and ECO is a read-only 
   assert.equal(eco.scalperMode, false);
   assert.equal(original.scalperMode, true);
   assert.equal(terminalEcoPreferences(original, false).scalperMode, true);
+});
+
+test('Scalper line style and contact points are visual-only independent preferences', () => {
+  const defaults = normalizeOriginalHookChartPreferences();
+  assert.equal(defaults.scalperLineStyle, 'auto');
+  assert.equal(defaults.showScalperTouchPoints, true);
+  for (const style of ['auto', 'solid', 'dash', 'dot'] as const) {
+    assert.equal(normalizeOriginalHookChartPreferences({ scalperLineStyle: style }).scalperLineStyle, style);
+  }
+  assert.equal(normalizeOriginalHookChartPreferences({ scalperLineStyle: 'invalid' as 'auto' }).scalperLineStyle, 'auto');
+  assert.equal(normalizeOriginalHookChartPreferences({ showScalperTouchPoints: 'false' as unknown as boolean }).showScalperTouchPoints, true);
+  assert.equal(normalizeOriginalHookChartPreferences({ showScalperTouchPoints: false }).showScalperTouchPoints, false);
+  assert.deepEqual(scalperLineDash('auto', 'confirmed'), []);
+  assert.deepEqual(scalperLineDash('auto', 'possible'), [4, 4]);
+  assert.deepEqual(scalperLineDash('auto', 'forming'), [4, 4]);
+  assert.deepEqual(scalperLineDash('auto', 'failed'), [4, 4]);
+  for (const status of ['forming', 'possible', 'confirmed', 'failed'] as const) {
+    assert.deepEqual(scalperLineDash('solid', status), []);
+    assert.deepEqual(scalperLineDash('dash', status), [7, 5]);
+    assert.deepEqual(scalperLineDash('dot', status), [2, 4]);
+  }
+
+  for (const language of ['uk', 'en', 'pl', 'ru'] as const) {
+    const prefs = normalizeOriginalHookChartPreferences({
+      language, siteLanguageAtSelection: 'uk',
+      scalperMode: true, scalperLineStyle: 'dot', showScalperTouchPoints: false,
+    });
+    const html = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
+      open: true, embedded: true, prefs,
+      onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
+    }));
+    for (const label of ['Вигляд ліній Режиму Скальпера', 'Показувати точки Режиму Скальпера', 'Авто (за статусом)', 'Суцільна', 'Пунктир', 'Крапки']) {
+      const localized = translateHookChartPhrase(language, label);
+      assert.ok(html.includes(localized), language + ': control or option ' + label);
+      if (language !== 'uk' && label !== 'Пунктир') assert.notEqual(localized, label, language + ': untranslated ' + label);
+    }
+    assert.ok(html.includes('value="dot" aria-pressed="true"'), language + ': selected line type');
+    assert.ok(html.includes('type="checkbox" aria-label="' + translateHookChartPhrase(language, 'Показувати точки Режиму Скальпера') + '"'),
+      language + ': touch point switch');
+    assert.ok(!html.includes(translateHookChartPhrase(language, 'Приховує або показує всі кружечки Скальпера: дотики до High/Low тіней та круглі мітки можливого чи підтвердженого пробою. Лінії, визначення формацій та текстові статуси не змінюються.')),
+      language + ': help should remain hidden');
+  }
+  const canvas = readFileSync('src/components/hookchart/HookChartCanvas.tsx', 'utf8');
+  const painter = readFileSync('src/components/hookchart/engine.tsx', 'utf8');
+  assert.match(canvas, /scalperLineStyle=\{runtimeSettings\.scalperLineStyle \|\| 'auto'\}/);
+  assert.match(canvas, /showScalperTouchPoints=\{runtimeSettings\.showScalperTouchPoints !== false\}/);
+  assert.match(painter, /q\.setLineDash\(scalperLineDash\(scalperLineStyle, setup\.status\)\)/);
+  assert.match(painter, /if \(showScalperTouchPoints\) for \(const touch of setup\.touches\)/);
+  assert.ok(painter.indexOf('if (showScalperTouchPoints) for (const touch') < painter.indexOf('if (showScalperTouchPoints && setup.breakout)'),
+    'both filled wick points and outlined breakout rings must follow the same visibility switch');
+  assert.match(painter, /if \(showScalperTouchPoints && setup\.breakout\)/,
+    'the breakout circle must not remain visible when Scalper points are disabled');
+  const scalperLayer = painter.split('if (scalperResult?.setups.length) {')[1]?.split('drawHookTimeMarkers(q,g,timeMarkers,mouse);')[0] ?? '';
+  assert.equal((scalperLayer.match(/q\.arc\(/g) || []).length, 2,
+    'new circular annotations in the Scalper layer must be added to the shared points switch');
+  assert.match(scalperLayer, /if \(showScalperTouchPoints\) for \(const touch[\s\S]*?q\.arc\([\s\S]*?if \(showScalperTouchPoints && setup\.breakout\)[\s\S]*?q\.arc\(/,
+    'all currently painted Scalper circles must be behind the shared switch');
+  assert.match(painter, /scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels/,
+    'changing either visual setting must trigger a repaint');
+  assert.match(canvas, /runtimeSettings\.scalperMode === true && !archiveMode && !replay && !externalData && !ecoActive/,
+    'appearance choices must not change the opt-in detector gating');
+});
+
+test('Scalper Mode on/off switch is prominent in both chart and profile settings', () => {
+  for (const embedded of [false, true]) {
+    const html = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
+      open: true, embedded, prefs: normalizeOriginalHookChartPreferences({ language: 'uk' }),
+      onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
+    }));
+    const application = html.indexOf('data-hookchart-guide-section="Застосунок"');
+    const scalper = html.indexOf('data-hookchart-guide-section="Автоматична розмітка"');
+    const interfaceSettings = html.indexOf('data-hookchart-guide-section="Інтерфейс"');
+    assert.ok(application >= 0 && scalper > application && interfaceSettings > scalper,
+      'Scalper toggle must be near the top of Main before the long Interface settings');
+    assert.match(html.slice(scalper, interfaceSettings), /aria-label="Режим Скальпера"/,
+      'the switch must be accessible and present in the near-top section');
+  }
 });
 
 test('Scalper Mode help follows chart-specific EN/PL/RU locale even when site is Ukrainian', () => {

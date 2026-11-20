@@ -4,6 +4,7 @@ import { mergeProfileUpdate } from '../utils/hookchartData';
 import { DEFAULT_APP_PREFERENCES, getStoredPreferences, saveStoredPreferences, setPreferencesIdentity } from '../utils/userPreferences';
 import { DEFAULT_METASCALP_SETTINGS, saveStoredMetaScalpSettings } from '../utils/metaScalpService';
 import { setApiIdentity, apiFetch } from '../utils/apiFetch';
+import { setDesktopRemoteLinkIdentity } from '../utils/desktopRemoteLink';
 import { applySiteAppearance, cacheSiteAppearance, normalizeSiteAppearance, setSiteAppearanceIdentity } from '../utils/siteAppearance';
 import {
   PROFILE_GUEST_FOCUS_REFRESH_MS, PROFILE_SIGNAL_COALESCE_MS, PROFILE_SYNC_SIGNAL_KEY,
@@ -39,6 +40,8 @@ interface AuthContextType {
   updateProfileData: (updates: Partial<UserProfile>) => Promise<void>;
   /** Atomic per-workspace write: a stale device receives a 409 instead of overwriting new charts. */
   updateTerminalWorkspace: (workspace: NonNullable<UserProfile['terminalSettings']>, expectedVersion: string | null) => Promise<string | null>;
+  /** Refresh the account from PostgreSQL to reconcile a stale Terminal workspace version. */
+  refreshProfile: () => Promise<UserProfile>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   listSessions: () => Promise<AuthSessionSummary[]>;
@@ -80,6 +83,7 @@ function applySitePreferences(profile: UserProfile, uid: string) {
   // Profile data from PostgreSQL is authoritative for this UID, including
   // missing fields on older accounts. Never reuse the previous owner's values.
   setPreferencesIdentity(uid);
+  setDesktopRemoteLinkIdentity(uid);
   saveStoredPreferences({
     defaultExchange: profile.defaultExchange ?? DEFAULT_APP_PREFERENCES.defaultExchange,
     defaultMarketType: profile.defaultMarketType ?? DEFAULT_APP_PREFERENCES.defaultMarketType,
@@ -137,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     identityEpochRef.current += 1;
     lastSessionCheckRef.current = Date.now();
     setApiIdentity(null, null);
+    setDesktopRemoteLinkIdentity(null);
     setPreferencesIdentity(null);
     setSiteAppearanceIdentity(null);
     userRef.current = null;
@@ -380,6 +385,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (userRef.current?.uid !== account.uid) throw new Error('Обліковий запис змінився.');
       const nextProfile = stripLegacySecrets(result.profile as UserProfile);
+      // A 200 response must not be presented as a successful profile save
+      // unless PostgreSQL returned the requested account values. This also
+      // catches accidentally dropped fields after a backend change.
+      const accountFields: Array<keyof UserProfile> = [
+        'displayName', 'defaultExchange', 'defaultMarketType', 'defaultTimeframe', 'timeZone',
+      ];
+      if (accountFields.some(field => clean[field] !== undefined && nextProfile[field] !== clean[field])) {
+        throw new Error('Сервер не підтвердив збереження налаштувань профілю. Спробуйте ще раз.');
+      }
       profileRef.current = nextProfile;
       setProfile(nextProfile);
       setUser(result.user as H00kUser);
@@ -398,6 +412,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       terminalSettings: { ...workspace, _expectedVersion: expectedVersion } as NonNullable<UserProfile['terminalSettings']>,
     });
     return profileRef.current?.terminalSettings?.version ?? null;
+  };
+  const refreshProfile = async (): Promise<UserProfile> => {
+    const account = userRef.current;
+    if (!account) throw new Error('Увійдіть у свій акаунт.');
+    // Do not let a refresh race an in-flight profile PATCH.
+    await writeQueue.current.catch(() => {});
+    const epoch = identityEpochRef.current;
+    const response = await fetch('/api/auth/session', {
+      credentials: 'same-origin', cache: 'no-store',
+    });
+    if (!response.ok) throw new Error('Не вдалося оновити хмарні налаштування Термінала.');
+    const payload = await response.json();
+    if (identityEpochRef.current !== epoch || userRef.current?.uid !== account.uid
+        || payload?.user?.uid !== account.uid || !payload.profile || !payload.csrf) {
+      throw new Error('Сесія змінилася під час синхронізації Термінала.');
+    }
+    setIdentity(payload);
+    return stripLegacySecrets(payload.profile as UserProfile);
   };
   const logout = async () => {
     if (userRef.current) {
@@ -434,7 +466,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={{
     user, profile, loading, signInWithEmail, registerWithEmail,
     resendVerification, requestPasswordReset, resetPassword, resetToken,
-    updateProfileData, updateTerminalWorkspace, logout, logoutAll, listSessions, revokeSession,
+    updateProfileData, updateTerminalWorkspace, refreshProfile, logout, logoutAll, listSessions, revokeSession,
     authError, authErrorCode, authNotice, clearAuthError,
   }}>{children}</AuthContext.Provider>;
 };

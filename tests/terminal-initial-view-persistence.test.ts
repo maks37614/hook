@@ -105,23 +105,24 @@ test('Done commits custom settings, cancels old fit-all and triggers immediate p
   assert.match(page, /if \(updated\.initialChartFitAll === false\) setTerminalFitAllRequest\(0\)/);
   assert.match(page, /requestImmediateWorkspaceSync\(\)/);
   assert.match(engine, /if\(!terminalFitAllRequest\)\{\s*lastTerminalFitAllRequestRef\.current=null;/);
-  assert.match(hook, /localStorage\.setItem\(terminalStorageKey\(CONFIG_KEY, uid\), JSON\.stringify\(workspace\.config\)\)/);
+  assert.match(hook, /if \(!uid\) \{/);
+  assert.match(hook, /auth\.updateTerminalWorkspace\(\{/);
   assert.match(hook, /immediate \? 0 : 1200/);
 });
 
-test('logged-in settings are sent to profile with revision protection; old profile cannot overwrite local edits', () => {
+test('logged-in settings use cloud revisions and reconcile stale edits', () => {
   const hook = read('src/utils/useTerminalWorkspace.ts');
   const backend = read('server/pgIdentity.ts');
   assert.match(hook, /auth\.updateTerminalWorkspace\(\{/);
   assert.match(hook, /columns: config\.columns, blockHeight: config\.blockHeight, config,/);
   assert.match(hook, /serverVersion\.current/);
-  assert.match(hook, /syncConflictRef\.current/);
-  assert.match(hook, /if \(\(revision\.current > 0 \|\| lastCommittedWorkspace\.current !== workspaceRef\.current\)/);
-  assert.match(hook, /if \(revision\.current === 0\)/);
+  assert.match(hook, /authRef\.current\.refreshProfile\(\)/);
+  assert.match(hook, /rebaseTerminalWorkspace/);
+  assert.match(hook, /lastCommittedWorkspace\.current !== workspace/);
+  assert.doesNotMatch(hook, /syncConflictRef|saveConflictBackup/);
   assert.match(backend, /COALESCE\(profile -> 'terminalSettings' ->> 'version', ''\) = \$3/);
   assert.match(backend, /new AuthFailure\(409,[\s\S]*?'TERMINAL_WORKSPACE_CONFLICT'\)/);
 });
-
 
 test('closing the drawer without Done discards the preview and restores the saved fit mode', () => {
   const drawer = read('src/components/terminal/TerminalSettingsDrawer.tsx');

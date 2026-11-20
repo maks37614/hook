@@ -23,8 +23,11 @@ test('all Terminal settings controls write to the same per-profile workspace and
   assert.match(page, /onDone=\{handleDoneWorkspaceSettings\}/);
   assert.match(page, /const handleDoneWorkspaceSettings = useCallback\(\(\) => \{[\s\S]*?requestImmediateWorkspaceSync\(\);\s*setConfig\(current => \(\{ \.\.\.current \}\)\);/);
   assert.match(hook, /updateTerminalWorkspace\(\{[\s\S]*?config,[\s\S]*?blocks: value\.blocks, customPresets: value\.presets/);
-  assert.match(hook, /terminalStorageKey\(CONFIG_KEY, uid\)/);
-  assert.match(hook, /terminalStorageKey\(BLOCKS_KEY, uid\)/);
+  assert.match(hook, /uid \? null : readCache\(BLOCKS_KEY\)/);
+  assert.match(hook, /uid \? null : readCache\(CONFIG_KEY\)/);
+  assert.match(hook, /if \(!uid\) \{/);
+  assert.match(hook, /auth\.updateTerminalWorkspace/);
+  assert.match(hook, /authRef\.current\.refreshProfile/);
 });
 
 
@@ -75,6 +78,20 @@ test('Terminal settings and 30 chart identities reload from the correct account 
       assert.equal(restored.config[key], config[key], `lost user setting: ${key}`);
     assert.equal(restored.config.initialChartView?.visibleBars, 90);
     assert.equal(restored.config.initialChartView?.rightGapBars, 12);
+    // Old browser snapshots, including a previously failed conflict, must never
+    // become a second workspace for a signed-in user (even before hydration).
+    items.set(terminalStorageKey('crypto_screener_terminal_blocks', 'owner-a'),
+      JSON.stringify([{ ...blocks[0], symbol: 'FAKEUSDT' }]));
+    items.set(terminalStorageKey('crypto_screener_terminal_presets', 'owner-a'),
+      JSON.stringify([{ id: 'stale', name: 'Stale', blocks: [blocks[0]] }]));
+    items.set(terminalStorageKey('crypto_screener_terminal_conflict_backup', 'owner-a'),
+      JSON.stringify({ blocks: [{ ...blocks[0], symbol: 'FAKEUSDT' }], config, presets: [] }));
+    const cloudOnly = loadTerminalWorkspace('owner-a', profile);
+    assert.deepEqual(cloudOnly.blocks, blocks);
+    assert.deepEqual(cloudOnly.presets, []);
+    const awaitingCloud = loadTerminalWorkspace('owner-a');
+    assert.deepEqual(awaitingCloud.blocks.map(chart => chart.symbol), ['BTCUSDT']);
+    assert.equal(awaitingCloud.config.coinPresetLimit, undefined);
     assert.equal(loadTerminalWorkspace('owner-b').config.coinPresetLimit, undefined);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'localStorage', previous);

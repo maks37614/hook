@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { createChartTouchHold, isChartControlTarget } from '../src/components/hookchart/touchHold';
 import { measurementHit } from '../src/components/hookchart/measurementTool';
+import { rulerDragThresholdMet, rulerHasRange, isRangeDrawingTool, isPointDrawingTool } from '../src/components/hookchart/rulerGestures';
 import { freeDrawingPoint, translateDrawingPoints } from '../src/components/hookchart/drawingManipulation';
 import { hookChartHorizontalRange, resizeHookChartViewport } from '../src/utils/hookchartData';
 
@@ -45,12 +46,15 @@ function setup(overrides: Record<string, unknown> = {}) {
     magnifierZoom:{current:2},magnifierPriceDrag:{current:null},
     TOUCH_MAGNIFIER_DEFAULT_ZOOM:2,
     magnifierZoomFromPriceDrag:(zoom:number,delta:number)=>Math.max(1.25,Math.min(6,zoom*Math.exp(-delta/150))),
-    mouseRef:{current:null},hoveredMeasurement:{current:null},pointers:{current:new Map()},drag:{current:null},lastTap:{current:0},
+    mouseRef:{current:null},hoveredMeasurement:{current:null},pointers:{current:new Map()},activePointerRect:{current:null},drag:{current:null},lastTap:{current:0},
     scheduleDraw:()=>{},editingDrawingId:null,drawings:[],draft:null,tool:'cursor',levelLabelMode:'always',autoLevels:[],timeMarkers:[],
     uid:()=> 'testing', drawingActionsPosition:(x:number,y:number)=>({x,y}),
     snap:(x:number,y:number)=>({t:x*1000,p:110-y/35}),
-    setDraft:()=>{},setDrawingActions:()=>{},
-    measurementHit,freeDrawingPoint,translateDrawingPoints,resizeHookChartViewport,intervalMs:60000,symbol:'BTCUSDT',setSelectedDrawingId:()=>{},setEditingDrawingId:()=>{},setDrawings:()=>{},
+    setDraft:()=>{},setDrawingActions:()=>{},setAlertActions:()=>{},
+    measurementHit,freeDrawingPoint,translateDrawingPoints,resizeHookChartViewport,
+    rulerDragThresholdMet,rulerHasRange,isRangeDrawingTool,isPointDrawingTool,
+    intervalMs:60000,symbol:'BTCUSDT',setSelectedDrawingId:()=>{},setEditingDrawingId:()=>{},setDrawings:()=>{},
+    setAlerts:()=>{},onCreatePriceAlert:undefined,onSelectPriceAlert:undefined,hitAlertAt:()=>null,
     vp:{barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null},candles:[{t:0}],rightPaddingBars:0,rightPadding:0,
     setVp:(update:any)=>viewportUpdates.push(update(env.vp)),
     setGestureVp:(update:any,_kind:string)=>viewportUpdates.push(update(env.vp)),
@@ -74,6 +78,23 @@ function setup(overrides: Record<string, unknown> = {}) {
   const fireHold=()=>{const callbacks=[...timers.values()];timers.clear();callbacks.forEach(callback=>callback());};
   return {env,handlers,event,fireHold,captured,viewportUpdates,timers};
 }
+
+test('captured pointer moves reuse chart bounds until layout invalidates them', () => {
+  let rectReads=0;
+  const rect={left:0,top:0,width:350,height:700};
+  const t=setup({ref:{current:{getBoundingClientRect:()=>{rectReads++;return rect}}}});
+  t.handlers.handlePointerDown(t.event(100,200));
+  const readsAfterDown=rectReads;
+  for(let x=101;x<=120;x++)t.handlers.handlePointerMove(t.event(x,200));
+  assert.equal(rectReads,readsAfterDown,'one pointer capture should not measure the DOM on each move');
+  t.env.activePointerRect.current=null; // Simulate ResizeObserver or nested scroll.
+  t.handlers.handlePointerMove(t.event(125,200));
+  assert.equal(rectReads,readsAfterDown+1,'next move must remeasure after layout changed');
+  t.handlers.handlePointerMove(t.event(130,200));
+  assert.equal(rectReads,readsAfterDown+1,'updated rect should be cached again');
+  t.handlers.handlePointerUp(t.event(130,200,1,'pointerup'));
+  assert.equal(t.env.activePointerRect.current,null,'release must forget the captured geometry');
+});
 
 test('a second finger pinches the chart even after the longer touch hold has opened the lens', () => {
   const t=setup();
@@ -244,23 +265,28 @@ test('dragging the shaded measurement moves both endpoints without changing its 
   assert.equal(t.viewportUpdates.length,0);
 });
 
-test('touching a trend tool opens a precision lens immediately and commits the first point on release', () => {
-  const placed: Array<{t:number;p:number}> = [];
-  const t=setup({tool:'trend',setDraft:(point:{t:number;p:number}|null)=>{if(point)placed.push(point);}});
+test('trend creates both endpoints with a single press-drag-release', () => {
+  let drawings:any[]=[];
+  let drafts:any[]=[];
+  const t=setup({tool:'trend',
+    setDraft:(point:any)=>{drafts.push(point)},
+    setDrawings:(updater:(rows:any[])=>any[])=>{drawings=updater(drawings)}});
   t.handlers.handlePointerDown(t.event(100,200));
-  assert.equal(t.env.drag.current?.kind,'drawingPlacement');
-  assert.equal(t.env.magnifierPointer.current,1, 'no hold timer needed for a drawing point');
+  assert.equal(t.env.drag.current?.kind,'drawingRangePlacement');
+  assert.equal(t.env.magnifierPointer.current,null);
   assert.equal(t.timers.size,0);
-  assert.equal(placed.length,0,'a finger press alone never commits an anchor');
+  assert.equal(drawings.length,0);
   t.handlers.handlePointerMove(t.event(150,250));
   assert.deepEqual(t.env.mouseRef.current,{x:150,y:250});
-  assert.equal(t.viewportUpdates.length,0,'sliding a drawing point must not pan the chart');
+  assert.equal(t.viewportUpdates.length,0);
   t.handlers.handleTouchEnd(t.event(150,250,1,'pointerup'));
-  assert.deepEqual(placed,[{t:150_000,p:110-250/35}]);
-  assert.equal(t.env.magnifierPointer.current,null,'release hides the lens');
+  assert.equal(drawings.length,1);
+  assert.equal(drawings[0].type,'trend');
+  assert.deepEqual(drawings[0].pts,[{t:100_000,p:110-200/35},{t:150_000,p:110-250/35}]);
+  assert.deepEqual(drafts,[null]);
   assert.equal(t.env.drag.current,null);
   assert.equal(t.captured.size,0);
-  assert.equal(t.env.suppressTouchClick.current,true,'synthetic click must not add a duplicate anchor');
+  assert.equal(t.env.suppressTouchClick.current,true);
 });
 
 test('second endpoint of a trend uses the final finger location and saves the full line', () => {
@@ -285,39 +311,45 @@ test('second endpoint of a trend uses the final finger location and saves the fu
   assert.equal(t.viewportUpdates.length,0);
 });
 
-test('drawing-touch cancellation and pinch never leave accidental first or second points', () => {
-  let count=0;
-  const canceled=setup({tool:'trend',setDraft:()=>{count++}});
+test('drawing cancel and pinch never commit an accidental shape', () => {
+  let writes=0;
+  const canceled=setup({tool:'trend',setDrawings:()=>{writes++}});
   canceled.handlers.handlePointerDown(canceled.event(120,200));
-  assert.equal(canceled.env.magnifierPointer.current,1);
-  canceled.handlers.handlePointerUp(canceled.event(155,240,1,'pointercancel'));
-  assert.equal(count,0);
   assert.equal(canceled.env.magnifierPointer.current,null);
+  canceled.handlers.handlePointerUp(canceled.event(155,240,1,'pointercancel'));
+  assert.equal(writes,0);
 
-  const pinched=setup({tool:'trend',setDraft:()=>{count++}});
+  let cleared=0;
+  const pinched=setup({tool:'trend',setDraft:()=>{cleared++},setDrawings:()=>{writes++}});
   pinched.handlers.handlePointerDown(pinched.event(100,240));
   pinched.handlers.handlePointerDown(pinched.event(180,240,2));
   assert.equal(pinched.env.drag.current.kind,'pinch');
   pinched.handlers.handleTouchEnd(pinched.event(180,240,2,'pointerup'));
   pinched.handlers.handleTouchEnd(pinched.event(100,240,1,'pointerup'));
-  assert.equal(count,0,'a pinch is not a drawing tap');
+  assert.equal(cleared,1);
+  assert.equal(writes,0,'pinch must not add a drawing');
 });
 
-test('finger placement is supported for other two-anchor tools and does not hijack cursor inspection', () => {
+test('press-drag-release works for all other two-anchor drawing tools', () => {
   for (const tool of ['ray','rect','fib','profile','ruler']) {
-    const t=setup({tool});
+    let drawings:any[]=[];
+    const t=setup({tool,setDrawings:(update:(rows:any[])=>any[])=>{drawings=update(drawings)}});
     t.handlers.handlePointerDown(t.event(115,210));
-    assert.equal(t.env.drag.current.kind,'drawingPlacement',tool);
-    assert.equal(t.env.magnifierPointer.current,1,tool);
-    t.handlers.handlePointerUp(t.event(115,210,1,'pointerup'));
+    assert.equal(t.env.drag.current.kind,'drawingRangePlacement',tool);
+    assert.equal(t.env.magnifierPointer.current,null,tool);
+    t.handlers.handlePointerMove(t.event(185,280));
+    t.handlers.handleTouchEnd(t.event(185,280,1,'pointerup'));
+    assert.equal(drawings.length,1,tool);
+    assert.equal(drawings[0].type,tool);
+    assert.equal(drawings[0].pts.length,2,tool);
   }
   const cursor=setup({tool:'cursor'});
   cursor.handlers.handlePointerDown(cursor.event(115,210));
-  assert.equal(cursor.env.magnifierPointer.current,null,'cursor still uses its hold-to-inspect behavior');
+  assert.equal(cursor.env.magnifierPointer.current,null);
   assert.equal(cursor.env.drag.current.kind,'touchCursor');
 });
 
-test('single-anchor horizontal level and text also open a touch lens and commit on release', () => {
+test('single-anchor level and text commit at the release position without a lens', () => {
   for(const tool of ['level','text']){
     let drawings: any[]=[];
     let selected: string|null=null;
@@ -328,8 +360,8 @@ test('single-anchor horizontal level and text also open a touch lens and commit 
       setDraft:()=>{draftCalls++},
     });
     t.handlers.handlePointerDown(t.event(100,200));
-    assert.equal(t.env.drag.current?.kind,'drawingPlacement',tool);
-    assert.equal(t.env.magnifierPointer.current,1,tool);
+    assert.equal(t.env.drag.current?.kind,'drawingPointPlacement',tool);
+    assert.equal(t.env.magnifierPointer.current,null,tool);
     assert.equal(drawings.length,0,'press does not commit the '+tool);
     t.handlers.handlePointerMove(t.event(175,250));
     assert.equal(t.viewportUpdates.length,0,'placing a '+tool+' does not pan candles');
@@ -356,6 +388,78 @@ test('canceling single-anchor placement does not create an accidental mark', () 
     assert.equal(writes,0);
     assert.equal(t.env.magnifierPointer.current,null);
     assert.equal(t.captured.size,0);
+  }
+});
+
+test('mouse and pen share the same press-drag-release geometry as touch', () => {
+  for (const pointerType of ['mouse','pen'] as const) {
+    let drawings:any[]=[];
+    const t=setup({tool:'rect',setDrawings:(updater:(items:any[])=>any[])=>{drawings=updater(drawings)}});
+    const event=(x:number,y:number,type:string)=>({...t.event(x,y,1,type),pointerType});
+    t.handlers.handlePointerDown(event(100,200,'pointerdown'));
+    t.handlers.handlePointerMove(event(175,245,'pointermove'));
+    t.handlers.handleTouchEnd(event(175,245,'pointerup'));
+    assert.equal(drawings.length,1,pointerType);
+    assert.equal(drawings[0].type,'rect');
+    assert.deepEqual(drawings[0].pts,[{t:100000,p:110-200/35},{t:175000,p:110-245/35}]);
+  }
+});
+
+test('an unmoved tap arms the first anchor and a later tap completes the drawing', () => {
+  let first:any=null;
+  const one=setup({tool:'fib',setDraft:(value:any)=>{first=value}});
+  one.handlers.handlePointerDown(one.event(80,200));
+  one.handlers.handleTouchEnd(one.event(80,200,1,'pointerup'));
+  assert.deepEqual(first,{t:80000,p:110-200/35});
+  let drawings:any[]=[];
+  const two=setup({tool:'fib',draft:first,
+    setDrawings:(u:(items:any[])=>any[])=>{drawings=u(drawings)},
+    setDraft:()=>{}});
+  two.handlers.handlePointerDown(two.event(190,280));
+  two.handlers.handleTouchEnd(two.event(190,280,1,'pointerup'));
+  assert.equal(drawings.length,1);
+  assert.deepEqual(drawings[0].pts,[first,{t:190000,p:110-280/35}]);
+});
+
+test('price alert only commits on release and existing marker keeps delete confirmation', () => {
+  let created:number[]=[];
+  let selected:string[]=[];
+  const tap=setup({tool:'alert',onCreatePriceAlert:(price:number)=>created.push(price),
+    onSelectPriceAlert:(id:string,action:string)=>selected.push(id+':'+action),
+    hitAlertAt:()=>({id:'BTCUSDT:existing'})});
+  tap.handlers.handlePointerDown(tap.event(150,245));
+  assert.equal(created.length,0);
+  tap.handlers.handleTouchEnd(tap.event(150,245,1,'pointerup'));
+  assert.deepEqual(selected,['BTCUSDT:existing:delete']);
+  assert.equal(created.length,0);
+  const move=setup({tool:'alert',onCreatePriceAlert:(price:number)=>created.push(price),
+    onSelectPriceAlert:(id:string,action:string)=>selected.push(id+':'+action),
+    hitAlertAt:()=>({id:'BTCUSDT:existing'})});
+  move.handlers.handlePointerDown(move.event(150,245));
+  move.handlers.handlePointerMove(move.event(150,320));
+  move.handlers.handleTouchEnd(move.event(150,320,1,'pointerup'));
+  assert.deepEqual(created,[110-320/35]);
+  assert.deepEqual(selected,['BTCUSDT:existing:delete']);
+});
+
+test('no drawing is saved on canceled gestures; two-finger pinch wins over point tools', () => {
+  let saved=0;
+  for(const tool of ['level','text','alert']){
+    const t=setup({tool,setDrawings:()=>{saved++},setAlerts:()=>{saved++},
+      onCreatePriceAlert:()=>{saved++}});
+    t.handlers.handlePointerDown(t.event(100,200));
+    t.handlers.handlePointerMove(t.event(170,280));
+    t.handlers.handlePointerUp(t.event(170,280,1,'pointercancel'));
+    assert.equal(saved,0,tool);
+    const pinch=setup({tool,setDrawings:()=>{saved++},setAlerts:()=>{saved++},
+      onCreatePriceAlert:()=>{saved++}});
+    pinch.handlers.handlePointerDown(pinch.event(100,200));
+    pinch.handlers.handlePointerDown(pinch.event(200,200,2));
+    assert.equal(pinch.env.drag.current.kind,'pinch',tool);
+    pinch.handlers.handlePointerMove(pinch.event(235,200,2));
+    pinch.handlers.handleTouchEnd(pinch.event(235,200,2,'pointerup'));
+    pinch.handlers.handleTouchEnd(pinch.event(100,200,1,'pointerup'));
+    assert.equal(saved,0,tool);
   }
 });
 
@@ -456,7 +560,7 @@ test('price axis still zooms while a drawing tool is selected; plot drawing gest
   t.handlers.handleTouchEnd(t.event(330,170,1,'pointerup'));
   const plot = setup({terminalMode:true,tool:'trend'});
   plot.handlers.handlePointerDown(plot.event(130,210));
-  assert.equal(plot.env.drag.current?.kind,'drawingPlacement');
+  assert.equal(plot.env.drag.current?.kind,'drawingRangePlacement');
 });
 
 test('price drag starts from the visible auto-fit range rather than a stale saved zoom',()=>{

@@ -40,6 +40,21 @@ const POPULAR_TIME_ZONES: Record<string, string> = {
   'Asia/Tokyo': 'Токіо', 'Asia/Shanghai': 'Шанхай', 'Asia/Hong_Kong': 'Гонконг',
   'Asia/Singapore': 'Сінгапур', 'Asia/Dubai': 'Дубай', 'Australia/Sydney': 'Сідней',
   'Asia/Kolkata': 'Колката', 'Asia/Kathmandu': 'Катманду',
+  // Keep Russia's IANA zone IDs explicit: iOS/older Intl implementations can
+  // omit them from supportedValuesOf, and the native picker is not searchable.
+  'Europe/Kaliningrad': 'Калінінград', 'Europe/Moscow': 'Москва',
+  'Europe/Samara': 'Самара', 'Asia/Yekaterinburg': 'Єкатеринбург',
+  'Asia/Omsk': 'Омськ', 'Asia/Novosibirsk': 'Новосибірськ',
+  'Asia/Krasnoyarsk': 'Красноярськ', 'Asia/Irkutsk': 'Іркутськ',
+  'Asia/Yakutsk': 'Якутськ', 'Asia/Vladivostok': 'Владивосток',
+  'Asia/Magadan': 'Магадан', 'Asia/Kamchatka': 'Камчатка',
+  'Asia/Anadyr': 'Анадир', 'Asia/Sakhalin': 'Сахалін',
+  'Europe/Kirov': 'Кіров', 'Europe/Volgograd': 'Волгоград',
+  'Europe/Astrakhan': 'Астрахань', 'Europe/Saratov': 'Саратов',
+  'Europe/Ulyanovsk': 'Ульяновськ', 'Asia/Barnaul': 'Барнаул',
+  'Asia/Tomsk': 'Томськ', 'Asia/Novokuznetsk': 'Новокузнецьк',
+  'Asia/Chita': 'Чита', 'Asia/Khandyga': 'Хандига',
+  'Asia/Ust-Nera': 'Усть-Нера', 'Asia/Srednekolymsk': 'Середньоколимськ',
 };
 
 const TIME_ZONE_CITY_TRANSLATIONS: Record<string, { en: string; ru: string; pl: string }> = {
@@ -59,11 +74,38 @@ const TIME_ZONE_CITY_TRANSLATIONS: Record<string, { en: string; ru: string; pl: 
   'Сідней': { en: 'Sydney', ru: 'Сидней', pl: 'Sydney' },
   'Колката': { en: 'Kolkata', ru: 'Колката', pl: 'Kalkuta' },
   'Катманду': { en: 'Kathmandu', ru: 'Катманду', pl: 'Katmandu' },
+  'Калінінград': { en: 'Kaliningrad', ru: 'Калининград', pl: 'Kaliningrad' },
+  'Москва': { en: 'Moscow', ru: 'Москва', pl: 'Moskwa' },
+  'Самара': { en: 'Samara', ru: 'Самара', pl: 'Samara' },
+  'Єкатеринбург': { en: 'Yekaterinburg', ru: 'Екатеринбург', pl: 'Jekaterynburg' },
+  'Омськ': { en: 'Omsk', ru: 'Омск', pl: 'Omsk' },
+  'Новосибірськ': { en: 'Novosibirsk', ru: 'Новосибирск', pl: 'Nowosybirsk' },
+  'Красноярськ': { en: 'Krasnoyarsk', ru: 'Красноярск', pl: 'Krasnojarsk' },
+  'Іркутськ': { en: 'Irkutsk', ru: 'Иркутск', pl: 'Irkuck' },
+  'Якутськ': { en: 'Yakutsk', ru: 'Якутск', pl: 'Jakuck' },
+  'Владивосток': { en: 'Vladivostok', ru: 'Владивосток', pl: 'Władywostok' },
+  'Магадан': { en: 'Magadan', ru: 'Магадан', pl: 'Magadan' },
+  'Камчатка': { en: 'Kamchatka', ru: 'Камчатка', pl: 'Kamczatka' },
+  'Анадир': { en: 'Anadyr', ru: 'Анадырь', pl: 'Anadyr' },
+  'Сахалін': { en: 'Sakhalin', ru: 'Сахалин', pl: 'Sachalin' },
+  'Кіров': { en: 'Kirov', ru: 'Киров', pl: 'Kirow' },
+  'Волгоград': { en: 'Volgograd', ru: 'Волгоград', pl: 'Wołgograd' },
+  'Астрахань': { en: 'Astrakhan', ru: 'Астрахань', pl: 'Astrachań' },
+  'Саратов': { en: 'Saratov', ru: 'Саратов', pl: 'Saratów' },
+  'Ульяновськ': { en: 'Ulyanovsk', ru: 'Ульяновск', pl: 'Uljanowsk' },
+  'Барнаул': { en: 'Barnaul', ru: 'Барнаул', pl: 'Barnauł' },
+  'Томськ': { en: 'Tomsk', ru: 'Томск', pl: 'Tomsk' },
+  'Новокузнецьк': { en: 'Novokuznetsk', ru: 'Новокузнецк', pl: 'Nowokuźnieck' },
+  'Чита': { en: 'Chita', ru: 'Чита', pl: 'Czyta' },
+  'Хандига': { en: 'Khandyga', ru: 'Хандыга', pl: 'Chandyga' },
+  'Усть-Нера': { en: 'Ust-Nera', ru: 'Усть-Нера', pl: 'Ust-Niera' },
+  'Середньоколимськ': { en: 'Srednekolymsk', ru: 'Среднеколымск', pl: 'Sredniekołymsk' },
 };
 
 export function getTimeZoneChoices(selected?: string, language: 'uk' | 'en' | 'ru' | 'pl' = 'uk'): Array<{ value: string; label: string }> {
   const supported = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') || [];
   const seen = new Set<string>();
+  const now = new Date();
   return [...new Set([...(selected && selected !== 'auto' ? [selected] : []), ...Object.keys(POPULAR_TIME_ZONES), resolveTimeZone(selected), ...supported])]
     .filter(value => {
       try {
@@ -76,7 +118,10 @@ export function getTimeZoneChoices(selected?: string, language: 'uk' | 'en' | 'r
     .map(value => {
       const city = POPULAR_TIME_ZONES[value];
       const localized = city && language !== 'uk' ? TIME_ZONE_CITY_TRANSLATIONS[city]?.[language] ?? city : city;
-      return { value, label: localized ? `${localized} · ${value}` : value.replaceAll('_', ' ') };
+      // Display the actual sign for the confusing POSIX Etc/GMT zones:
+      // Etc/GMT+3 is UTC-3, not Moscow's UTC+3.
+      const offset = city || value.startsWith('Etc/GMT') ? ` (${formatTimeZoneOffset(now, value)})` : '';
+      return { value, label: localized ? `${localized}${offset} · ${value}` : `${value.replaceAll('_', ' ')}${offset}` };
     });
 }
 

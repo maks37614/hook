@@ -15,7 +15,8 @@ const desktop = source.slice(
 
 test('desktop header centers the existing logo, fullscreen and language controls', () => {
   assert.match(source, /xl:relative xl:justify-between/);
-  assert.match(brand, /xl:absolute xl:left-1\/2 xl:top-1\/2 xl:z-10 xl:flex xl:w-auto xl:-translate-x-1\/2 xl:-translate-y-1\/2/);
+  assert.match(brand, /xl:pointer-events-none xl:absolute xl:inset-x-0 xl:top-1\/2 xl:z-10 xl:-translate-y-1\/2/);
+  assert.match(brand, /justify-self-center[^"]*xl:pointer-events-auto/, 'the logo alone must sit in the center column');
   assert.match(brand, /src="\/h00k-robot-logo\.svg"/);
   assert.match(brand, /onClick=\{toggleFullScreen\}/);
   assert.match(brand, /onChange=\{\(e\) => changeSiteLanguage\(e\.target\.value as SupportedLanguage\)\}/);
@@ -26,9 +27,9 @@ test('mobile keeps its original symmetric brand grid and controls', () => {
   assert.match(brand, /grid min-h-9 w-full min-w-0 grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);
   assert.match(brand, /sm:min-h-10 sm:gap-x-2/);
   assert.match(brand, /id="screener-help-btn"/);
-  assert.match(brand, /justify-self-end/);
-  assert.ok(brand.indexOf('id="screener-help-btn"') < brand.indexOf('src="/h00k-robot-logo.svg"'));
-  assert.ok(brand.indexOf('src="/h00k-robot-logo.svg"') < brand.indexOf('data-screener-guide="fullscreen"'));
+  assert.match(brand, /<span aria-hidden="true" className="min-w-0" \/>/);
+  assert.ok(brand.indexOf('src="/h00k-robot-logo.svg"') < brand.indexOf('id="screener-help-btn"'));
+  assert.ok(brand.indexOf('id="screener-help-btn"') < brand.indexOf('data-screener-guide="fullscreen"'));
   assert.match(brand, /<option value="uk">🇺🇦 UA<\/option>/);
 });
 
@@ -49,7 +50,7 @@ test('site header retains icon borders but does not show a manual refresh button
   assert.ok(actions.includes('border-slate-800'));
 });
 
-test('header language selector is transparent and immediately right of the logo', () => {
+test('header language selector remains transparent to the right of logo and help', () => {
   const selectStart = brand.indexOf('<select');
   const selectEnd = brand.indexOf('</select>', selectStart);
   const languageSelect = brand.slice(selectStart, selectEnd + '</select>'.length);
@@ -57,7 +58,9 @@ test('header language selector is transparent and immediately right of the logo'
   const logoEnd = brand.indexOf('</button>', logoStart) + '</button>'.length;
   const fullscreen = brand.indexOf('onClick={toggleFullScreen}');
 
-  assert.ok(logoEnd > 0 && logoEnd < selectStart, 'language selector must follow logo');
+  const helpStart = brand.indexOf('id="screener-help-btn"');
+  assert.ok(logoEnd > 0 && logoEnd < helpStart && helpStart < selectStart,
+    'centered logo must be followed by help, then language');
   assert.ok(selectStart < fullscreen, 'fullscreen button must follow language selector');
   assert.match(languageSelect, /appearance-none/);
   assert.match(languageSelect, /border-0 bg-transparent/);
@@ -73,4 +76,28 @@ test('header language selector is transparent and immediately right of the logo'
     assert.match(languageSelect, new RegExp('<option value="' + code + '">'));
   }
   assert.equal((languageSelect.match(/<option /g) ?? []).length, 4);
+});
+
+test('desktop Terminal gap is reduced without moving the centered logo or hiding categories', () => {
+  const nav = source.slice(source.indexOf('{/* Navigation Category Tabs */}'), source.indexOf('</nav>'));
+  assert.match(nav, /xl:gap-0 xl:p-0\.5/);
+  assert.equal((nav.match(/xl:px-1\.5/g) ?? []).length, 4);
+  assert.match(nav, /xl:right-auto xl:left-1/, 'PC badge must remain inside Terminal, away from the logo');
+  assert.match(brand, /xl:pointer-events-none/);
+  assert.match(brand, /xl:pointer-events-auto/);
+  for (const tab of ['screener', 'patterns', 'replay', 'terminal']) {
+    assert.match(nav, new RegExp('id="nav-category-' + tab + '-btn"'));
+  }
+});
+
+test('Desktop header cannot mask the right-side notification and terminal buttons',()=>{
+  // The outer centered logo overlay occupies the full header width but must
+  // never be a hit target. Its utility child must be its intrinsic width only.
+  assert.match(brand, /xl:pointer-events-none xl:absolute xl:inset-x-0/);
+  assert.match(brand, /xl:w-max xl:justify-self-start xl:pointer-events-auto/);
+  assert.match(source, /xl:relative xl:z-20 xl:w-auto xl:flex-nowrap/);
+  assert.match(source, /<SiteNotificationBell/);
+  for(const id of ['open-metascalp-btn','open-watchlist-btn','open-telegram-btn',
+    'open-surveillance-btn','open-archive-btn','open-guide-btn'])
+    assert.ok(source.includes('id="' + id + '"'), 'Missing interactive header button ' + id);
 });

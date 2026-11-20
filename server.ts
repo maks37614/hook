@@ -1,6 +1,7 @@
 import { initializeIdentity } from './server/pgIdentity';
 import { installPostgresIdentityRoutes } from './server/pgIdentityRoutes';
 import { installReplayProfileRoutes } from './server/replayProfileRoutes';
+import { installDesktopLinkRelay } from './server/desktopLinkRelay';
 import { startAuthMailWorker } from './server/authMailWorker';
 import express from 'express';
 import path from 'path';
@@ -85,6 +86,8 @@ async function startServer() {
   });
   installPostgresIdentityRoutes(app);
   installReplayProfileRoutes(app);
+  // Opt-in Desktop channel: user-scoped and idle when no Desktop is connected.
+  installDesktopLinkRelay(app);
 
   // Read-only operator endpoint is disabled unless H00K_OPS_TOKEN is configured.
   let chartDepthMetrics: (() => ReturnType<ReturnType<typeof installHookChartDepthStream>['stats']>) | null = null;
@@ -420,9 +423,10 @@ async function startServer() {
     res.setHeader('Cache-Control', 'public, max-age=30');
     try {
       const trades24h = await fetch24hTradeCount(exchange, market as MarketType, symbol);
-      res.json({ success: true, trades24h, source: exchange === 'binance' ? 'binance_24h_ticker' : 'not_available' });
+      const volume24hUsd = marketTickerFeed.getCached24hVolumeUsd(exchange as ExchangeId, market as MarketType, symbol);
+      res.json({ success: true, trades24h, volume24hUsd, source: exchange === 'binance' ? 'binance_24h_ticker' : 'not_available' });
     } catch {
-      res.json({ success: true, trades24h: null, source: 'unavailable' });
+      res.json({ success: true, trades24h: null, volume24hUsd: marketTickerFeed.getCached24hVolumeUsd(exchange as ExchangeId, market as MarketType, symbol), source: 'unavailable' });
     }
   });
 

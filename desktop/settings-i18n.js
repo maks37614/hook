@@ -4,6 +4,17 @@
 (function (root) {
   const rows = [
     // [Ukrainian source, English, Polish, Russian]
+    ['5. Лінковка MetaScalp з планшета','5. MetaScalp tablet linking','5. Łączenie MetaScalp z tabletem','5. Связь MetaScalp с планшетом'],
+    ['Приймати перемикання монет з планшета через h00k Desktop','Receive tablet ticker selections through h00k Desktop','Odbieraj wybór monet z tabletu przez h00k Desktop','Принимать выбор монет с планшета через h00k Desktop'],
+    ['Увійдіть в один акаунт h00k.top на планшеті та в окремому вікні h00k Desktop. На планшеті ввімкніть «Надсилати в h00k Desktop» у налаштуваннях лінковки. Стакан і графіки MetaScalp мають бути в одній групі (наприклад 002). Команди передаються через захищений акаунт, а MetaScalp доступний тільки цьому комп’ютеру.',
+      'Sign in to the same h00k.top account on the tablet and in a separate h00k Desktop window. Enable “Send to h00k Desktop” on the tablet. Place the MetaScalp order book and charts in the same group (e.g. 002). Commands pass through your authenticated account; MetaScalp remains local to this computer.',
+      'Zaloguj się na to samo konto h00k.top na tablecie i w osobnym oknie h00k Desktop. Na tablecie włącz „Wyślij do h00k Desktop”. Ustaw arkusz zleceń i wykresy MetaScalp w tej samej grupie (np. 002). Polecenia są przesyłane przez zalogowane konto, a MetaScalp pozostaje lokalny.',
+      'Войдите в один аккаунт h00k.top на планшете и в отдельном окне h00k Desktop. На планшете включите «Отправлять в h00k Desktop». Поместите стакан и графики MetaScalp в одну группу (например 002). Команды передаются через авторизованный аккаунт, а MetaScalp остаётся локальным.'],
+    ['Увійдіть до h00k.top у вікні Desktop','Sign in to h00k.top inside Desktop','Zaloguj się do h00k.top w aplikacji Desktop','Войдите в h00k.top в окне Desktop'],
+    ['Планшет може надсилати монети','Ready to receive tablet tickers','Gotowe do odbioru monet z tabletu','Готов к приёму монет с планшета'],
+    ['MetaScalp не знайдено на комп’ютері','MetaScalp not found on this computer','Nie znaleziono MetaScalp na komputerze','MetaScalp не найден на компьютере'],
+    ['MetaScalp відхилив команду','MetaScalp rejected the command','MetaScalp odrzucił polecenie','MetaScalp отклонил команду'],
+    ['Немає з’єднання з h00k.top','Connection to h00k.top unavailable','Brak połączenia z h00k.top','Нет соединения с h00k.top'],
     ['Мова','Language','Język','Язык'],
     ['Налаштування прикріплення','Docking settings','Ustawienia dokowania','Настройки прикрепления'],
     ['h00k robot logo','h00k robot logo','Logo robota h00k','Логотип робота h00k'],

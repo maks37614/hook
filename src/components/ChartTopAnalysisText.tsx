@@ -402,6 +402,7 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
               ({analysis.bslDistPct.toFixed(2)}%)
             </span>
           </div>
+
         </div>
 
         {/* Section 2: Сильні опорні рівні (Support / Resistance) */}

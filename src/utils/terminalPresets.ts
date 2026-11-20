@@ -1,5 +1,5 @@
 import type { MarketCoin, TerminalChartBlock, TerminalSavedPreset, Timeframe } from '../types';
-import { coinMarketKey } from './marketPresets';
+import { coinMarketKey, type TerminalPresetCoin } from './marketPresets';
 import { formatCryptoPrice } from './formatters';
 import { normalizeExchangeSymbol } from './marketSymbols';
 import { getCoinWatchlistKey, parseWatchlistKey } from './watchlistUtils';
@@ -118,16 +118,22 @@ export function blocksForSavedFavorites(
 }
 
 /** Keep existing widget IDs and settings when the market ranking is unchanged. */
-export function blocksForMarketPreset(current: TerminalChartBlock[], coins: MarketCoin[], timeframe: Timeframe): TerminalChartBlock[] {
+export function blocksForMarketPreset(current: TerminalChartBlock[], coins: readonly TerminalPresetCoin[], timeframe: Timeframe): TerminalChartBlock[] {
   // Reuse blocks in O(n + m) instead of searching every open chart for each
   // market candidate on every automatic preset update.
   const currentByMarket = new Map(current.map(block => [coinMarketKey(block), block] as const));
   const next = coins.map(coin => {
     const existing = currentByMarket.get(coinMarketKey(coin));
-    if (existing) return existing;
+    if (existing) {
+      // Formation preset uses the scanner's actual timeframe and selected pattern.
+      // Preserve the existing chart ID, drawings, size and user settings.
+      if (coin.timeframe && (existing.timeframe !== coin.timeframe || existing.formationId !== coin.formationId))
+        return { ...existing, timeframe: coin.timeframe, formationId: coin.formationId };
+      return existing;
+    }
     return { id: `market-${coinMarketKey(coin)}`, symbol: coin.symbol, baseAsset: coin.baseAsset,
       quoteAsset: coin.quoteAsset, exchange: coin.exchange, marketType: coin.marketType,
-      timeframe, colSpan: 1 as const };
+      timeframe: coin.timeframe ?? timeframe, formationId: coin.formationId, colSpan: 1 as const };
   });
   return next.length === current.length && next.every((block, index) => block === current[index]) ? current : next;
 }

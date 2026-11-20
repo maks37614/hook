@@ -8,8 +8,10 @@ import {
   positionReplaySpeedMenu,
 } from '../src/components/replay/ReplaySpeedPicker';
 
-test('Replay speed picker retains all six original playback rates', () => {
-  assert.deepEqual(REPLAY_SPEED_OPTIONS.map(option => option.value), [0.25, 0.5, 1, 2, 5, 10]);
+test('Replay speed picker retains all original playback rates and adds 0.1x', () => {
+  assert.deepEqual(REPLAY_SPEED_OPTIONS.map(option => option.value), [0.1, 0.25, 0.5, 1, 2, 5, 10]);
+  assert.equal(REPLAY_SPEED_OPTIONS[0].label, '0.1x');
+  assert.equal(REPLAY_SPEED_OPTIONS.length, 7);
 });
 
 test('Replay speed picker uses a custom popover, not the native iOS select sheet', () => {
@@ -21,6 +23,14 @@ test('Replay speed picker uses a custom popover, not the native iOS select sheet
   assert.match(html, /aria-haspopup="listbox"/);
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, />2x<\/span>/);
+  assert.doesNotMatch(html, /<select\b/);
+});
+
+test('Replay 0.1x displays as the selected speed with no browser-native select', () => {
+  const html = renderToStaticMarkup(React.createElement(ReplaySpeedPicker, {
+    speed: 0.1, onSpeedChange: () => {},
+  }));
+  assert.match(html, />0\.1x<\/span>/);
   assert.doesNotMatch(html, /<select\b/);
 });
 

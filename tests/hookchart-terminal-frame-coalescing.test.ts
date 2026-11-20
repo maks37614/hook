@@ -43,13 +43,18 @@ test('Terminal full-canvas commits coalesce into one RAF and use latest market s
   assert.equal(drawn, 2);
 });
 
-test('Terminal queues regular scene paints but fullscreen / Replay preserve synchronous flush', () => {
+test('all HookChart scenes coalesce render commits, including fullscreen and Replay', () => {
   const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
-  assert.match(engine, /if\(terminalMode\)frames\.current\?\.request\(true\);\s*else frames\.current\?\.flush\(\)/);
+  const commitEffect = engine.match(/\/\/ Every HookChart can receive multiple market\/viewport commits[\s\S]*?\},\[candles,vp,drawings,alerts/);
+  assert.ok(commitEffect, 'the viewport-driven commit effect remains present');
+  assert.match(commitEffect[0], /frames\.current\?\.request\(true\)/,
+    'dragging and live updates must queue one complete scene per animation frame');
+  assert.doesNotMatch(commitEffect[0], /frames\.current\?\.flush\(\)/,
+    'commits must not synchronously block pointer events with a full DPR paint');
   assert.match(engine, /if\(document\.visibilityState==='hidden'\|\|!chartOnScreen\.current\)\{frames\.current\?\.cancel\(\);return\}/);
   assert.match(engine, /\[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,/);
-  assert.match(engine, /strategyResult,scalperResult,showScalperLabels,/,
-    'turning off scalp captions must trigger a chart repaint');
+  assert.match(engine, /strategyResult,scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels,/,
+    'changing Scalper lines, points or captions must trigger a chart repaint');
   assert.match(engine, /liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive\]\)/,
     'keyboard magnifier visibility must also trigger a chart repaint');
 });

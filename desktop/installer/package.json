@@ -1,6 +1,6 @@
 {
   "name": "h00k-setup",
-  "version": "0.1.12",
+  "version": "0.1.17",
   "description": "Animated setup launcher for h00k Desktop",
   "private": true,
   "main": "main.cjs",

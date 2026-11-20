@@ -109,3 +109,72 @@ export function terminalViewportHistoryPhase(
   // The 30s interval is built from live trades and has no REST history.
   return !isTerminalView || timeframe === '30s' || historyLoaded ? 'ready' : 'seed';
 }
+
+
+/**
+ * Protect compact Terminal charts from an isolated flash wick (or a bad
+ * exchange high/low) that is many times larger than all candle bodies.
+ *
+ * This changes only the *display range*: the underlying OHLC is never
+ * altered and manual vertical navigation still exposes the entire wick.
+ * Ordinary candles, sustained trends and repeated extreme wicks always
+ * retain their genuine high/low in automatic scaling.
+ *
+ * A single pass handles the common case. Only a confirmed extreme wick
+ * needs a second, linear pass across the already-visible candle window.
+ */
+export function terminalReadableCandleExtrema(
+  candles: readonly { o: number; h: number; l: number; c: number }[],
+): { low: number; high: number; clippedHigh: boolean; clippedLow: boolean } {
+  const validPriceCandle = (candle: { o: number; h: number; l: number; c: number }) =>
+    Number.isFinite(candle.o) && candle.o > 0 &&
+    Number.isFinite(candle.h) && candle.h > 0 &&
+    Number.isFinite(candle.l) && candle.l > 0 &&
+    Number.isFinite(candle.c) && candle.c > 0;
+  let low = Infinity;
+  let high = -Infinity;
+  let bodyLow = Infinity;
+  let bodyHigh = -Infinity;
+  let validCount = 0;
+  for (const candle of candles) {
+    if (!validPriceCandle(candle)) continue;
+    validCount++;
+    low = Math.min(low, candle.l, candle.o, candle.c);
+    high = Math.max(high, candle.h, candle.o, candle.c);
+    bodyLow = Math.min(bodyLow, candle.o, candle.c);
+    bodyHigh = Math.max(bodyHigh, candle.o, candle.c);
+  }
+  if (validCount === 0) return { low: 0, high: 1, clippedHigh: false, clippedLow: false };
+  if (validCount < 5) return { low, high, clippedHigh: false, clippedLow: false };
+
+  const bodySpan = Math.max(bodyHigh - bodyLow, bodyHigh * 0.0005, 1e-12);
+  const upperGuard = Math.max(bodyHigh * 1.6, bodyHigh + bodySpan * 7);
+  const lowerGuard = Math.min(bodyLow / 1.6, bodyLow - bodySpan * 7);
+  const checkUpper = high > upperGuard;
+  const checkLower = low < lowerGuard;
+  if (!checkUpper && !checkLower) return { low, high, clippedHigh: false, clippedLow: false };
+
+  let regularHigh = bodyHigh, regularLow = bodyLow;
+  let excludedHigh = 0, excludedLow = 0;
+  for (const candle of candles) {
+    if (!validPriceCandle(candle)) continue;
+    if (checkUpper) {
+      if (candle.h > upperGuard) excludedHigh++;
+      else regularHigh = Math.max(regularHigh, candle.h);
+    }
+    if (checkLower) {
+      if (candle.l < lowerGuard) excludedLow++;
+      else regularLow = Math.min(regularLow, candle.l);
+    }
+  }
+  // Repeated spikes should not be silently treated as measurement noise.
+  const maxIsolated = Math.max(1, Math.ceil(validCount * .08));
+  const clippedHigh = checkUpper && excludedHigh > 0 && excludedHigh <= maxIsolated;
+  const clippedLow = checkLower && excludedLow > 0 && excludedLow <= maxIsolated;
+  return {
+    low: clippedLow ? regularLow : low,
+    high: clippedHigh ? regularHigh : high,
+    clippedHigh,
+    clippedLow,
+  };
+}

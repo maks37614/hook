@@ -42,6 +42,7 @@ import { MarketRecurrenceTool } from './MarketRecurrenceTool';
 import { createMarketRecurrenceMarks, type MarketRecurrenceMark, type RecurrenceReport } from './marketRecurrence';
 import { chartMarketStatistics, memoizedAutoLevels, formatUsd, normalizeDensityDistance, type LevelTf } from './marketAnalytics';
 import { useOriginalHookChartLiveFeed } from './useOriginalHookChartLiveFeed';
+import { HookChartFooterFunding } from './HookChartFooterFunding';
 import { terminalEcoPreferences } from './terminalEcoPreferences';
 import { connectChartDiagnostics } from './chartDiagnostics';
 import { visibleChartDensities } from './reactionPotential';
@@ -163,6 +164,19 @@ const OVERLAYS = [
   ['channel', 'Канал'], ['stops', 'Зони стопів'],
 ] as const;
 
+const AV_FOOTER_TOOLTIP: Record<string, string> = {
+  uk: 'AV 24h — середній обсяг торгів у USDT за хвилину: оборот за 24 години / 1440. Коли котирування недоступне, використовується оцінка за повною добою завантажених свічок.',
+  en: 'AV 24h — average trading turnover in USDT per minute: 24h turnover / 1440. When the quote is unavailable, a full day of loaded candles is used as an estimate.',
+  ru: 'AV 24h — средний объём торгов в USDT за минуту: оборот за 24 часа / 1440. Если котировка недоступна, используется оценка по полным суткам загруженных свечей.',
+  pl: 'AV 24h — średni obrót w USDT na minutę: obrót z 24 h / 1440. Gdy brak notowań, wykorzystywane jest oszacowanie z pełnej doby załadowanych świec.',
+};
+
+const TRADE_LEVEL_TOGGLE_LABELS: Record<string, { show: string; hide: string; unavailable: string; unavailableTitle: string }> = {
+  uk: { show: 'Показати TP, Вхід і SL', hide: 'Приховати TP, Вхід і SL', unavailable: 'TP/SL: немає розрахованих рівнів', unavailableTitle: 'TP/SL стане доступним, коли будуть розраховані Вхід, Ціль і Стоп' },
+  en: { show: 'Show TP, Entry and SL', hide: 'Hide TP, Entry and SL', unavailable: 'TP/SL: no calculated trade levels', unavailableTitle: 'TP/SL is available when Entry, Target and Stop are calculated' },
+  pl: { show: 'Pokaż TP, wejście i SL', hide: 'Ukryj TP, wejście i SL', unavailable: 'TP/SL: brak wyznaczonych poziomów', unavailableTitle: 'TP/SL będzie dostępne po wyznaczeniu wejścia, celu i stopa' },
+  ru: { show: 'Показать TP, вход и SL', hide: 'Скрыть TP, вход и SL', unavailable: 'TP/SL: уровни не рассчитаны', unavailableTitle: 'TP/SL станет доступно после расчёта входа, цели и стопа' },
+};
 const NECKLINE_TOGGLE_LABELS: Record<string, { show: string; hide: string }> = {
   uk: { show: 'Показати лінію шиї', hide: 'Приховати лінію шиї' },
   en: { show: 'Show neckline', hide: 'Hide neckline' },
@@ -652,7 +666,12 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
       activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
   });
-  const potentialDensityCount = liveFeed.densities.filter(density => density.reactionTier === 'potential').length;
+  // The heavy chart container also commits for viewport gestures. Density
+  // classification changes with the market feed, not with mouse position.
+  const potentialDensityCount = useMemo(() =>
+    liveFeed.densities.filter(density => density.reactionTier === 'potential').length,
+    [liveFeed.densities],
+  );
   // Only filter the chart. Strategy evaluation and density lists retain the full live book.
   const chartDensities = useMemo(
     () => visibleChartDensities(liveFeed.densities, settings.densityMode, settings.densityAutoDisplay),
@@ -803,8 +822,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // changes; an inexpensive 90-bar signature also detects exchange backfills.
   // No extra API, worker, interval or saved drawing is created.
   const scalperResult = useMemo(() => runtimeSettings.scalperMode === true && !archiveMode && !replay && !externalData && !ecoActive
-    ? scalperAnalyzer.evaluate(candles, [exchange, marketType, symbol, timeframe].join(':'), runtimeSettings.scalperRegressionMode === true)
-    : null, [runtimeSettings.scalperMode, runtimeSettings.scalperRegressionMode, archiveMode, replay, externalData, ecoActive, scalperAnalyzer, candles, exchange, marketType, symbol, timeframe]);
+    ? scalperAnalyzer.evaluate(candles, [exchange, marketType, symbol, timeframe].join(':'), runtimeSettings.scalperRegressionMode === true, runtimeSettings.scalperCascadeLevels === true)
+    : null, [runtimeSettings.scalperMode, runtimeSettings.scalperRegressionMode, runtimeSettings.scalperCascadeLevels, archiveMode, replay, externalData, ecoActive, scalperAnalyzer, candles, exchange, marketType, symbol, timeframe]);
   const chartToolbarEnabled = replay || archiveMode || settings.chartToolbar !== false;
   // Terminal extras must open visibly below the crowded chart controls.
   // Other HookChart pages keep using the saved toolbar preference.
@@ -832,16 +851,16 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const statsScope = [exchange, marketType, normalizeExchangeSymbol(symbol), timeframe].join(':');
   const showMarketStats = !replay && !archiveMode && !externalData && runtimeSettings.showMarketStatsBar !== false;
   const [btcReference, setBtcReference] = useState<{ scope: string; rows: Kline[] } | null>(null);
-  const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null } | null>(null);
+  const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null; volume24hUsd: number | null } | null>(null);
 
   useEffect(() => {
-    if (!showMarketStats || timeframe === '30s') return;
+    if (!showMarketStats) return;
     const cleanedSymbol = normalizeExchangeSymbol(symbol);
     const benchmark = btcBenchmarkSymbol(cleanedSymbol);
     if (!/^[A-Z0-9]{3,30}$/.test(cleanedSymbol)) return;
     const stops: Array<() => void> = [];
     // A single BTC benchmark fetch serves every chart of this market/TF.
-    if (benchmark && benchmark !== cleanedSymbol) {
+    if (benchmark && benchmark !== cleanedSymbol && timeframe !== '30s') {
       const params = new URLSearchParams({
         exchange, market: marketType, symbol: benchmark, timeframe, limit: '250',
       });
@@ -856,7 +875,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         },
       ));
     }
-    if (exchange === 'binance') {
+    // A single memoized 60s public quote endpoint serves AV on both exchanges
+    // and the pre-existing Binance trade count; no extra exchange REST for AV.
+    {
       const params = new URLSearchParams({ exchange, market: marketType, symbol: cleanedSymbol });
       stops.push(sharedPublicChartPolling.subscribe(
         ['trades24h', exchange, marketType, cleanedSymbol].join(':'),
@@ -865,9 +886,12 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           onData: data => {
             const count = data.success && Number.isSafeInteger(data.trades24h) && data.trades24h >= 0
               ? data.trades24h as number : null;
-            setTradeCount24h({ scope: statsScope, count });
+            const volume24hUsd = data.success && typeof data.volume24hUsd === 'number'
+              && Number.isFinite(data.volume24hUsd) && data.volume24hUsd >= 0
+              ? data.volume24hUsd as number : null;
+            setTradeCount24h({ scope: statsScope, count, volume24hUsd });
           },
-          onError: () => setTradeCount24h({ scope: statsScope, count: null }),
+          onError: () => setTradeCount24h({ scope: statsScope, count: null, volume24hUsd: null }),
         },
       ));
     }
@@ -894,6 +918,17 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     () => chartMarketStatistics(statsCandles, settings.natrPeriod),
     [statsCandles, settings.natrPeriod],
   );
+  // Prefer the precise exchange 24h ticker; use the existing candle statistics
+  // only when an entire 24h window is available. Never present partial data as 24h.
+  const quotedVolume24hUsd = tradeCount24h?.scope === statsScope ? tradeCount24h.volume24hUsd : null;
+  const hasFullDayHistory = candles.length >= 2 && !!TF_MS[timeframe]
+    && candles[0].t <= (candles[candles.length - 1].t - 86_400_000 + TF_MS[timeframe]);
+  const estimatedVolume24hUsd = !ecoActive && hasFullDayHistory && marketStats.vol24 > 0
+    ? marketStats.vol24 : null;
+  const av24hUsdPerMinute = quotedVolume24hUsd !== null
+    ? quotedVolume24hUsd / 1440
+    : estimatedVolume24hUsd !== null ? estimatedVolume24hUsd / 1440 : null;
+  const avIsEstimate = quotedVolume24hUsd === null && estimatedVolume24hUsd !== null;
 
   const flush = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -1634,8 +1669,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         {!replay && tradeLevelToggle && <button
           type="button"
           className={'trade-level-toggle-button' + (tradeLevelToggle.visible && tradeLevelToggle.available !== false ? ' active' : '')}
-          aria-label={tradeLevelToggle.available === false ? 'TP/SL: немає розрахованих рівнів для цієї монети' : tradeLevelToggle.visible ? 'Приховати TP, Вхід і SL' : 'Показати TP, Вхід і SL'}
-          title={tradeLevelToggle.available === false ? 'TP/SL стане доступним, коли будуть розраховані Вхід, Ціль і Стоп' : tradeLevelToggle.visible ? 'Приховати всі три мітки: TP, Вхід, SL' : 'Показати всі три мітки: TP, Вхід, SL'}
+          aria-label={tradeLevelToggle.available === false ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].unavailable : tradeLevelToggle.visible ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].hide : TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].show}
+          title={settings.tooltips !== false ? (tradeLevelToggle.available === false ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].unavailableTitle : tradeLevelToggle.visible ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].hide : TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].show) : undefined}
           aria-pressed={tradeLevelToggle.visible}
           disabled={tradeLevelToggle.available === false}
           onClick={tradeLevelToggle.onToggle}
@@ -2119,6 +2154,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         horizontalDrawingLineWidth={runtimeSettings.horizontalDrawingLineWidth ?? 0.4}
         trendDrawingLineWidth={runtimeSettings.trendDrawingLineWidth ?? 0.4}
         scalperTrendLineWidth={runtimeSettings.scalperTrendLineWidth ?? 0.9}
+        scalperLineStyle={runtimeSettings.scalperLineStyle || 'auto'}
+        showScalperTouchPoints={runtimeSettings.showScalperTouchPoints !== false}
         rightPaddingBars={rightPaddingBars}
         roundGrid={!!runtimeSettings.roundGrid}
         roundness={runtimeSettings.roundness ?? 2}
@@ -2221,7 +2258,10 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
 
     <div className="hookchart-footer">
       {(showMarketStats || screenerCardCompactLayout) && <div ref={statsBarRef} className="marketStatsBar" role="region" aria-label="Показники ринку" tabIndex={0}>
-        {showMarketStats && <span>Vol 24h: <b>{marketStats.vol24 ? `$${formatUsd(marketStats.vol24)}` : '—'}</b></span>}
+        {showMarketStats && <span>Vol 24h: <b>{marketStats.vol24 ? `${formatUsd(marketStats.vol24)}` : '—'}</b></span>}
+        {showMarketStats && <span data-testid="hookchart-footer-av" title={AV_FOOTER_TOOLTIP[chartLanguage] ?? AV_FOOTER_TOOLTIP.uk}>
+          AV 24h: <b>{av24hUsdPerMinute !== null ? `${avIsEstimate ? '≈' : ''}${formatUsd(av24hUsdPerMinute)}/min` : '—'}</b>
+        </span>}
         {screenerCardCompactLayout ? (
           <div className="screenerCardTimeframes" role="group" aria-label="Таймфрейм">
             {TIMEFRAMES.map(tf => (
@@ -2252,6 +2292,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
             Trades 24h: <b>{tradeCount24h?.scope === statsScope && tradeCount24h.count !== null
               ? tradeCount24h.count.toLocaleString() : '—'}</b>
           </span>}
+          <HookChartFooterFunding
+            key={`${exchange}:${marketType}:${normalizeExchangeSymbol(symbol)}`}
+            exchange={exchange}
+            marketType={marketType}
+            symbol={symbol}
+            language={chartLanguage}
+          />
         </>}
       </div>}
       <div className="hookchart-footer-controls" ref={setControlsContainer} />

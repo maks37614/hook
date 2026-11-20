@@ -117,6 +117,48 @@ export function mergeLiveChartHistory(history: Kline[], displayed: Kline[]): Kli
   return start === displayed.length ? history : [...history, ...displayed.slice(start)];
 }
 
+/**
+ * Recover an observed kline gap without inventing OHLC.
+ * Reconcile the last candle before disconnection from exchange history:
+ * it may have frozen before close and otherwise appear disconnected from
+ * the next bar. Never overwrite the current, still-forming live candle.
+ *
+ * Called only after a detected missing time interval, not on normal ticks.
+ */
+export function mergeMissingExchangeKlines(
+  displayed: Kline[],
+  recovered: readonly Kline[],
+  gapFrom: number,
+  gapTo: number,
+  limit = 40_000,
+): Kline[] {
+  if (!displayed.length || gapFrom >= gapTo || !recovered.length) return displayed;
+  const byTime = new Map(displayed.map(candle => [candle.time, candle]));
+  const additions: Kline[] = [];
+  let correctedStart: Kline | null = null;
+  const oldStart = byTime.get(gapFrom);
+  for (const candle of recovered) {
+    if (!validCandle(candle) || candle.time < gapFrom || candle.time >= gapTo) continue;
+    if (candle.time === gapFrom) {
+      // A closed exchange bar is authoritative when its cumulative volume
+      // is at least that of the last (potentially partial) live snapshot.
+      if (oldStart && candle.volume >= oldStart.volume &&
+          !sameKlineValues(candle, oldStart)) correctedStart = candle;
+      continue;
+    }
+    if (byTime.has(candle.time)) continue;
+    byTime.set(candle.time, candle);
+    additions.push(candle);
+  }
+  if (!additions.length && !correctedStart) return displayed;
+  const revised = correctedStart
+    ? displayed.map(candle => candle.time === gapFrom ? correctedStart! : candle)
+    : displayed;
+  return [...revised, ...additions]
+    .sort((a, b) => a.time - b.time)
+    .slice(-Math.max(2, limit));
+}
+
 /** A later trade can update the close and wicks, while cumulative fields come from Kline. */
 export function withNewerTradePrice(candle: Kline, current: Kline): Kline {
   return {

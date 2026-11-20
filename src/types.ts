@@ -18,6 +18,8 @@ export interface TerminalChartBlock {
   marketType: MarketType;
   timeframe: Timeframe;
   formationId?: string;
+  /** Terminal-only per-chart TP / Entry / SL overlays; absent means hidden. */
+  showTradeLevels?: boolean;
   colSpan?: 1 | 2 | 3 | 4 | 'full';
   heightPx?: number;
 }
@@ -27,6 +29,8 @@ export interface TerminalWorkspaceConfig {
   columns: 1 | 2 | 3 | 4 | 5 | 6;
   /** Free grid adapts automatically; false preserves an explicit column choice. */
   freeLayoutAutoColumns?: boolean;
+  /** Touch-screen gap between Terminal chart tiles in CSS pixels. */
+  touchGapPx?: number;
   autoFitScreen: boolean;
   /** Hide the Terminal header clock and its trading sessions popover. Defaults to visible. */
   showClock?: boolean;
@@ -705,10 +709,16 @@ export interface HookChartPreferences {
   strategyId?: string;
   /** Opt-in, client-only scalp patterns on the live chart. Never creates alerts/orders. */
   scalperMode?: boolean;
+  /** Separately opt in to 3–5 wick-tested cascading High/Low levels; client-only. */
+  scalperCascadeLevels?: boolean;
   /** Independent opt-out for scalp pattern/status text; lines and wick dots stay visible. */
   showScalperLabels?: boolean;
   /** Optional legacy least-squares fit instead of exact wick-tip anchored scalp lines. */
   scalperRegressionMode?: boolean;
+  /** Appearance only; auto preserves the existing status-based solid/dashed strokes. */
+  scalperLineStyle?: 'auto' | 'solid' | 'dash' | 'dot';
+  /** One visual toggle for all Scalper circles: wick contacts and breakout rings. */
+  showScalperTouchPoints?: boolean;
   hotkeys?: Record<string, string>;
 }
 
@@ -848,7 +858,7 @@ export interface ArchivedChartSnapshot {
   scalperEnabled: boolean;
   scalperRegression: boolean;
   scalperLabels: boolean;
-  scalperLines: { from: { t: number; p: number }; to: { t: number; p: number }; role: 'upper'|'lower'|'neckline' }[];
+  scalperLines: { from: { t: number; p: number }; to: { t: number; p: number }; role: 'upper'|'lower'|'neckline'|'cascade-step' }[];
   liquidationMap: { enabled: boolean; period: '24h'|'7d' };
   density?: ArchivedDensityScene;
   tradeLevels: { entry: boolean; target: boolean; stop: boolean };

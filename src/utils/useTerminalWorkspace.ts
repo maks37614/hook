@@ -2,37 +2,68 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { translateKey, translatePhrase } from '../locales';
+import { translateKey } from '../locales';
 import type { TerminalChartBlock, TerminalSavedPreset, TerminalWorkspaceConfig, TerminalWorkspaceSettings } from '../types';
 import { getStoredPreferences } from './userPreferences';
 import { normalizeVisualProfile } from '../components/hookchart/visualProfiles';
 import { normalizeTerminalChartRefreshMs } from './terminalChartRefresh';
+import { DEFAULT_TERMINAL_TOUCH_GAP_PX, normalizeTerminalTouchGapPx } from './terminalTouchGap';
 import { normalizeTerminalBlocks, normalizeTerminalPresets, terminalStorageKey, TERMINAL_PRESETS_STORAGE_KEY } from './terminalPresets';
 
 const BLOCKS_KEY = 'crypto_screener_terminal_blocks';
 const CONFIG_KEY = 'crypto_screener_terminal_config';
-const CONFLICT_KEY = 'crypto_screener_terminal_conflict_backup';
 type WorkspaceSnapshot = { blocks: TerminalChartBlock[]; config: TerminalWorkspaceConfig; presets: TerminalSavedPreset[] };
-function readConflictBackup(uid?: string): WorkspaceSnapshot | null {
-  if (!uid) return null;
-  const raw = readCache(CONFLICT_KEY, uid);
-  if (!raw || typeof raw !== 'object') return null;
-  const value = raw as Partial<WorkspaceSnapshot>;
-  if (!Array.isArray(value.blocks) || !value.config || typeof value.config !== 'object'
-      || !Array.isArray(value.presets)) return null;
-  return { blocks: normalizeTerminalBlocks(value.blocks), config: value.config,
-    presets: normalizeTerminalPresets(value.presets) };
+
+/** Three-way merge by stable IDs. A deleted or changed chart/preset is an
+ * intentional local edit; untouched items adopt cloud changes. New items from
+ * another device are retained, so a stale save cannot erase its additions.
+ */
+function mergeEditedItems<T extends { id: string }>(
+  base: T[], edited: T[], cloud: T[], limit: number,
+): T[] {
+  const changed = (left: unknown, right: unknown) => JSON.stringify(left) !== JSON.stringify(right);
+  if (!changed(base, edited)) return cloud;
+  const previous = new Map(base.map(item => [item.id, item]));
+  const local = new Map(edited.map(item => [item.id, item]));
+  const output = new Map(cloud.map(item => [item.id, item]));
+  for (const item of base) if (!local.has(item.id)) output.delete(item.id);
+  for (const item of edited) {
+    if (!previous.has(item.id) || changed(item, previous.get(item.id))) output.set(item.id, item);
+  }
+  const oldOrder = base.filter(item => local.has(item.id)).map(item => item.id);
+  const editedOldOrder = edited.filter(item => previous.has(item.id)).map(item => item.id);
+  const reordered = changed(oldOrder, editedOldOrder);
+  if (!reordered) return Array.from(output.values()).slice(0, limit);
+  const sorted: T[] = [];
+  const seen = new Set<string>();
+  for (const id of [...edited.map(item => item.id), ...output.keys()]) {
+    const item = output.get(id);
+    if (item && !seen.has(id)) { sorted.push(item); seen.add(id); }
+  }
+  return sorted.slice(0, limit);
 }
-function saveConflictBackup(uid: string, value: WorkspaceSnapshot): boolean {
-  try {
-    localStorage.setItem(terminalStorageKey(CONFLICT_KEY, uid),
-      JSON.stringify({ ...value, savedAt: new Date().toISOString() }));
-    return true;
-  } catch { return false; }
+
+/** Reapply only this device's unsaved edits on top of the newest server version.
+ * Unchanged settings, charts and presets always come from the cloud. The server
+ * compare-and-swap version still prevents overwriting a newer unseen snapshot.
+ */
+export function rebaseTerminalWorkspace(base: WorkspaceSnapshot, edited: WorkspaceSnapshot, cloud: WorkspaceSnapshot): WorkspaceSnapshot {
+  const changed = (left: unknown, right: unknown) => JSON.stringify(left) !== JSON.stringify(right);
+  const config = { ...cloud.config } as Record<string, unknown>;
+  const oldConfig = base.config as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(edited.config)) {
+    if (changed(value, oldConfig[key])) config[key] = value;
+  }
+  return {
+    blocks: mergeEditedItems(base.blocks, edited.blocks, cloud.blocks, 50),
+    config: config as unknown as TerminalWorkspaceConfig,
+    presets: mergeEditedItems(base.presets, edited.presets, cloud.presets, 30),
+  };
 }
 const DEFAULT_CONFIG: TerminalWorkspaceConfig = {
   layoutPreset: 'custom', columns: 2, freeLayoutAutoColumns: true, autoFitScreen: true, showClock: true, blocks: [], showFormations: true, blockHeight: 'medium',
   terminalMarketAlerts: false,
+  touchGapPx: DEFAULT_TERMINAL_TOUCH_GAP_PX,
 };
 /** Validate imported files before replacing any chart or saving to a profile. */
 export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
@@ -88,6 +119,7 @@ export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
     config.columns = source.columns as TerminalWorkspaceConfig['columns'];
   if (typeof source.freeLayoutAutoColumns === 'boolean')
     config.freeLayoutAutoColumns = source.freeLayoutAutoColumns;
+  config.touchGapPx = normalizeTerminalTouchGapPx(source.touchGapPx);
   if (typeof source.autoFitScreen === 'boolean') config.autoFitScreen = source.autoFitScreen;
   if (typeof source.showClock === 'boolean') config.showClock = source.showClock;
   if (typeof source.autoScaleCharts === 'boolean') config.autoScaleCharts = source.autoScaleCharts;
@@ -119,19 +151,20 @@ function readCache(key: string, uid?: string): unknown {
   try { return JSON.parse(localStorage.getItem(terminalStorageKey(key, uid)) || 'null'); } catch { return null; }
 }
 export function loadTerminalWorkspace(uid?: string, settings?: TerminalWorkspaceSettings) {
-  const storedBlocks = readCache(BLOCKS_KEY, uid);
-  const storedConfig = readCache(CONFIG_KEY, uid);
-  const recovery = readConflictBackup(uid);
+  // Signed-in accounts have exactly one authoritative workspace: PostgreSQL.
+  // Browser storage is only a convenience for visitors without an account.
+  const storedBlocks = uid ? null : readCache(BLOCKS_KEY);
+  const storedConfig = uid ? null : readCache(CONFIG_KEY);
   const prefs = getStoredPreferences();
   const defaultBlock: TerminalChartBlock = { id: 'block-btc-default', symbol: 'BTCUSDT', baseAsset: 'BTC', quoteAsset: 'USDT',
     exchange: prefs.defaultExchange === 'all' ? 'binance' : prefs.defaultExchange,
     marketType: prefs.defaultMarketType === 'all' ? 'futures' : prefs.defaultMarketType,
     timeframe: prefs.defaultTimeframe, colSpan: 1 };
-  const sourceConfig = recovery ? recovery.config
-    : settings ? { ...settings.config, columns: settings.columns, blockHeight: settings.blockHeight }
+  const sourceConfig = settings ? { ...settings.config, columns: settings.columns, blockHeight: settings.blockHeight }
     : storedConfig && typeof storedConfig === 'object' ? storedConfig : {};
   const config = { ...DEFAULT_CONFIG, ...sourceConfig } as TerminalWorkspaceConfig;
   if (![1, 2, 3, 4, 5, 6].includes(config.columns)) config.columns = 2;
+  config.touchGapPx = normalizeTerminalTouchGapPx(config.touchGapPx);
   config.freeLayoutAutoColumns = config.freeLayoutAutoColumns !== false;
   if ((config.blockHeight as string) === 'tall') config.blockHeight = 'large';
   if (!['compact', 'medium', 'large'].includes(config.blockHeight)) config.blockHeight = 'medium';
@@ -143,30 +176,28 @@ export function loadTerminalWorkspace(uid?: string, settings?: TerminalWorkspace
   config.terminalEcoMode = config.terminalEcoMode === true;
   config.presetAutoUpdate = config.presetAutoUpdate !== false;
   config.terminalRefreshMs = normalizeTerminalChartRefreshMs(config.terminalRefreshMs);
-  return { blocks: recovery?.blocks ?? (Array.isArray(settings?.blocks) ? normalizeTerminalBlocks(settings.blocks)
-    : Array.isArray(storedBlocks) ? normalizeTerminalBlocks(storedBlocks) : [defaultBlock]), config,
-    presets: normalizeTerminalPresets(recovery?.presets ?? settings?.customPresets ?? readCache(TERMINAL_PRESETS_STORAGE_KEY, uid)) };
+  return { blocks: Array.isArray(settings?.blocks) ? normalizeTerminalBlocks(settings.blocks)
+    : Array.isArray(storedBlocks) ? normalizeTerminalBlocks(storedBlocks) : [defaultBlock], config,
+    presets: normalizeTerminalPresets(settings?.customPresets ?? (uid ? null : readCache(TERMINAL_PRESETS_STORAGE_KEY))) };
 }
 
 /** TerminalPage is keyed by account, so pending writes cannot cross an account change. */
 export function useTerminalWorkspace() {
-  const { user, profile, updateTerminalWorkspace } = useAuth();
+  const { user, profile, updateTerminalWorkspace, refreshProfile } = useAuth();
   const { language } = useLanguage();
   const uid = user?.uid;
   const [workspace, setWorkspace] = useState(() => loadTerminalWorkspace(uid, profile?.uid === uid ? profile?.terminalSettings : undefined));
-  const [syncError, setSyncError] = useState(() => Boolean(readConflictBackup(uid)));
-  const [syncConflict, setSyncConflict] = useState(() => Boolean(readConflictBackup(uid)));
-  const [backupFailed, setBackupFailed] = useState(false);
-  const syncConflictRef = useRef(syncConflict);
+  const [syncError, setSyncError] = useState(false);
   const serverVersion = useRef<string | null>(profile?.terminalSettings?.version ?? null);
   const revision = useRef(0);
   const savedRevision = useRef(0);
   const hydrated = useRef(Boolean(!uid || profile?.uid === uid));
-  const authRef = useRef({ uid, profile, updateTerminalWorkspace });
-  authRef.current = { uid, profile, updateTerminalWorkspace };
+  const authRef = useRef({ uid, profile, updateTerminalWorkspace, refreshProfile });
+  authRef.current = { uid, profile, updateTerminalWorkspace, refreshProfile };
   const workspaceRef = useRef(workspace);
   workspaceRef.current = workspace;
   const lastCommittedWorkspace = useRef(workspace);
+  const syncedWorkspaceRef = useRef(workspace);
   const hydrationWorkspaceRef = useRef<typeof workspace | null>(null);
   const saveQueue = useRef(Promise.resolve());
   const mounted = useRef(true);
@@ -181,24 +212,41 @@ export function useTerminalWorkspace() {
     saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
       const auth = authRef.current;
       if (!uid || auth.uid !== uid || auth.profile?.uid !== uid
-        || currentRevision < revision.current || syncConflictRef.current) return;
+        || !hydrated.current || currentRevision < revision.current) return;
       const { blocks: _blocks, ...config } = value.config;
       const nextVersion = await auth.updateTerminalWorkspace({
         columns: config.columns, blockHeight: config.blockHeight, config,
         blocks: value.blocks, customPresets: value.presets,
       }, serverVersion.current);
       serverVersion.current = nextVersion;
+      syncedWorkspaceRef.current = value;
       savedRevision.current = currentRevision;
-      if (mounted.current) { setSyncError(false); setSyncConflict(false); }
-    }).catch((error: Error & { code?: string }) => {
-      if (error.code === 'TERMINAL_WORKSPACE_CONFLICT') {
-        syncConflictRef.current = true;
-        const saved = uid ? saveConflictBackup(uid, workspaceRef.current) : false;
-        if (mounted.current && !saved) setBackupFailed(true);
+      if (mounted.current) setSyncError(false);
+    }).catch(async (error: Error & { code?: string }) => {
+      if (error.code === 'TERMINAL_WORKSPACE_CONFLICT' && uid) {
+        try {
+          // The other device has saved first. Read it directly from PostgreSQL
+          // and rebase our *unsaved* changes instead of offering two workspaces.
+          const newest = await authRef.current.refreshProfile();
+          if (authRef.current.uid !== uid || newest.uid !== uid) return;
+          const cloud = loadTerminalWorkspace(uid, newest.terminalSettings);
+          const base = syncedWorkspaceRef.current;
+          serverVersion.current = newest.terminalSettings?.version ?? null;
+          syncedWorkspaceRef.current = cloud;
+          const merged = rebaseTerminalWorkspace(base, workspaceRef.current, cloud);
+          const matchesCloud = JSON.stringify(merged) === JSON.stringify(cloud);
+          if (matchesCloud) {
+            savedRevision.current = revision.current;
+            hydrationWorkspaceRef.current = cloud;
+          }
+          setWorkspace(matchesCloud ? cloud : merged);
+          if (mounted.current) setSyncError(false);
+          return;
+        } catch {
+          // Preserve pending edits in memory and offer retry on network errors.
+        }
       }
-      if (!mounted.current) return;
-      setSyncError(true);
-      if (error.code === 'TERMINAL_WORKSPACE_CONFLICT') setSyncConflict(true);
+      if (mounted.current) setSyncError(true);
     });
   }, [uid]);
 
@@ -206,41 +254,35 @@ export function useTerminalWorkspace() {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      if (!syncConflictRef.current && revision.current !== savedRevision.current)
+      if (revision.current !== savedRevision.current)
         persistToProfile(workspaceRef.current, revision.current);
     };
   }, [persistToProfile]);
 
   useEffect(() => {
-    if (hydrated.current || !uid || profile?.uid !== uid) return;
+    if (!uid || profile?.uid !== uid) return;
+    const cloudVersion = profile.terminalSettings?.version ?? null;
+    if (hydrated.current && cloudVersion === serverVersion.current) return;
+    const cloud = loadTerminalWorkspace(uid, profile.terminalSettings);
+    // A profile refresh and an edit can commit in the same React render, before
+    // the revision effect runs. Never drop that unsaved edit during hydration.
+    const pendingEdits = revision.current !== savedRevision.current
+      || (lastCommittedWorkspace.current !== workspace && hydrationWorkspaceRef.current !== workspace);
+    const rebased = pendingEdits
+      ? rebaseTerminalWorkspace(syncedWorkspaceRef.current, workspaceRef.current, cloud)
+      : cloud;
     hydrated.current = true;
-    // If the user edited cached charts while their account was loading, they
-    // never saw the server version they would be replacing. Treat it as a
-    // conflict rather than silently authorizing an overwrite of cloud charts.
-    if ((revision.current > 0 || lastCommittedWorkspace.current !== workspaceRef.current)
-        && profile.terminalSettings && !syncConflictRef.current) {
-      syncConflictRef.current = true;
-      const saved = saveConflictBackup(uid, workspaceRef.current);
-      setBackupFailed(!saved);
-      setSyncError(true);
-      setSyncConflict(true);
-      return;
+    serverVersion.current = cloudVersion;
+    syncedWorkspaceRef.current = cloud;
+    if (!pendingEdits || JSON.stringify(rebased) === JSON.stringify(cloud)) {
+      savedRevision.current = revision.current;
+      hydrationWorkspaceRef.current = rebased;
     }
-    if (syncConflictRef.current) return;
-    serverVersion.current = profile.terminalSettings?.version ?? null;
-    // With no local changes, the account workspace is authoritative.
-    if (revision.current === 0) {
-      // Remember the exact cloud snapshot. If a user edit is batched with the
-      // hydration update, the resulting workspace differs and must still save.
-      const hydratedWorkspace = loadTerminalWorkspace(uid, profile.terminalSettings);
-      hydrationWorkspaceRef.current = hydratedWorkspace;
-      setWorkspace(hydratedWorkspace);
-    }
+    setWorkspace(rebased);
   }, [uid, profile]);
 
-  // CAS is deliberately pinned to the version this tab actually loaded
-  // (or received from its own successful save). A newer profile update from
-  // another device must NOT silently grant this tab permission to overwrite it.
+  // The server is authoritative even when another device changes its version.
+  // Only edits made since the last loaded cloud snapshot are rebased and saved.
 
   const setField = useCallback(<K extends keyof typeof workspace>(field: K, update: SetStateAction<(typeof workspace)[K]>) => {
     setWorkspace(current => {
@@ -267,36 +309,24 @@ export function useTerminalWorkspace() {
     if (revision.current === savedRevision.current) return;
     const immediate = urgentWorkspaceSyncRef.current;
     urgentWorkspaceSyncRef.current = false;
-    try {
-      localStorage.setItem(terminalStorageKey(BLOCKS_KEY, uid), JSON.stringify(workspace.blocks));
-      localStorage.setItem(terminalStorageKey(CONFIG_KEY, uid), JSON.stringify(workspace.config));
-      localStorage.setItem(terminalStorageKey(TERMINAL_PRESETS_STORAGE_KEY, uid), JSON.stringify(workspace.presets));
-    } catch { setSyncError(true); }
-    if (uid && syncConflictRef.current) {
-      const stored = saveConflictBackup(uid, workspace);
-      setBackupFailed(!stored);
+    if (!uid) {
+      // Guest-only cache. A signed-in user never has a competing local version.
+      try {
+        localStorage.setItem(terminalStorageKey(BLOCKS_KEY), JSON.stringify(workspace.blocks));
+        localStorage.setItem(terminalStorageKey(CONFIG_KEY), JSON.stringify(workspace.config));
+        localStorage.setItem(terminalStorageKey(TERMINAL_PRESETS_STORAGE_KEY), JSON.stringify(workspace.presets));
+      } catch { setSyncError(true); }
+      return;
     }
-    if (!uid || !hydrated.current || syncConflict) return;
+    if (!hydrated.current) return;
     const currentRevision = revision.current;
     const timer = setTimeout(() => persistToProfile(workspace, currentRevision), immediate ? 0 : 1200);
     return () => clearTimeout(timer);
-  }, [workspace, uid, profile?.uid, persistToProfile, syncConflict]);
+  }, [workspace, uid, profile?.uid, persistToProfile]);
 
   const retrySync = useCallback(() => {
-    if (syncConflict) return; // A conflicting version needs explicit reconciliation.
-    // Cloning schedules a committed workspace change; the commit effect
-    // advances revision once, even with React StrictMode replays.
     setWorkspace(current => ({ ...current }));
-  }, [syncConflict]);
-
-  const restoreCloudWorkspace = useCallback(() => {
-    if (!uid || !syncConflictRef.current) return;
-    if (!window.confirm(translatePhrase(language, 'Локальні зміни не буде завантажено в хмару. Спочатку експортуйте JSON-копію. Повернути хмарну версію?'))) return;
-    try {
-      localStorage.removeItem(terminalStorageKey(CONFLICT_KEY, uid));
-      window.location.reload(); // Loads the latest server profile after conflict recovery.
-    } catch { setSyncError(true); }
-  }, [uid, language]);
+  }, []);
 
   const importWorkspaceBackup = useCallback((json: string): boolean => {
     const recovered = parseTerminalWorkspaceBackup(json);
@@ -316,7 +346,7 @@ export function useTerminalWorkspace() {
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'h00k-terminal-local-backup.json';
+    anchor.download = 'h00k-terminal-workspace-backup.json';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -324,7 +354,6 @@ export function useTerminalWorkspace() {
   }, []);
 
   return { blocks: workspace.blocks, config: workspace.config, customPresets: workspace.presets,
-    setBlocks, setConfig, setCustomPresets, syncError, syncConflict, retrySync,
-    downloadLocalBackup, importWorkspaceBackup, restoreCloudWorkspace, backupFailed,
-    requestImmediateWorkspaceSync };
+    setBlocks, setConfig, setCustomPresets, syncError, retrySync,
+    downloadLocalBackup, importWorkspaceBackup, requestImmediateWorkspaceSync };
 }

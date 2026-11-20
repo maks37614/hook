@@ -66,7 +66,7 @@ function normalizeSettings(raw) {
   const uiLanguage = ['uk','en','pl','ru'].includes(src.uiLanguage) ? src.uiLanguage : 'uk';
   // Disabled by default: a clean install retains all configured panels.
   const ecoMode = src.ecoMode === true;
-  return { version: 1, setupComplete, uiLanguage, ecoMode, profiles };
+  return { version: 1, setupComplete, uiLanguage, ecoMode, remoteLinkEnabled: src.remoteLinkEnabled === true, profiles };
 }
 function matchesTerminal(provider, item) {
   const exe = String(item.exe || '').toLowerCase();

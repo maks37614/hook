@@ -4,6 +4,7 @@ import { Check, ChevronDown, Gauge } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const REPLAY_SPEED_OPTIONS = [
+  { label: '0.1x', value: 0.1 },
   { label: '0.25x', value: 0.25 },
   { label: '0.5x', value: 0.5 },
   { label: '1x', value: 1 },

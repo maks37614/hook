@@ -32,6 +32,7 @@ import type { ArchiveChartCapture } from '../../utils/archiveChartSnapshot';
 import { formatTerminalQuotedPrice } from '../../utils/terminalPresets';
 import { normalizeChartProvider } from '../../utils/chartPreferences';
 import { formationChartMarkers } from '../../utils/hookchartData';
+import { isTerminalWidgetNearViewport } from '../../utils/terminalWidgetVisibility';
 
 interface TerminalChartWidgetProps {
   block: TerminalChartBlock;
@@ -60,6 +61,7 @@ interface TerminalChartWidgetProps {
   metaScalpBinding?: string;
   onOpenTelegramAlerts?: (prefill?: any) => void;
   onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
@@ -100,6 +102,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   metaScalpBinding = '001',
   onOpenTelegramAlerts,
   onDragStart,
+  onDragEnd,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -131,26 +134,70 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     onDrawingToolsOpenChange: setDrawingToolsOpen,
   }), [extraToolsOpen, drawingToolsOpen]);
   const blockRootRef = useRef<HTMLDivElement>(null);
-  // The first chart must be interactive immediately. Keep isSingleBlock=false
-  // in the grid to preserve its drag/resize/remove controls.
-  const [isNearViewport, setIsNearViewport] = useState(isSingleBlock || isOnlyChart || isMaximized);
-  const shouldLoadWidgets = !isSuspended && (isSingleBlock || isOnlyChart || isMaximized || isNearViewport);
+  // The first chart (and the fullscreen grid's at most four charts) is immediate.
+  // Keep isSingleBlock=false in the Terminal grid to retain all tile controls.
+  const [isNearViewport, setIsNearViewport] = useState(
+    isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode,
+  );
+  const shouldLoadWidgets = !isSuspended
+    && (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode || isNearViewport);
 
-  // Defer charts, feeds, and order books until their block is near the viewport.
+  // Lazy-load only nearby Terminal rows. On iPad Safari IntersectionObserver can
+  // report a stale false value inside nested overflow grids: use actual geometry
+  // as the source of truth, and coalesce checks to one per animation frame.
   useEffect(() => {
     const node = blockRootRef.current;
     if (!node) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode) {
       setIsNearViewport(true);
       return;
     }
 
-    const observer = new IntersectionObserver(([entry]) => {
-      setIsNearViewport(entry.isIntersecting);
-    }, { rootMargin: '160px 0px' });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+    const scrollRoot = node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
+    let pendingFrame: number | null = null;
+    const updateVisibility = () => {
+      pendingFrame = null;
+      const screen = { top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth };
+      const near = isTerminalWidgetNearViewport(
+        node.getBoundingClientRect(),
+        scrollRoot?.getBoundingClientRect() ?? screen,
+        screen,
+      );
+      setIsNearViewport(current => current === near ? current : near);
+    };
+    const scheduleVisibilityCheck = () => {
+      if (pendingFrame === null) pendingFrame = window.requestAnimationFrame(updateVisibility);
+    };
+
+    const observer = typeof IntersectionObserver === 'undefined' ? null
+      : new IntersectionObserver(scheduleVisibilityCheck, {
+        root: scrollRoot,
+        rootMargin: '160px 0px',
+      });
+    observer?.observe(node);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null
+      : new ResizeObserver(scheduleVisibilityCheck);
+    resizeObserver?.observe(node);
+    if (scrollRoot) resizeObserver?.observe(scrollRoot);
+
+    scrollRoot?.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
+    window.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
+    window.addEventListener('resize', scheduleVisibilityCheck);
+    window.addEventListener('orientationchange', scheduleVisibilityCheck);
+    document.addEventListener('visibilitychange', scheduleVisibilityCheck);
+    scheduleVisibilityCheck();
+
+    return () => {
+      observer?.disconnect();
+      resizeObserver?.disconnect();
+      scrollRoot?.removeEventListener('scroll', scheduleVisibilityCheck);
+      window.removeEventListener('scroll', scheduleVisibilityCheck);
+      window.removeEventListener('resize', scheduleVisibilityCheck);
+      window.removeEventListener('orientationchange', scheduleVisibilityCheck);
+      document.removeEventListener('visibilitychange', scheduleVisibilityCheck);
+      if (pendingFrame !== null) window.cancelAnimationFrame(pendingFrame);
+    };
+  }, [isSingleBlock, isOnlyChart, isMaximized, compactFullscreenMode, isSuspended]);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const toolbarMenusRef = useRef<HTMLDivElement>(null);
@@ -298,6 +345,13 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       ? coin.formations ?? [] : []
   ), [coin, block.symbol, block.exchange, block.marketType, block.timeframe]);
   const chosenFormation = availableFormations.find(item => item.id === block.formationId) ?? null;
+  // A chart's TP / Entry / SL markers are an opt-in display layer. The optional
+  // field lives in the cloud workspace so old and newly added tiles start OFF.
+  const showTradeLevels = block.showTradeLevels === true;
+  const tradeLevelToggle = useMemo(() => ({
+    visible: showTradeLevels,
+    onToggle: () => onUpdateBlock({ showTradeLevels: !showTradeLevels }),
+  }), [showTradeLevels, onUpdateBlock]);
   // Reuse existing scanner results only: no extra analysis or exchange requests per chart.
   const chosenMarkers = useMemo(() => chosenFormation
     ? formationChartMarkers(chosenFormation, { entry: true, target: true, stop: true }, block.timeframe)
@@ -343,6 +397,15 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     <>
         {!compactFullscreenMode && !isSingleBlock && !isMaximized && (
           <div
+            draggable={Boolean(onDragStart)}
+            onDragStart={event => {
+              // Only this grip may start a native tile reorder. The chart body
+              // stays non-draggable for pointer/touch history pan and pinch zoom.
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', block.id);
+              onDragStart?.(event);
+            }}
+            onDragEnd={onDragEnd}
             className="terminal-chart-drag-handle rounded text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing hover:bg-slate-800/60"
             title={translatePhrase(language, "Перетягнути для зміни позиції")}
           >
@@ -645,8 +708,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     <div
       ref={blockRootRef}
       data-terminal-block-id={block.id}
-      draggable={!compactFullscreenMode && !isSingleBlock && !isMaximized}
-      onDragStart={onDragStart}
+      draggable={false}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -708,6 +770,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
                 formation={chosenFormation || (chartProvider === 'hookchart' && coin?.timeframe === block.timeframe ? activeFormation : undefined)}
                 customMarkers={chosenMarkers}
                 previewMarkers={!!chosenFormation}
+                tradeLevelToggle={tradeLevelToggle}
                 symbol={block.symbol}
                 exchange={block.exchange}
                 marketType={block.marketType}

@@ -41,5 +41,6 @@ test('Terminal price stream updates its visible owner without rerendering a hidd
   assert.equal(guards.length, 3, 'immediate, ECO trailing-tick and animation-frame price updates must all be guarded');
   assert.match(chart, /onLivePriceUpdate\?\.\(update\.price\)/,
     'Terminal must keep receiving live price even without a chart badge');
-  assert.match(chart, /\[onLivePriceUpdate, chartProvider, showNavigationControls, hideSymbolAndPrice, liveCandles, liveUiIntervalMs, terminalEcoMode, terminalRefreshMs\]/);
+  // The gap recovery callback is stable and must remain in the live tick dependencies.
+  assert.match(chart, /\[onLivePriceUpdate, chartProvider, showNavigationControls, hideSymbolAndPrice, liveCandles, liveUiIntervalMs, terminalEcoMode, terminalRefreshMs, recoverKlineGap\]/);
 });
