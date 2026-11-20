@@ -32,6 +32,7 @@ export interface TerminalGridItemProps {
   onSendMetaScalp?: (coin: ScannedCoin) => void;
   onOpenTelegramAlerts?: (prefill?: any) => void;
   onDragStart: (index: number) => void;
+  onDragEnd: () => void;
   onDragOver: (event: React.DragEvent) => void;
   onDrop: (index: number) => void;
 }
@@ -45,7 +46,7 @@ export const TerminalGridItem = memo(function TerminalGridItem({
   terminalInitialView, terminalFitAllRequest, heightStyle, metaScalpBinding,
   onToggleMaximize, onRemove, onUpdateBlock, onOpenCoinSelector,
   onOpenFullscreenModal, onSendMetaScalp, onOpenTelegramAlerts, onSaveToArchive, isSavingArchive,
-  onDragStart, onDragOver, onDrop,
+  onDragStart, onDragEnd, onDragOver, onDrop,
 }: TerminalGridItemProps) {
   const toggle = useCallback(() => onToggleMaximize(block.id), [onToggleMaximize, block.id]);
   const remove = useCallback(() => onRemove(block.id), [onRemove, block.id]);
@@ -86,6 +87,7 @@ export const TerminalGridItem = memo(function TerminalGridItem({
       onSendMetaScalp={onSendMetaScalp}
       onOpenTelegramAlerts={onOpenTelegramAlerts}
       onDragStart={dragStart}
+      onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={drop}
     />

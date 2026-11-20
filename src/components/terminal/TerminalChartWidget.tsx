@@ -60,6 +60,7 @@ interface TerminalChartWidgetProps {
   metaScalpBinding?: string;
   onOpenTelegramAlerts?: (prefill?: any) => void;
   onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
@@ -100,6 +101,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   metaScalpBinding = '001',
   onOpenTelegramAlerts,
   onDragStart,
+  onDragEnd,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -339,6 +341,15 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     <>
         {!compactFullscreenMode && !isSingleBlock && !isMaximized && (
           <div
+            draggable={Boolean(onDragStart)}
+            onDragStart={event => {
+              // Only this grip may start a native tile reorder. The chart body
+              // stays non-draggable for pointer/touch history pan and pinch zoom.
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', block.id);
+              onDragStart?.(event);
+            }}
+            onDragEnd={onDragEnd}
             className="terminal-chart-drag-handle rounded text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing hover:bg-slate-800/60"
             title={translatePhrase(language, "Перетягнути для зміни позиції")}
           >
@@ -641,8 +652,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     <div
       ref={blockRootRef}
       data-terminal-block-id={block.id}
-      draggable={!compactFullscreenMode && !isSingleBlock && !isMaximized}
-      onDragStart={onDragStart}
+      draggable={false}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}

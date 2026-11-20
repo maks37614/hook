@@ -688,6 +688,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     // Drag bookkeeping should not rerender every live chart in the grid.
     draggedBlockIndexRef.current = index;
   }, []);
+  const handleDragEnd = useCallback(() => {
+    // Drag cancellation must never leave a stale reorder source.
+    draggedBlockIndexRef.current = null;
+  }, []);
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
   }, []);
@@ -1787,6 +1791,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                       onSendMetaScalp={onSendMetaScalp ? stableSendMetaScalp : undefined}
                       onOpenTelegramAlerts={onOpenTelegramAlerts ? stableOpenTelegram : undefined}
                       onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                     />
