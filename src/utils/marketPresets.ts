@@ -13,7 +13,7 @@ export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quot
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
   { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
-  { id: 'av_1m', label: 'AV 1m TOP 10', description: '10 найбільших перевірених обсягів за останню завершену хвилину (USDT), лише від 200 000 USDT. Пошук обмежений вибіркою ліквідних монет, а не всіма ринками.' },
+  { id: 'av_1m', label: 'AV 1m TOP 10', description: 'Топ-10 монет за середнім хвилинним оборотом (USDT): оборот за 24 години / 1440, мінімум 200 000 USDT за хвилину.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },
@@ -66,7 +66,10 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
       || (!averageVolumePreset && !Number.isFinite(coin.change24h))) return false;
     if (selection.exchange !== 'all' && selection.exchange !== coin.exchange) return false;
     if (selection.marketType !== 'all' && selection.marketType !== coin.marketType) return false;
-    if (preset === 'av_1m' && (!Number.isFinite(coin.volume1mUsd) || (coin.volume1mUsd ?? 0) < 200_000)) return false;
+    // AV 1m is the 24h quote turnover averaged over 1440 minutes, not the
+    // last closed candle's volume. AKEUSDT and other liquid markets must not
+    // disappear simply because one individual minute was quiet/missing.
+    if (preset === 'av_1m' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 200_000 * 1440)) return false;
     if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0)) return false;
     if (preset !== 'av' && preset !== 'av_1m' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
@@ -76,7 +79,7 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     let difference = 0;
     switch (preset) {
       case 'av': difference = b.volumeUsd - a.volumeUsd; break;
-      case 'av_1m': difference = (b.volume1mUsd ?? 0) - (a.volume1mUsd ?? 0); break;
+      case 'av_1m': difference = b.volumeUsd - a.volumeUsd; break;
       case 'active': difference = getCoinVol5m(b) - getCoinVol5m(a); break;
       case 'top_gainers': difference = b.change24h - a.change24h; break;
       case 'top_losers': difference = a.change24h - b.change24h; break;
@@ -85,8 +88,8 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     }
     return difference || b.volumeUsd - a.volumeUsd || coinMarketKey(a).localeCompare(coinMarketKey(b));
   });
-  // Top 10 by a completed one-minute candle's exact quote turnover (USDT).
-  // 24-hour quote volume remains a tie-breaker, never the AV ranking input.
+  // Top 10 by average minute quote turnover (24h / 1440). No additional
+  // minute-candle API calls are needed for this preset.
   const ranked = preset === 'av_1m' ? result.slice(0, 10) : result;
   if (limit === Number.POSITIVE_INFINITY) return ranked;
   return ranked.slice(0, Number.isFinite(limit) ? Math.max(0, Math.min(36, Math.floor(limit))) : 0);
