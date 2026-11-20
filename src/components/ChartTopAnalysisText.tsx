@@ -4,6 +4,8 @@ import { formatCryptoPrice } from '../utils/formatters';
 import { reconcileChartOi } from '../utils/chartOiDisplay';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
+import { isValidExchangeSymbol, normalizeExchangeSymbol } from '../utils/marketSymbols';
+import { subscribeSharedHookChartFunding } from './hookchart/sharedFundingStream';
 
 interface ChartTopAnalysisTextProps {
   coin: ScannedCoin;
@@ -82,6 +84,23 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
   const { language } = useLanguage();
   const tr = (source: string) => translatePhrase(language, source);
   const timeframes: Timeframe[] = ['5m', '15m', '1h', '4h', '1d'];
+
+  // Use the existing exchange/symbol funding stream, shared with HookChart.
+  // Scope the displayed reading so changing coins never flashes the prior rate.
+  const fundingSymbol = normalizeExchangeSymbol(coin.symbol);
+  const fundingScope = `${coin.exchange}:${coin.marketType}:${fundingSymbol}`;
+  const [fundingReading, setFundingReading] = useState<{ scope: string; rate: number }>({
+    scope: '',
+    rate: Number.NaN,
+  });
+  const fundingRate = fundingReading.scope === fundingScope ? fundingReading.rate : Number.NaN;
+  useEffect(() => {
+    // Spot markets have no perpetual-futures funding rate.
+    if (coin.marketType !== 'futures' || !isValidExchangeSymbol(fundingSymbol)) return;
+    return subscribeSharedHookChartFunding(coin.exchange, fundingSymbol, snapshot => {
+      setFundingReading({ scope: fundingScope, rate: snapshot.rate });
+    });
+  }, [coin.exchange, coin.marketType, fundingSymbol, fundingScope]);
 
   // Keep livePrice in ref to avoid recreation of fetchOI on every live price tick
   const livePriceRef = useRef<number>(livePrice);
@@ -401,6 +420,17 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
               ({analysis.bslDistPct.toFixed(2)}%)
             </span>
           </div>
+
+          {coin.marketType === 'futures' && (
+            <div data-testid="chart-top-funding">
+              <span className="text-slate-400">{tr("Фандинг:")}{" "}</span>
+              <span className="font-mono font-bold text-amber-300">
+                {Number.isFinite(fundingRate)
+                  ? `${fundingRate > 0 ? '+' : ''}${(fundingRate * 100).toFixed(4)}%`
+                  : '—'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Section 2: Сильні опорні рівні (Support / Resistance) */}

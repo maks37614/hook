@@ -50,6 +50,21 @@ test('all six labels have localized Ukrainian, English, Russian and Polish forms
   assert.equal(translatePhrase('ru', 'оновлення...'), 'обновление...');
 });
 
+test('above-chart funding is localized and reuses the existing futures stream', () => {
+  assert.match(source, /normalizeExchangeSymbol\\(coin\\.symbol\\)/);
+  assert.match(source, /subscribeSharedHookChartFunding\\(coin\\.exchange, fundingSymbol, snapshot =>/);
+  assert.match(source, /coin\\.marketType !== 'futures'/);
+  assert.match(source, /fundingReading\\.scope === fundingScope/);
+  assert.match(view, /coin\\.marketType === 'futures'/);
+  assert.match(view, /data-testid="chart-top-funding"/);
+  assert.match(view, /tr\\("Фандинг:"\\)/);
+  assert.match(view, /fundingRate \\* 100\\)\\.toFixed\\(4\\)/);
+  assert.equal(translatePhrase('uk', 'Фандинг:'), 'Фандинг:');
+  assert.equal(translatePhrase('en', 'Фандинг:'), 'Funding:');
+  assert.equal(translatePhrase('ru', 'Фандинг:'), 'Фандинг:');
+  assert.equal(translatePhrase('pl', 'Фандинг:'), 'Finansowanie:');
+});
+
 test('localization does not change OI polling cadence, chart sizing, or analysis calculations', () => {
   assert.match(source, /const interval = setInterval\(\(\) => \{/);
   assert.match(source, /\}, 10_000\);/);

@@ -37,6 +37,14 @@ test('analysis stays directly above the chart and does not change its computatio
   assert.match(analysis, /formatCryptoPrice\(analysis\.strongSupply\)/);
 });
 
+test('funding sits below long stops in the left column without changing the two-column layout', () => {
+  const stopLong = view.indexOf('tr("Стопи лонг:")');
+  const funding = view.indexOf('data-testid="chart-top-funding"');
+  const rightColumn = view.indexOf('{/* Section 2:');
+  assert.ok(stopLong >= 0 && stopLong < funding && funding < rightColumn);
+  assert.match(view, /coin.marketType === 'futures'/);
+});
+
 test('Binance and Bybit OI status dots stay anchored next to their percentages', () => {
   for (const exchange of ['binance', 'bybit']) {
     const start = view.indexOf(`{${exchange}OI.change5mPct !== null && (`);
