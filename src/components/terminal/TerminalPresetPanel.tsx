@@ -27,7 +27,7 @@ interface Props {
   error: string | null;
   onActivePresetChange: (preset: TerminalMarketPreset | null) => void;
   onPresetChosen?: () => void;
-  onApplyCoins: (coins: TerminalPresetCoin[]) => void;
+  onApplyCoins: (coins: TerminalPresetCoin[], preset: TerminalMarketPreset) => void;
   onSavePreset: (name: string, blocks: TerminalChartBlock[]) => void;
   onLoadPreset: (preset: TerminalSavedPreset) => void;
   onDeletePreset: (id: string) => void;
@@ -38,7 +38,7 @@ interface Props {
   signedIn: boolean;
 }
 
-const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
+const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, av_1m: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
 export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, onRequestFormationScan, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
@@ -74,7 +74,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
     // Do not replace live charts using partial/stale exchange source snapshots.
     if (activePreset && autoUpdate && !pendingFormationPreset && readyCoins[activePreset].length
         && (activePreset === 'formations' || (!error && !snapshot.warning))) {
-      applyRef.current(readyCoins[activePreset]);
+      applyRef.current(readyCoins[activePreset], activePreset);
     }
   }, [activePreset, autoUpdate, readyCoins, error, snapshot.warning]);
 
@@ -85,7 +85,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
     if (readyCoins.formations.length) {
       setPendingFormationPreset(false);
       setMessage(null);
-      applyRef.current(readyCoins.formations);
+      applyRef.current(readyCoins.formations, 'formations');
       onPresetChosen?.();
       return;
     }
@@ -115,7 +115,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
     }
     setMessage(null);
     onActivePresetChange(id);
-    onApplyCoins(readyCoins[id]);
+    onApplyCoins(readyCoins[id], id);
     onPresetChosen?.();
   };
 
