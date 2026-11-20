@@ -13,7 +13,7 @@ export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quot
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
   { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
-  { id: 'av_1m', label: 'AV 1m', description: 'Усі монети із середнім AV від 200 000 USDT/хв (24г / 1440), крім великих BTC/ETH та інших базових активів і токенів, прив’язаних до BTC/ETH. За спаданням AV.' },
+  { id: 'av_1m', label: 'AV 1m', description: 'Усі монети із середнім AV від 200 000 USDT/хв (24г / 1440), крім великих активів, BTC/ETH-похідних та виключених інструментів. За спаданням AV.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },
@@ -39,9 +39,20 @@ export const AV_1M_BTC_ETH_TRACKER_EXCLUSIONS = new Set([
   'ETHX', '1000ETH',
 ]);
 
+/** Trader-requested AV 1m-only exclusions. Exact BASE assets, never a substring
+ * test: a token like NEARX, HYPER or 1000PEPE2 must remain searchable.
+ * These cover Binance/Bybit spot/futures without changing other presets. */
+export const AV_1M_CUSTOM_EXCLUSIONS = new Set([
+  'SOXS', 'SPCX', 'XAG', '1000PEPE', 'NEAR', 'AMD', 'GOOGL',
+  'TQQQ', 'MSTR', 'SPY', 'BZ', 'SNXX', 'CL', 'HYPE',
+  'SKHYNIX', 'KORU', 'SKHY', 'QQQ',
+]);
+
 export function isAvOneMinuteExcludedBase(baseAsset: string): boolean {
   const base = baseAsset.trim().toUpperCase();
-  return AV_1M_LARGE_ASSET_EXCLUSIONS.has(base) || AV_1M_BTC_ETH_TRACKER_EXCLUSIONS.has(base);
+  return AV_1M_LARGE_ASSET_EXCLUSIONS.has(base)
+    || AV_1M_BTC_ETH_TRACKER_EXCLUSIONS.has(base)
+    || AV_1M_CUSTOM_EXCLUSIONS.has(base);
 }
 
 export function getCoinVol5m(coin: { volatility5mPct?: number; volatility24hPct?: number; change24h?: number }): number {
