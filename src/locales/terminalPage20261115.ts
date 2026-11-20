@@ -165,6 +165,12 @@ export const terminalPagePhraseRows = [
     "Zegar i menu sesji handlowych w nagłówku Terminala"
   ],
   [
+    "Середній обсяг торгів за хвилину (USDT), розрахований за оборотом 24г. Від найбільшого до найменшого.",
+    "Average trading volume per minute (USDT) based on 24h turnover, highest first.",
+    "Средний объём торгов в минуту (USDT) по обороту за 24 ч, от большего к меньшему.",
+    "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
+  ],
+  [
     "Топ ріст 24г",
     "Top gainers (24h)",
     "Лидеры роста за 24 ч",
