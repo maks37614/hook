@@ -13,7 +13,7 @@ export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quot
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
   { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
-  { id: 'av_1m', label: 'AV 1m TOP 10', description: 'Топ-10 монет за середнім хвилинним оборотом (USDT): оборот за 24 години / 1440, мінімум 200 000 USDT за хвилину.' },
+  { id: 'av_1m', label: 'AV 1m', description: 'Усі монети із середнім хвилинним оборотом від 200 000 USDT (24г / 1440), крім BTC, ETH, XAU та SOL. Сортування від більшого до меншого.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },
@@ -70,6 +70,9 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     // last closed candle's volume. AKEUSDT and other liquid markets must not
     // disappear simply because one individual minute was quiet/missing.
     if (preset === 'av_1m' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 200_000 * 1440)) return false;
+    // Hide only these four base assets, across Binance/Bybit and Spot/Futures.
+    // Symbols such as WBTC, STETH or SOLV are different assets and remain eligible.
+    if (preset === 'av_1m' && ['BTC', 'ETH', 'XAU', 'SOL'].includes(coin.baseAsset.toUpperCase())) return false;
     if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0)) return false;
     if (preset !== 'av' && preset !== 'av_1m' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
@@ -88,11 +91,10 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     }
     return difference || b.volumeUsd - a.volumeUsd || coinMarketKey(a).localeCompare(coinMarketKey(b));
   });
-  // Top 10 by average minute quote turnover (24h / 1440). No additional
-  // minute-candle API calls are needed for this preset.
-  const ranked = preset === 'av_1m' ? result.slice(0, 10) : result;
-  if (limit === Number.POSITIVE_INFINITY) return ranked;
-  return ranked.slice(0, Number.isFinite(limit) ? Math.max(0, Math.min(36, Math.floor(limit))) : 0);
+  // The full ranked universe is needed for Terminal paging. Limit only when
+  // a caller requests a slice; never silently discard eligible AV markets.
+  if (limit === Number.POSITIVE_INFINITY) return result;
+  return result.slice(0, Number.isFinite(limit) ? Math.max(0, Math.min(50, Math.floor(limit))) : 0);
 }
 
 /**
