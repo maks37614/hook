@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { MarketCoin } from '../src/types';
-import { MARKET_PRESETS, selectMarketPresetCoins } from '../src/utils/marketPresets';
+import { MARKET_PRESETS, selectMarketPresetCoins, isAvOneMinuteExcludedBase } from '../src/utils/marketPresets';
 
 function quote(symbol: string, volumeUsd: number, extra: Partial<MarketCoin> = {}): MarketCoin {
   return {
@@ -117,36 +117,49 @@ test('AV 1m shows every qualifying coin in descending 24h/1440 average, not only
   assert.deepEqual(coins, original);
 });
 
-test('AV 1m excludes BTC ETH XAU SOL on every exchange/market, preserves similarly named assets', () => {
+test('AV 1m excludes large benchmarks and BTC/ETH price trackers, not unrelated ticker names', () => {
+  const excluded = [
+    'BTC','ETH','SOL','XAU','BNB','XRP','DOGE','ADA','TRX','LTC','BCH',
+    'WBTC','BTCB','TBTC','CBBTC','FBTC','LBTC','UNIBTC','SOLVBTC','OBTC','1000BTC',
+    'WETH','STETH','WSTETH','WBETH','BETH','CBETH','RETH','WEETH','EETH',
+    'METH','RSETH','EZETH','FRXETH','SFRXETH','ANKRETH','OSETH','SWETH','ETHX','1000ETH',
+  ];
+  for (const base of excluded) {
+    assert.equal(isAvOneMinuteExcludedBase(base), true, `expected to filter ${base}`);
+    assert.equal(isAvOneMinuteExcludedBase(base.toLowerCase()), true, `case insensitive: ${base}`);
+  }
+  for (const base of ['AKE','BTCST','ETHFI','SOLV','WBTCC','BTCS','ETC','XAUT','KERNEL']) {
+    assert.equal(isAvOneMinuteExcludedBase(base), false, `must not over-filter ${base}`);
+  }
   const coins = [
-    quote('BTCUSDT', 9_000_000_000),
-    quote('BTCUSDT', 8_000_000_000, {marketType:'spot'}),
-    quote('ETHUSDT', 7_000_000_000, {exchange:'bybit'}),
-    quote('XAUUSDT', 6_000_000_000, {exchange:'bybit',marketType:'spot'}),
-    quote('SOLUSDT', 5_000_000_000),
+    ...excluded.map((base,i) => quote(base+'USDT', (50-i)*500_000_000,
+      {exchange: i%2 ? 'bybit' : 'binance', marketType: i%3 ? 'futures' : 'spot'})),
     quote('AKEUSDT', 451_106_979.95045),
     quote('AKEUSDT', 600_000_000, {exchange:'bybit'}),
-    quote('AKEUSDT', 800_000_000), // duplicate exchange+market must not replace first quote
-    quote('WBTCUSDT', 720_000_000),
+    quote('AKEUSDT', 800_000_000), // Duplicate: first quote wins for same exchange/market.
+    quote('ETHFIUSDT', 720_000_000),
     quote('SOLVUSDT', 576_000_000),
-    quote('STETHUSDT', 432_000_000, {exchange:'bybit',marketType:'spot'}),
+    quote('BTCSTUSDT', 432_000_000, {exchange:'bybit',marketType:'spot'}),
+    quote('XRPUSDT', 1_000_000_000),
     quote('XRPUSDT', 0, {exchange:'bybit',marketType:'spot'}),
   ];
-  const all = {exchange:'all', marketType:'all'} as const;
+  const all = {exchange:'all',marketType:'all'} as const;
   const ranked = selectMarketPresetCoins(coins, 'av_1m', all, Number.POSITIVE_INFINITY);
   assert.deepEqual(ranked.map(x=>[x.symbol,x.exchange,x.marketType]), [
-    ['WBTCUSDT','binance','futures'],
+    ['ETHFIUSDT','binance','futures'],
     ['AKEUSDT','bybit','futures'],
     ['SOLVUSDT','binance','futures'],
     ['AKEUSDT','binance','futures'],
-    ['STETHUSDT','bybit','spot'],
+    ['BTCSTUSDT','bybit','spot'],
   ]);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'binance',marketType:'futures'}, Number.POSITIVE_INFINITY)
-    .map(x=>x.symbol), ['WBTCUSDT','SOLVUSDT','AKEUSDT']);
+    .map(x=>x.symbol), ['ETHFIUSDT','SOLVUSDT','AKEUSDT']);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'bybit',marketType:'spot'}, Number.POSITIVE_INFINITY)
-    .map(x=>x.symbol), ['STETHUSDT']);
+    .map(x=>x.symbol), ['BTCSTUSDT']);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'bybit',marketType:'futures'}, Number.POSITIVE_INFINITY)
     .map(x=>x.symbol), ['AKEUSDT']);
+  // No unrelated preset is affected by the exclusions.
+  assert.ok(selectMarketPresetCoins(coins,'av',all,Number.POSITIVE_INFINITY).some(x=>x.symbol==='WBTCUSDT'));
 });
 
 test('AV 1m exposes all ranked coins in paginated groups of up to 50 live charts', () => {
