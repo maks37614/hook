@@ -14,6 +14,35 @@ const BLOCKS_KEY = 'crypto_screener_terminal_blocks';
 const CONFIG_KEY = 'crypto_screener_terminal_config';
 type WorkspaceSnapshot = { blocks: TerminalChartBlock[]; config: TerminalWorkspaceConfig; presets: TerminalSavedPreset[] };
 
+/** Three-way merge by stable IDs. A deleted or changed chart/preset is an
+ * intentional local edit; untouched items adopt cloud changes. New items from
+ * another device are retained, so a stale save cannot erase its additions.
+ */
+function mergeEditedItems<T extends { id: string }>(
+  base: T[], edited: T[], cloud: T[], limit: number,
+): T[] {
+  const changed = (left: unknown, right: unknown) => JSON.stringify(left) !== JSON.stringify(right);
+  if (!changed(base, edited)) return cloud;
+  const previous = new Map(base.map(item => [item.id, item]));
+  const local = new Map(edited.map(item => [item.id, item]));
+  const output = new Map(cloud.map(item => [item.id, item]));
+  for (const item of base) if (!local.has(item.id)) output.delete(item.id);
+  for (const item of edited) {
+    if (!previous.has(item.id) || changed(item, previous.get(item.id))) output.set(item.id, item);
+  }
+  const oldOrder = base.filter(item => local.has(item.id)).map(item => item.id);
+  const editedOldOrder = edited.filter(item => previous.has(item.id)).map(item => item.id);
+  const reordered = changed(oldOrder, editedOldOrder);
+  if (!reordered) return Array.from(output.values()).slice(0, limit);
+  const sorted: T[] = [];
+  const seen = new Set<string>();
+  for (const id of [...edited.map(item => item.id), ...output.keys()]) {
+    const item = output.get(id);
+    if (item && !seen.has(id)) { sorted.push(item); seen.add(id); }
+  }
+  return sorted.slice(0, limit);
+}
+
 /** Reapply only this device's unsaved edits on top of the newest server version.
  * Unchanged settings, charts and presets always come from the cloud. The server
  * compare-and-swap version still prevents overwriting a newer unseen snapshot.
@@ -26,9 +55,9 @@ export function rebaseTerminalWorkspace(base: WorkspaceSnapshot, edited: Workspa
     if (changed(value, oldConfig[key])) config[key] = value;
   }
   return {
-    blocks: changed(edited.blocks, base.blocks) ? edited.blocks : cloud.blocks,
-    config: config as TerminalWorkspaceConfig,
-    presets: changed(edited.presets, base.presets) ? edited.presets : cloud.presets,
+    blocks: mergeEditedItems(base.blocks, edited.blocks, cloud.blocks, 50),
+    config: config as unknown as TerminalWorkspaceConfig,
+    presets: mergeEditedItems(base.presets, edited.presets, cloud.presets, 30),
   };
 }
 const DEFAULT_CONFIG: TerminalWorkspaceConfig = {
