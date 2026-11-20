@@ -173,7 +173,8 @@ test('BID/ASK metadata is bounded by visible viewport, with no silent truncation
   assert.match(engine,/g \? \{low:g\.lo,high:g\.hi\} : null/);
   assert.match(chart,/const density=engineRef\.current\?\.takeArchiveDensityScene\?\.\(\)/);
   assert.match(chart,/\.\.\.\(density \? \{density\} : \{\}\)/);
-  assert.match(engine,/if\(showDensityLines\|\|showDensityLabels\)densities\.filter/);
+  assert.match(engine,/if\(showDensityLines\|\|showDensityLabels\)for\(const d of densities\)\{/);
+  assert.match(engine,/if\(!\(d\.p>=g\.lo&&d\.p<=g\.hi\)\)continue/);
   assert.match(chart,/visibleChartDensities\(liveFeed\.densities, settings\.densityMode, settings\.densityAutoDisplay\)/);
 });
 
