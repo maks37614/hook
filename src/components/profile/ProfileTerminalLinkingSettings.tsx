@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, Save, PlugZap, RefreshCw, BookOpen, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { DesktopRemoteLinkSettings } from './DesktopRemoteLinkSettings';
+import { desktopRemoteLinkEnabled, desktopRemoteLinkStatus } from '../../utils/desktopRemoteLink';
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase } from '../../locales';
 import { findActiveMetaScalpPort, getUserMetaScalpSettings, type MetaScalpSettings } from '../../utils/metaScalpService';
@@ -97,7 +98,15 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
     setTesting(true);
     setMessage(null);
     try {
-      if (draft.provider === 'metascalp') {
+      if (draft.provider === 'metascalp' && desktopRemoteLinkEnabled(user?.uid)) {
+        const online = await desktopRemoteLinkStatus();
+        setMessage({
+          ok: online,
+          text: online
+            ? 'h00k Desktop підключено до вашого акаунта. Для перевірки MetaScalp натисніть «Тест BTCUSDT».'
+            : 'h00k Desktop не підключено. Запустіть програму, увійдіть у той самий акаунт і ввімкніть приймання команд.',
+        });
+      } else if (draft.provider === 'metascalp') {
         const port = await findActiveMetaScalpPort(meta.port);
         setMessage(port !== null
           ? { ok: true, text: 'MetaScalp знайдено на локальному порту {port}. Це перевірка з’єднання без перемикання монети.', port }
