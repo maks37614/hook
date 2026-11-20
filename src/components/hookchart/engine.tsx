@@ -1318,12 +1318,25 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         q.lineWidth = line.role === 'cascade-step' ? 0.7
           : setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
         q.strokeStyle = color;
-        // Project only horizontal cascade tiers/boundaries to the same
-        // right plot edge used by ordinary price levels. Do not alter the
-        // detector's original pivot geometry or any other Scalper formation.
-        q.moveTo(x0, y0);
-        q.lineTo(scalperRenderedLineEndX(setup.kind, line, x1, g.plotW), y1);
+        // Project horizontal cascade tiers and the breakout boundary all
+        // the way to the price-scale divider, independently of future candles.
+        // Preserve the detector's original time/price coordinates.
+        const renderedEndX = scalperRenderedLineEndX(setup.kind, line, x1, g.plotW);
+        const cascadeRay = setup.kind === 'cascade' && renderedEndX === g.plotW
+          && line.from.p === line.to.p;
+        if (cascadeRay && x0 > g.plotW) continue; // Do not paint before the pivot exists.
+        q.moveTo(cascadeRay ? Math.max(0, x0) : x0, y0);
+        q.lineTo(renderedEndX, y1);
         q.stroke();
+        if (cascadeRay && y1 >= 0 && y1 <= g.plotH) {
+          // With a dashed style the last dash can be a gap, looking as though
+          // the cascade stops short of the scale. Finish with a tiny solid tip.
+          q.setLineDash([]);
+          q.beginPath();
+          q.moveTo(Math.max(0, g.plotW - 2), y1);
+          q.lineTo(g.plotW, y1);
+          q.stroke();
+        }
       }
       q.setLineDash([]);
       if (showScalperTouchPoints) for (const touch of setup.touches) {
@@ -1362,6 +1375,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   drawHookTimeMarkers(q,g,timeMarkers,mouse);
   const priceTags:{price:number;label:string;bg:string;fg:string;y:number;current?:boolean}[]=[];
   const priceTag=(price:number,label:string,bg:string,fg='#ffffff')=>{const yy=g.y(price);if(yy>=0&&yy<=g.plotH)priceTags.push({price,label,bg,fg,y:yy})};
+  // Mark the actionable outer tier at its actual price on the right axis.
+  // One badge per cascade, rather than one per closely packed inner shelf,
+  // keeps compact Terminal charts and price-scale labels readable.
+  if (scalperResult?.setups.length) for (const setup of scalperResult.setups) {
+    if (setup.kind !== 'cascade') continue;
+    const boundary = setup.lines.find(line => line.role === 'upper' || line.role === 'lower');
+    if (!boundary || boundary.from.p !== boundary.to.p || g.x(boundary.from.t) > g.plotW) continue;
+    const color = setup.status === 'failed' ? '#f0a66d'
+      : setup.status === 'confirmed' ? '#57c9a4'
+      : setup.status === 'possible' ? '#ead178' : '#8baac8';
+    priceTag(boundary.from.p, '', color, '#101722');
+  }
   for(const marker of paintedMarkers){
     const isSupportResistance=marker.type==='support'||marker.type==='resistance';
     if(isSupportResistance&&!autoSR)continue;
