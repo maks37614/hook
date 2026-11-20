@@ -52,17 +52,26 @@ test('all six labels have localized Ukrainian, English, Russian and Polish forms
 
 test('above-chart funding is localized and reuses the existing futures stream', () => {
   assert.ok(source.includes('normalizeExchangeSymbol(coin.symbol)'));
-  assert.ok(source.includes('subscribeSharedHookChartFunding(coin.exchange, fundingSymbol, snapshot =>'));
+  assert.ok(source.includes("subscribeSharedHookChartFunding('binance', fundingSymbol, snapshot =>"));
+  assert.ok(source.includes("subscribeSharedHookChartFunding('bybit', fundingSymbol, snapshot =>"));
   assert.ok(source.includes("coin.marketType !== 'futures'"));
-  assert.ok(source.includes('fundingReading.scope === fundingScope'));
+  assert.ok(source.includes('fundingReadings.binance.scope === fundingScope'));
+  assert.ok(source.includes('fundingReadings.bybit.scope === fundingScope'));
   assert.ok(view.includes("coin.marketType === 'futures'"));
-  assert.ok(view.includes('data-testid="chart-top-funding"'));
-  assert.ok(view.includes('tr("Фандинг:")'));
-  assert.ok(view.includes('(fundingRate * 100).toFixed(4)'));
-  assert.equal(translatePhrase('uk', 'Фандинг:'), 'Фандинг:');
-  assert.equal(translatePhrase('en', 'Фандинг:'), 'Funding:');
-  assert.equal(translatePhrase('ru', 'Фандинг:'), 'Фандинг:');
-  assert.equal(translatePhrase('pl', 'Фандинг:'), 'Finansowanie:');
+  assert.ok(view.includes('data-testid="chart-top-funding-binance"'));
+  assert.ok(view.includes('data-testid="chart-top-funding-bybit"'));
+  assert.ok(view.includes('tr("Фандинг Binance:")'));
+  assert.ok(view.includes('tr("Фандинг Bybit:")'));
+  assert.ok(view.includes('(binanceFundingRate * 100).toFixed(4)'));
+  assert.ok(view.includes('(bybitFundingRate * 100).toFixed(4)'));
+  for (const [sourceLabel, translations] of [
+    ['Фандинг Binance:', ['Фандинг Binance:', 'Binance funding:', 'Фандинг Binance:', 'Finansowanie Binance:']],
+    ['Фандинг Bybit:', ['Фандинг Bybit:', 'Bybit funding:', 'Фандинг Bybit:', 'Finansowanie Bybit:']],
+  ] as const) {
+    for (const [index, language] of (['uk', 'en', 'ru', 'pl'] as const).entries()) {
+      assert.equal(translatePhrase(language, sourceLabel), translations[index]);
+    }
+  }
 });
 
 test('localization does not change OI polling cadence, chart sizing, or analysis calculations', () => {

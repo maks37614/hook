@@ -10,6 +10,8 @@ const rows = [
   ['Не вдалося зберегти налаштування. Повторити', 'Could not save settings. Retry', 'Не удалось сохранить настройки. Повторить', 'Nie udało się zapisać ustawień. Ponów'],
   ['Дані OI тимчасово недоступні', 'OI data is temporarily unavailable', 'Данные OI временно недоступны', 'Dane OI są chwilowo niedostępne'],
   ['Фандинг:', 'Funding:', 'Фандинг:', 'Finansowanie:'],
+  ['Фандинг Binance:', 'Binance funding:', 'Фандинг Binance:', 'Finansowanie Binance:'],
+  ['Фандинг Bybit:', 'Bybit funding:', 'Фандинг Bybit:', 'Finansowanie Bybit:'],
   ['Курсор', 'Cursor', 'Курсор', 'Kursor'],
   ['Лінія тренду', 'Trend line', 'Линия тренда', 'Linia trendu'],
   ['Горизонтальний рівень', 'Horizontal level', 'Горизонтальный уровень', 'Poziom poziomy'],

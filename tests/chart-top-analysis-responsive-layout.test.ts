@@ -39,9 +39,10 @@ test('analysis stays directly above the chart and does not change its computatio
 
 test('funding sits below long stops in the left column without changing the two-column layout', () => {
   const stopLong = view.indexOf('tr("Стопи лонг:")');
-  const funding = view.indexOf('data-testid="chart-top-funding"');
+  const binanceFunding = view.indexOf('data-testid="chart-top-funding-binance"');
+  const bybitFunding = view.indexOf('data-testid="chart-top-funding-bybit"');
   const rightColumn = view.indexOf('{/* Section 2:');
-  assert.ok(stopLong >= 0 && stopLong < funding && funding < rightColumn);
+  assert.ok(stopLong >= 0 && stopLong < binanceFunding && binanceFunding < bybitFunding && bybitFunding < rightColumn);
   assert.match(view, /coin.marketType === 'futures'/);
 });
 

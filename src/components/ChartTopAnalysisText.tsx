@@ -85,22 +85,39 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
   const tr = (source: string) => translatePhrase(language, source);
   const timeframes: Timeframe[] = ['5m', '15m', '1h', '4h', '1d'];
 
-  // Use the existing exchange/symbol funding stream, shared with HookChart.
-  // Scope the displayed reading so changing coins never flashes the prior rate.
+  // Read Binance and Bybit independently from the same exchange/symbol
+  // subscription registry as HookChart. Switching coins must not show a rate
+  // belonging to the previous symbol, including during in-flight requests.
   const fundingSymbol = normalizeExchangeSymbol(coin.symbol);
-  const fundingScope = `${coin.exchange}:${coin.marketType}:${fundingSymbol}`;
-  const [fundingReading, setFundingReading] = useState<{ scope: string; rate: number }>({
-    scope: '',
-    rate: Number.NaN,
+  const fundingScope = `${coin.marketType}:${fundingSymbol}`;
+  const [fundingReadings, setFundingReadings] = useState<{
+    binance: { scope: string; rate: number };
+    bybit: { scope: string; rate: number };
+  }>({
+    binance: { scope: '', rate: Number.NaN },
+    bybit: { scope: '', rate: Number.NaN },
   });
-  const fundingRate = fundingReading.scope === fundingScope ? fundingReading.rate : Number.NaN;
+  const binanceFundingRate = fundingReadings.binance.scope === fundingScope
+    ? fundingReadings.binance.rate : Number.NaN;
+  const bybitFundingRate = fundingReadings.bybit.scope === fundingScope
+    ? fundingReadings.bybit.rate : Number.NaN;
   useEffect(() => {
-    // Spot markets have no perpetual-futures funding rate.
+    // Spot markets do not have perpetual-futures funding.
     if (coin.marketType !== 'futures' || !isValidExchangeSymbol(fundingSymbol)) return;
-    return subscribeSharedHookChartFunding(coin.exchange, fundingSymbol, snapshot => {
-      setFundingReading({ scope: fundingScope, rate: snapshot.rate });
+    const stopBinance = subscribeSharedHookChartFunding('binance', fundingSymbol, snapshot => {
+      setFundingReadings(previous => {
+        if (previous.binance.scope === fundingScope && Object.is(previous.binance.rate, snapshot.rate)) return previous;
+        return { ...previous, binance: { scope: fundingScope, rate: snapshot.rate } };
+      });
     });
-  }, [coin.exchange, coin.marketType, fundingSymbol, fundingScope]);
+    const stopBybit = subscribeSharedHookChartFunding('bybit', fundingSymbol, snapshot => {
+      setFundingReadings(previous => {
+        if (previous.bybit.scope === fundingScope && Object.is(previous.bybit.rate, snapshot.rate)) return previous;
+        return { ...previous, bybit: { scope: fundingScope, rate: snapshot.rate } };
+      });
+    });
+    return () => { stopBinance(); stopBybit(); };
+  }, [coin.marketType, fundingSymbol, fundingScope]);
 
   // Keep livePrice in ref to avoid recreation of fetchOI on every live price tick
   const livePriceRef = useRef<number>(livePrice);
@@ -422,14 +439,24 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
           </div>
 
           {coin.marketType === 'futures' && (
-            <div data-testid="chart-top-funding">
-              <span className="text-slate-400">{tr("Фандинг:")}{" "}</span>
-              <span className="font-mono font-bold text-amber-300">
-                {Number.isFinite(fundingRate)
-                  ? `${fundingRate > 0 ? '+' : ''}${(fundingRate * 100).toFixed(4)}%`
-                  : '—'}
-              </span>
-            </div>
+            <>
+              <div data-testid="chart-top-funding-binance">
+                <span className="text-slate-400">{tr("Фандинг Binance:")}{" "}</span>
+                <span className="font-mono font-bold text-amber-300">
+                  {Number.isFinite(binanceFundingRate)
+                    ? `${binanceFundingRate > 0 ? '+' : ''}${(binanceFundingRate * 100).toFixed(4)}%`
+                    : '—'}
+                </span>
+              </div>
+              <div data-testid="chart-top-funding-bybit">
+                <span className="text-slate-400">{tr("Фандинг Bybit:")}{" "}</span>
+                <span className="font-mono font-bold text-orange-300">
+                  {Number.isFinite(bybitFundingRate)
+                    ? `${bybitFundingRate > 0 ? '+' : ''}${(bybitFundingRate * 100).toFixed(4)}%`
+                    : '—'}
+                </span>
+              </div>
+            </>
           )}
         </div>
 
