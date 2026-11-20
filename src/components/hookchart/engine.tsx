@@ -9,6 +9,7 @@ import { CalendarDays, Pencil, Trash2 } from 'lucide-react';
 import { drawingActionsPosition, drawingTextHitDistance, freeDrawingPoint, rayEndPoint, translateDrawingPoints } from './drawingManipulation';
 import { drawTouchMagnifier, magnifierZoomFromPriceDrag, TOUCH_MAGNIFIER_DEFAULT_ZOOM } from './touchMagnifier';
 import { createChartFrameScheduler } from './frameScheduler';
+import { createChartViewportNotifier } from './viewportNotifier';
 import { sameTimeAxisInputs } from './timeAxisMemo';
 import { createAutoPocZoneCache } from './autoPoc';
 import { closestActiveDensityPrices, rankAutoLevelsForPrice } from './chartPanPrecompute';
@@ -410,6 +411,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const lastVisualGapRef=useRef(rightPaddingBars);
  const [visualCanvasWidth,setVisualCanvasWidth]=useState(0);
  const gestureKindRef=useRef<ViewportGesture|null>(null);
+ // The shared axis / indicator panels need the latest viewport at display
+ // frequency, not one parent React commit per high-rate pointer event.
+ const viewportNotifier=useMemo(()=>createChartViewportNotifier<Viewport,ViewportGesture>(),[]);
  const setGestureVp=(update:React.SetStateAction<Viewport>,kind:ViewportGesture)=>{
    if(kind!=='focus')fitAllScopeRef.current=null;
    gestureKindRef.current=kind;
@@ -418,10 +422,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    setVp(update);
  };
  useEffect(()=>{
-   onViewportChange?.(vp);
    const kind=gestureKindRef.current;
-   if(kind){gestureKindRef.current=null;onViewportGesture?.(vp,kind)}
- },[vp,onViewportChange,onViewportGesture]);
+   gestureKindRef.current=null;
+   const notification={viewport:vp,kind,onChange:onViewportChange,onGesture:onViewportGesture};
+   if(kind&&kind!=='focus')viewportNotifier.request(notification);
+   else viewportNotifier.flush(notification);
+ },[vp,onViewportChange,onViewportGesture,viewportNotifier]);
+ useEffect(()=>()=>viewportNotifier.cancel(),[viewportNotifier]);
  // Request older exchange candles only when a user approaches the left edge.
  // Do not prefetch every Terminal card: up to 50 charts may be mounted.
  const olderHistoryAttempt = useRef<{ key:string; at:number; pending:boolean } | null>(null);
