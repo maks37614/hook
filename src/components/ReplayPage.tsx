@@ -28,7 +28,7 @@ import {
 import { fetchReplayHistoryBoundary, resolveReplayHistoryDate } from '../utils/replayHistoryAvailability';
 import { prependCachedReplayHistory, replayVisibleCandles } from '../utils/replayHistoryExtend';
 import { REPLAY_INTRABAR_PHASES, REPLAY_INTRABAR_TICK_MS, replayIntrabarCandle, replayRemainingCandle } from '../utils/replayIntrabar';
-import { supportsReplaySeconds, replaySecondDuration, replaySecondPreview, firstReplaySecondEvent, fetchReplaySecondBatch, type ReplaySecondHistory } from '../utils/replaySecondHistory';
+import { supportsReplaySeconds, replaySecondDuration, replaySecondPreview, replaySecondObservedTime, firstReplaySecondEvent, fetchReplaySecondBatch, type ReplaySecondHistory } from '../utils/replaySecondHistory';
 import { useReplayProfileState } from '../utils/useReplayProfileState';
 import { storeReplayScreenshot, deleteReplayScreenshots, clearReplayScreenshots, replayImageKey } from '../utils/replayScreenshots';
 import {
@@ -807,8 +807,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
   // Recorded seconds must timestamp manual market entries, pending orders
   // and manual exits at the currently visible second, not the parent candle.
   const replayActionTime = secondsForNext && partialCandle && secondsForNext.parentTime === partialCandle.time
-    ? secondsForNext.parentTime + Math.max(0, Math.ceil(
-        playbackPhase * secondsForNext.seconds / REPLAY_INTRABAR_PHASES) - 1)
+    ? replaySecondObservedTime(secondsForNext, playbackPhase / REPLAY_INTRABAR_PHASES)
     : currentCandle?.time ?? Math.floor(Date.now() / 1000);
   // Display the simulated last price/PnL while leaving the persisted open
   // position untouched until the next historical candle is committed.

@@ -62,6 +62,13 @@ export function buildReplaySecondHistory(parent: Kline, rows: readonly Kline[], 
   }
   return {parentTime:parent.time,seconds,rows:ordered,cumulative};
 }
+/** UTC second corresponding to the latest already-visible 1s close.
+ * Floor to match replaySecondPreview, never round into an unseen second.
+ */
+export function replaySecondObservedTime(h:ReplaySecondHistory,fraction:number):number {
+  const count=Number.isFinite(fraction)?Math.max(0,Math.min(h.seconds,Math.floor(fraction*h.seconds))):0;
+  return h.parentTime+Math.max(0,count-1);
+}
 export function replaySecondPreview(parent:Kline,h:ReplaySecondHistory,fraction:number):Kline {
   const count=Number.isFinite(fraction)?Math.max(0,Math.min(h.seconds,Math.floor(fraction*h.seconds))):0;
   if(count===h.seconds)return parent;

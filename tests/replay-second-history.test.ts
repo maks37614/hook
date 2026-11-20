@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import type { Kline } from '../src/types';
 import {
   supportsReplaySeconds, buildReplaySecondHistory, replaySecondPreview,
-  firstReplaySecondEvent, fetchReplaySecondBatch,
+  firstReplaySecondEvent, fetchReplaySecondBatch, replaySecondObservedTime,
 } from '../src/utils/replaySecondHistory';
 
 const bar = (time:number,open:number,high:number,low:number,close:number,volume:number):Kline =>
@@ -32,6 +32,11 @@ test('historical seconds never reveal future highs/lows or cumulative volume',()
   assert.equal(replaySecondPreview(parent,h,0).close,100);
   assert.equal(replaySecondPreview(parent,h,1/60).close,101);
   assert.equal(replaySecondPreview(parent,h,2/60).low,95);
+  assert.equal(replaySecondObservedTime(h,0),parent.time);
+  assert.equal(replaySecondObservedTime(h,2/60),parent.time+1);
+  assert.equal(replaySecondObservedTime(h,2.9/60),parent.time+1,
+    'the entry timestamp must not round into an unseen future second');
+  assert.equal(replaySecondObservedTime(h,1),parent.time+59);
   assert.equal(replaySecondPreview(parent,h,3/60).high,110);
   assert.equal(replaySecondPreview(parent,h,5/60).high,115);
   assert.equal(replaySecondPreview(parent,h,5/60).volume,9);
@@ -79,7 +84,7 @@ test('the Replay page gates animation on loading, checks 1s fills, and labels fa
   assert.match(page,/entryTime: replayActionTime/);
   assert.match(page,/createdAtTime: replayActionTime/);
   assert.match(page,/exitTime: replayActionTime/);
-  assert.match(page,/secondsForNext\.parentTime \+ Math\.max\(0, Math\.ceil\(/);
+  assert.match(page,/replaySecondObservedTime\(secondsForNext, playbackPhase \/ REPLAY_INTRABAR_PHASES\)/);
   const secondSource=readFileSync('src/utils/replaySecondHistory.ts','utf8');
   assert.match(secondSource,/AbortSignal\.any\(\[signal,timeout\]\)/);
   assert.match(secondSource,/AbortSignal\.timeout\(4500\)/);
