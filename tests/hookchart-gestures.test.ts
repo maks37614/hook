@@ -46,7 +46,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     magnifierZoom:{current:2},magnifierPriceDrag:{current:null},
     TOUCH_MAGNIFIER_DEFAULT_ZOOM:2,
     magnifierZoomFromPriceDrag:(zoom:number,delta:number)=>Math.max(1.25,Math.min(6,zoom*Math.exp(-delta/150))),
-    mouseRef:{current:null},hoveredMeasurement:{current:null},pointers:{current:new Map()},drag:{current:null},lastTap:{current:0},
+    mouseRef:{current:null},hoveredMeasurement:{current:null},pointers:{current:new Map()},activePointerRect:{current:null},drag:{current:null},lastTap:{current:0},
     scheduleDraw:()=>{},editingDrawingId:null,drawings:[],draft:null,tool:'cursor',levelLabelMode:'always',autoLevels:[],timeMarkers:[],
     uid:()=> 'testing', drawingActionsPosition:(x:number,y:number)=>({x,y}),
     snap:(x:number,y:number)=>({t:x*1000,p:110-y/35}),
@@ -78,6 +78,23 @@ function setup(overrides: Record<string, unknown> = {}) {
   const fireHold=()=>{const callbacks=[...timers.values()];timers.clear();callbacks.forEach(callback=>callback());};
   return {env,handlers,event,fireHold,captured,viewportUpdates,timers};
 }
+
+test('captured pointer moves reuse chart bounds until layout invalidates them', () => {
+  let rectReads=0;
+  const rect={left:0,top:0,width:350,height:700};
+  const t=setup({ref:{current:{getBoundingClientRect:()=>{rectReads++;return rect}}}});
+  t.handlers.handlePointerDown(t.event(100,200));
+  const readsAfterDown=rectReads;
+  for(let x=101;x<=120;x++)t.handlers.handlePointerMove(t.event(x,200));
+  assert.equal(rectReads,readsAfterDown,'one pointer capture should not measure the DOM on each move');
+  t.env.activePointerRect.current=null; // Simulate ResizeObserver or nested scroll.
+  t.handlers.handlePointerMove(t.event(125,200));
+  assert.equal(rectReads,readsAfterDown+1,'next move must remeasure after layout changed');
+  t.handlers.handlePointerMove(t.event(130,200));
+  assert.equal(rectReads,readsAfterDown+1,'updated rect should be cached again');
+  t.handlers.handlePointerUp(t.event(130,200,1,'pointerup'));
+  assert.equal(t.env.activePointerRect.current,null,'release must forget the captured geometry');
+});
 
 test('a second finger pinches the chart even after the longer touch hold has opened the lens', () => {
   const t=setup();
