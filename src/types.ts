@@ -18,6 +18,8 @@ export interface TerminalChartBlock {
   marketType: MarketType;
   timeframe: Timeframe;
   formationId?: string;
+  /** Terminal-only per-chart TP / Entry / SL overlays; absent means hidden. */
+  showTradeLevels?: boolean;
   colSpan?: 1 | 2 | 3 | 4 | 'full';
   heightPx?: number;
 }
