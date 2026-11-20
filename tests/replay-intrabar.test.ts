@@ -12,18 +12,21 @@ function bar(close = 110): Kline {
 
 test('Replay progressively builds a valid historical candle without leaking high/low or volume before those phases', () => {
   const original = bar();
-  assert.equal(REPLAY_INTRABAR_PHASES, 8);
+  assert.equal(REPLAY_INTRABAR_PHASES, 64);
   assert.ok(REPLAY_INTRABAR_TICK_MS >= 30);
-  const previews = Array.from({ length: 9 }, (_, step) => replayIntrabarCandle(original, step / 8));
+  const previews = Array.from({ length: REPLAY_INTRABAR_PHASES + 1 },
+    (_, step) => replayIntrabarCandle(original, step / REPLAY_INTRABAR_PHASES));
   assert.equal(previews[0].open, original.open);
   assert.equal(previews[0].close, original.open);
   assert.equal(previews[0].high, original.open);
   assert.equal(previews[0].low, original.open);
   assert.notEqual(previews[1].close, original.close);
   assert.ok(previews[1].low > original.low, 'the full low must not appear in the opening seconds');
-  assert.ok(previews[4].high < original.high, 'the full high must not appear before the path reaches it');
-  assert.equal(previews[8], original, 'the end must use the EXACT archived OHLC object');
-  for (let i = 0; i < 9; i++) {
+  assert.ok(previews[REPLAY_INTRABAR_PHASES / 2].high < original.high,
+    'the full high must not appear before the path reaches it');
+  assert.equal(previews[REPLAY_INTRABAR_PHASES], original,
+    'the end must use the EXACT archived OHLC object');
+  for (let i = 0; i <= REPLAY_INTRABAR_PHASES; i++) {
     const row = previews[i];
     assert.ok(row.high >= row.open && row.high >= row.close && row.low <= row.open && row.low <= row.close);
     assert.ok(row.high <= original.high && row.low >= original.low);
@@ -36,6 +39,11 @@ test('Replay progressively builds a valid historical candle without leaking high
   assert.equal(original.open, 100, 'the authoritative record must stay immutable');
   assert.equal(original.high, 120);
   assert.deepEqual(replayIntrabarCandle(original, Infinity), previews[0]);
+  // The longest 0.1x playback must not increase timer frequency: gradual
+  // interpolation is a bounded browser-only visualization.
+  assert.equal(600 / 0.1, 6000);
+  assert.ok(REPLAY_INTRABAR_TICK_MS >= 40);
+  assert.ok(REPLAY_INTRABAR_PHASES * REPLAY_INTRABAR_TICK_MS <= 6000);
   assert.equal(replayIntrabarCandle(original, 1), original);
 });
 
@@ -76,6 +84,8 @@ test('Animating the next historical bar stays compatible with incremental charts
   assert.match(page, /replayVisibleCandles\(allCandles, currentIndex, historyExpanded, cachedHistoryPrefix\)/);
   assert.match(page, /\[\.\.\.confirmedReplayCandles, partialCandle\]/);
   assert.match(page, /Math\.max\(80, 600 \/ playbackSpeed\)/);
+  assert.match(page, /Math\.floor\(playbackFractionRef\.current \* REPLAY_INTRABAR_PHASES\)/);
+  assert.match(page, /setInterval\(\(\) => \{/);
   assert.match(page, /if \(document\.visibilityState === 'hidden'\)/);
   assert.match(page, /orderCutoffsRef\.current\.get\(order\.id\)/);
   assert.match(page, /replayRemainingCandle\(nextCandle, currentEntryCutoff\.phase\)/);

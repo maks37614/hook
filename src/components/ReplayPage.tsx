@@ -948,8 +948,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
 
   // Browser-only intra-candle animation. Historical seconds are never fetched
   // as fake ticks: the user sees an explicitly labelled OHLC approximation.
-  // Maximum 8 paints/bar (up to 25 timer checks/sec); 5x/10x may show fewer
-  // frames to keep the original 600ms-per-bar speed and preserve chart FPS.
+  // Up to 64 sub-bar states, with at most 25 timer checks/second. At 0.1x
+  // each historical bar takes six seconds; faster speeds skip intermediate
+  // states instead of increasing chart CPU or sending exchange requests.
   useEffect(() => {
     if (!isPlaying) return;
     let lastTickAt = performance.now();
@@ -964,7 +965,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         resetIntrabar();
         handleStepForwardRef.current();
       } else {
-        const phase = Math.max(1, Math.min(REPLAY_INTRABAR_PHASES - 1,
+        // Floor rather than ceil: a slow preview must never show a state
+        // from later than the simulated clock, especially at 0.1x.
+        const phase = Math.max(0, Math.min(REPLAY_INTRABAR_PHASES - 1,
           Math.floor(playbackFractionRef.current * REPLAY_INTRABAR_PHASES)));
         setPlaybackPhase(previous => previous === phase ? previous : phase);
       }
