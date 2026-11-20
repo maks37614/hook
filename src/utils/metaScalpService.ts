@@ -108,6 +108,86 @@ export async function findActiveMetaScalpPort(preferredPort = 17845): Promise<nu
   return null;
 }
 
+interface LinkedMetaScalpPanel { externalId: string; connectionId: number }
+const META_DOCUMENT_GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/** A group can contain spot and futures books; never turn either connection into the other. */
+export function linkedMetaScalpPanels(state: unknown, binding: string):
+  { documents: LinkedMetaScalpPanel[]; error?: string } | null {
+  if (!state || typeof state !== 'object') return null;
+  const inventory = state as { windows?: unknown; standaloneCharts?: unknown };
+  if (!Array.isArray(inventory.windows) || !Array.isArray(inventory.standaloneCharts)) return null;
+  const documents: unknown[] = [...inventory.standaloneCharts];
+  for (const window of inventory.windows) {
+    if (!window || typeof window !== 'object') continue;
+    const tabs = (window as { tabs?: unknown }).tabs;
+    if (!Array.isArray(tabs)) continue;
+    for (const tab of tabs) {
+      const items = tab && typeof tab === 'object' ? (tab as { documents?: unknown }).documents : null;
+      if (Array.isArray(items)) documents.push(...items);
+    }
+  }
+  const bindingNumber = Number(binding);
+  const candidates = documents.filter(d => d && typeof d === 'object'
+    && (d as { linkNumber?: number }).linkNumber === bindingNumber
+    && ['orderBook','chart'].includes((d as {kind?: string}).kind || '')) as {
+    externalId: string; connectionId: number;
+  }[];
+  if (candidates.length > 16) return { documents: [], error: 'TOO_MANY_PANELS' };
+  const found: LinkedMetaScalpPanel[] = [];
+  const seen = new Set<string>();
+  for (const doc of candidates) {
+    if (typeof doc.externalId !== 'string' || !META_DOCUMENT_GUID.test(doc.externalId)
+      || !Number.isSafeInteger(doc.connectionId) || doc.connectionId <= 0)
+      return { documents: [], error: 'UNBOUND_PANEL' };
+    const externalId = doc.externalId.toLowerCase();
+    if (seen.has(externalId)) continue;
+    seen.add(externalId);
+    found.push({ externalId, connectionId: doc.connectionId });
+  }
+  return { documents: found };
+}
+
+/** Only local read-only inventory plus document-specific ticker writes. */
+async function sendMixedMetaScalpGroup(port: number, binding: string, symbol: string):
+  Promise<{ success: boolean; message: string } | null> {
+  const base = `http://127.0.0.1:${port}`;
+  const stateController = new AbortController();
+  const stateTimer = setTimeout(() => stateController.abort(), 1200);
+  let state: unknown;
+  try {
+    const response = await fetch(base + '/api/ui/state', {
+      method: 'GET', mode: 'cors', cache: 'no-store', signal: stateController.signal,
+    });
+    if (!response.ok) return null; // Older MetaScalp: normal named-binding fallback.
+    state = await response.json();
+  } catch { return null; }
+  finally { clearTimeout(stateTimer); }
+  const matched = linkedMetaScalpPanels(state, binding);
+  if (!matched) return null;
+  if (matched.error) return { success: false, message: 'MetaScalp: некоректні панелі у групі ' + binding + '.' };
+  const docs = matched.documents;
+  if (docs.length < 2 || new Set(docs.map(d => d.connectionId)).size < 2) return null;
+  const results = await Promise.all(docs.map(async doc => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1600);
+    try {
+      const response = await fetch(base + '/api/ui/documents/' + doc.externalId + '/ticker', {
+        method: 'PUT', mode: 'cors', signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: symbol.trim().toUpperCase() }),
+      });
+      const data = await response.json().catch(() => null);
+      return response.ok && data?.status === 'ok';
+    } catch { return false; }
+    finally { clearTimeout(timeout); }
+  }));
+  const succeeded = results.filter(Boolean).length;
+  return succeeded === docs.length
+    ? { success: true, message: `MetaScalp: ${symbol.toUpperCase()} надіслано до ${succeeded} панелей групи ${binding} зі збереженням Spot/Futures.` }
+    : { success: false, message: `MetaScalp: оновлено ${succeeded} з ${docs.length} панелей групи ${binding}. Перевірте підключення.` };
+}
+
 export interface SendToMetaScalpResult {
   success: boolean;
   message: string;
@@ -146,6 +226,10 @@ export async function sendTickerToMetaScalp(
   let message = 'MetaScalp не знайдено. Запустіть термінал на цьому комп’ютері та дозвольте сайту доступ до локальної мережі.';
 
   if (activePort !== null) {
+    const mixed = await sendMixedMetaScalpGroup(activePort, binding, symbol);
+    if (mixed) return {
+      success: mixed.success, message: mixed.message, ticker, binding, portUsed: activePort,
+    };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1800);
     try {
