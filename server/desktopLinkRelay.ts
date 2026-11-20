@@ -80,7 +80,11 @@ export function installDesktopLinkRelay(app: Express) {
     slot.lastPollAt = now;
     // The cursor belongs to this desktop client's current connection only.
     const afterRaw = typeof req.query.after === 'string' ? req.query.after : '';
-    const after = /^\d{1,12}$/.test(afterRaw) ? Number(afterRaw) : 0;
+    const requestEpoch = typeof req.query.epoch === 'string' ? req.query.epoch : '';
+    // Ignore a previous VPS instance's cursor on the *first* request after
+    // restart, rather than waiting 20s and allowing a fresh command to expire.
+    const after = requestEpoch === slot.epoch && /^\d{1,12}$/.test(afterRaw)
+      ? Number(afterRaw) : 0;
     res.set({ 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
     if (slot.latest && slot.latest.seq > after && now - slot.latest.createdAt <= FRESH_MS) {
       return void res.json({ command: slot.latest });
