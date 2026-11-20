@@ -100,7 +100,7 @@ export function AuthCaptcha({ siteKey, onTokenChange }: Props) {
     let active = true;
     let widgetId: string | null = null;
     let api: TurnstileAPI | null = null;
-    let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+    let noticeTimer: number | null = null;
     const clearNoticeTimer = () => {
       if (noticeTimer !== null) window.clearTimeout(noticeTimer);
       noticeTimer = null;
