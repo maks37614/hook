@@ -126,13 +126,18 @@ export function terminalViewportHistoryPhase(
 export function terminalReadableCandleExtrema(
   candles: readonly { o: number; h: number; l: number; c: number }[],
 ): { low: number; high: number; clippedHigh: boolean; clippedLow: boolean } {
+  const validPriceCandle = (candle: { o: number; h: number; l: number; c: number }) =>
+    Number.isFinite(candle.o) && candle.o > 0 &&
+    Number.isFinite(candle.h) && candle.h > 0 &&
+    Number.isFinite(candle.l) && candle.l > 0 &&
+    Number.isFinite(candle.c) && candle.c > 0;
   let low = Infinity;
   let high = -Infinity;
   let bodyLow = Infinity;
   let bodyHigh = -Infinity;
   let validCount = 0;
   for (const candle of candles) {
-    if (![candle.o, candle.h, candle.l, candle.c].every(value => Number.isFinite(value) && value > 0)) continue;
+    if (!validPriceCandle(candle)) continue;
     validCount++;
     low = Math.min(low, candle.l, candle.o, candle.c);
     high = Math.max(high, candle.h, candle.o, candle.c);
@@ -152,7 +157,7 @@ export function terminalReadableCandleExtrema(
   let regularHigh = bodyHigh, regularLow = bodyLow;
   let excludedHigh = 0, excludedLow = 0;
   for (const candle of candles) {
-    if (![candle.o, candle.h, candle.l, candle.c].every(value => Number.isFinite(value) && value > 0)) continue;
+    if (!validPriceCandle(candle)) continue;
     if (checkUpper) {
       if (candle.h > upperGuard) excludedHigh++;
       else regularHigh = Math.max(regularHigh, candle.h);
