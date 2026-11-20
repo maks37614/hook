@@ -25,7 +25,7 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
   ];
   const all = { exchange: 'all', marketType: 'all' } as const;
   assert.ok(!MARKET_PRESETS.some(p => p.id === 'av'), 'obsolete AV button must not be offered');
-  assert.ok(MARKET_PRESETS.some(p => p.id === 'av_1m' && p.label === 'AV 1m TOP 10'));
+  assert.ok(MARKET_PRESETS.some(p => p.id === 'av_1m' && p.label === 'AV 1m'));
   const ranked = selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY);
   assert.deepEqual(ranked.map(c => [c.symbol, c.exchange, c.marketType]), [
     ['BTCUSDT', 'binance', 'futures'],
@@ -75,7 +75,7 @@ test('AV shares existing quote refresh/preset pagination and does not trigger se
   const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   assert.match(panel, /MARKET_PRESETS\.map\(preset => preset\.id\)/);
   assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
-  assert.match(terminal, /applyPresetPage\(selected, presetPageRef\.current, preset === 'av_1m' \? 10 : coinPresetLimit\)/);
+  assert.match(terminal, /applyPresetPage\(selected, presetPageRef\.current, preset === 'av_1m' \? MAX_TERMINAL_CHARTS : coinPresetLimit\)/);
 });
 
 test('HookChart AV footer uses only cached 24h quotes or a full day of existing candles', () => {
@@ -97,62 +97,75 @@ test('HookChart AV footer uses only cached 24h quotes or a full day of existing 
   assert.match(server, /volume24hUsd = marketTickerFeed\.getCached24hVolumeUsd/);
 });
 
-test('AV 1m ranks top ten qualifying markets by full-universe 24h/1440 average', () => {
+test('AV 1m shows every qualifying coin in descending 24h/1440 average, not only ten', () => {
   const all = { exchange: 'all', marketType: 'all' } as const;
-  const coins = Array.from({ length: 16 }, (_, index) =>
-    quote(`C${index}USDT`, (index + 1) * 144_000_000, { volume1mUsd: index === 15 ? 0 : 500_000 }));
+  const coins = Array.from({ length: 72 }, (_, index) =>
+    quote(`C${index}USDT`, (index + 1) * 144_000_000, { volume1mUsd: index === 71 ? 0 : 500_000 }));
   coins.push(quote('BROKENUSDT', Number.NaN), quote('MISSINGUSDT', 0), quote('NEGUSDT', -1));
   const original = [...coins];
-  assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m TOP 10'));
+  assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m'));
   const ranked = selectMarketPresetCoins(coins, 'av_1m', all, Number.POSITIVE_INFINITY);
-  assert.equal(ranked.length, 10);
-  assert.deepEqual(ranked.map(coin => coin.symbol),
-    ['C15USDT','C14USDT','C13USDT','C12USDT','C11USDT',
-      'C10USDT','C9USDT','C8USDT','C7USDT','C6USDT']);
-  assert.equal(ranked[0].volumeUsd / 1440, 1_600_000);
-  assert.equal(ranked[9].volumeUsd / 1440, 700_000);
+  assert.equal(ranked.length, 71, 'all markets over the 200k/min threshold survive');
+  assert.deepEqual(ranked.slice(0, 5).map(coin => coin.symbol),
+    ['C71USDT','C70USDT','C69USDT','C68USDT','C67USDT']);
+  assert.equal(ranked[0].volumeUsd / 1440, 7_200_000);
+  assert.equal(ranked[70].volumeUsd / 1440, 200_000);
+  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', all, 50), ranked.slice(0, 50));
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', all, 4), ranked.slice(0, 4));
-  // Legacy internal AV sorting still operates without exposing an AV button.
-  assert.equal(selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY).length, 17);
+  // Preserve legacy internal AV sorting for other consumers.
+  assert.equal(selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY).length, 72);
   assert.deepEqual(coins, original);
 });
 
-test('AV 1m honors Binance/Bybit and Spot/Futures selection and deduplicates', () => {
+test('AV 1m excludes BTC ETH XAU SOL on every exchange/market, preserves similarly named assets', () => {
   const coins = [
-    quote('BTCUSDT', 432_000_000),
-    quote('BTCUSDT', 9_990_000_000), // duplicated market must not replace its first authoritative quote
-    quote('BTCUSDT', 576_000_000, { marketType: 'spot' }),
-    quote('ETHUSDT', 720_000_000, { exchange: 'bybit' }),
-    quote('SOLUSDT', 648_000_000, { exchange: 'bybit', marketType: 'spot' }),
+    quote('BTCUSDT', 9_000_000_000),
+    quote('BTCUSDT', 8_000_000_000, {marketType:'spot'}),
+    quote('ETHUSDT', 7_000_000_000, {exchange:'bybit'}),
+    quote('XAUUSDT', 6_000_000_000, {exchange:'bybit',marketType:'spot'}),
+    quote('SOLUSDT', 5_000_000_000),
     quote('AKEUSDT', 451_106_979.95045),
-    quote('XRPUSDT', 0, { exchange: 'bybit', marketType: 'spot' }),
+    quote('AKEUSDT', 600_000_000, {exchange:'bybit'}),
+    quote('AKEUSDT', 800_000_000), // duplicate exchange+market must not replace first quote
+    quote('WBTCUSDT', 720_000_000),
+    quote('SOLVUSDT', 576_000_000),
+    quote('STETHUSDT', 432_000_000, {exchange:'bybit',marketType:'spot'}),
+    quote('XRPUSDT', 0, {exchange:'bybit',marketType:'spot'}),
   ];
-  const all = { exchange: 'all', marketType: 'all' } as const;
+  const all = {exchange:'all', marketType:'all'} as const;
   const ranked = selectMarketPresetCoins(coins, 'av_1m', all, Number.POSITIVE_INFINITY);
-  assert.deepEqual(ranked.map(x => [x.symbol, x.exchange, x.marketType]), [
-    ['ETHUSDT', 'bybit', 'futures'], ['SOLUSDT', 'bybit', 'spot'],
-    ['BTCUSDT', 'binance', 'spot'], ['AKEUSDT', 'binance', 'futures'],
-    ['BTCUSDT', 'binance', 'futures'],
+  assert.deepEqual(ranked.map(x=>[x.symbol,x.exchange,x.marketType]), [
+    ['WBTCUSDT','binance','futures'],
+    ['AKEUSDT','bybit','futures'],
+    ['SOLVUSDT','binance','futures'],
+    ['AKEUSDT','binance','futures'],
+    ['STETHUSDT','bybit','spot'],
   ]);
-  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'binance', marketType: 'spot' }, 10)
-    .map(x => x.symbol), ['BTCUSDT']);
-  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'bybit', marketType: 'futures' }, 10)
-    .map(x => x.symbol), ['ETHUSDT']);
-  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'binance', marketType: 'futures' }, 10)
-    .map(x => x.symbol), ['AKEUSDT', 'BTCUSDT']);
+  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'binance',marketType:'futures'}, Number.POSITIVE_INFINITY)
+    .map(x=>x.symbol), ['WBTCUSDT','SOLVUSDT','AKEUSDT']);
+  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'bybit',marketType:'spot'}, Number.POSITIVE_INFINITY)
+    .map(x=>x.symbol), ['STETHUSDT']);
+  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', {exchange:'bybit',marketType:'futures'}, Number.POSITIVE_INFINITY)
+    .map(x=>x.symbol), ['AKEUSDT']);
 });
 
-test('AV 1m shows all ten terminal charts even when ordinary presets page at four', () => {
+test('AV 1m exposes all ranked coins in paginated groups of up to 50 live charts', () => {
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
   const locale = readFileSync(new URL('../src/locales/terminalPage20261115.ts', import.meta.url), 'utf8');
+  const config = readFileSync(new URL('../src/utils/marketPresets.ts', import.meta.url), 'utf8');
   assert.match(page, /const avOneMinuteActive = activeMarketPreset === 'av_1m'/);
-  assert.match(page, /avOneMinuteActive \? 10 : config\.coinPresetLimit/);
-  assert.match(page, /const effectivePresetPageSize = avOneMinuteActive \? 10 : coinPresetLimit/);
+  assert.match(page, /avOneMinuteActive \? MAX_TERMINAL_CHARTS : config\.coinPresetLimit/);
+  assert.match(page, /const effectivePresetPageSize = avOneMinuteActive \? MAX_TERMINAL_CHARTS : coinPresetLimit/);
   assert.match(page, /getTerminalPresetPage\(presetMatches, presetPage, effectivePresetPageSize\)/);
-  assert.match(page, /preset === 'av_1m' \? 10 : coinPresetLimit/);
+  assert.match(page, /preset === 'av_1m' \? MAX_TERMINAL_CHARTS : coinPresetLimit/);
+  assert.match(page, /visiblePresetPage\.pageCount > 1/);
+  assert.match(page, /goToPresetPage\(visiblePresetPage\.page \+ direction\)/);
   assert.match(panel, /onApplyCoins\(readyCoins\[id\], id\)/);
   assert.match(panel, /applyRef\.current\(readyCoins\[activePreset\], activePreset\)/);
   assert.match(panel, /av_1m: BarChart3/);
-  assert.match(locale, /Top 10 coins by average trading turnover per minute/);
+  assert.match(config, /label: 'AV 1m'/);
+  assert.doesNotMatch(config, /AV 1m TOP 10|slice\(0, 10\)/);
+  assert.match(locale, /All coins averaging at least 200,000 USDT/);
+  assert.doesNotMatch(locale, /AV 1m TOP 10|Top 10 coins/);
 });
