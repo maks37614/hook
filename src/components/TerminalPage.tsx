@@ -145,6 +145,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     syncError, retrySync, downloadLocalBackup, importWorkspaceBackup,
     requestImmediateWorkspaceSync } = useTerminalWorkspace();
   const [activeMarketPreset, setActiveMarketPreset] = useState<TerminalMarketPreset | null>(null);
+  const avOneMinuteActive = activeMarketPreset === 'av_1m';
   const [presetMatches, setPresetMatches] = useState<TerminalPresetCoin[]>([]);
   const [presetPage, setPresetPage] = useState(0);
   const presetPageRef = useRef(0);
@@ -185,7 +186,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   // legacy workspaces above 50 charts retain the 50-chart safety page cap.
   const isAutomaticMarketSelection = Boolean(activeMarketPreset && presetMatches.length > 0);
   const workspacePageSize = resolveTerminalWorkspacePageSize(
-    config.coinPresetLimit, blocks.length, isAutomaticMarketSelection,
+    avOneMinuteActive ? 10 : config.coinPresetLimit, blocks.length, isAutomaticMarketSelection,
   );
   const [workspacePage, setWorkspacePage] = useState(0);
   const workspacePageCount = Math.max(1, Math.ceil(blocks.length / workspacePageSize));
@@ -353,8 +354,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     marketType: config.coinPresetMarketType ?? preferences.defaultMarketType,
   }), [config.coinPresetExchange, config.coinPresetMarketType, preferences.defaultExchange, preferences.defaultMarketType]);
   const coinPresetLimit = resolveTerminalPresetPageSize(config.coinPresetLimit);
-  const visiblePresetPage = useMemo(() => getTerminalPresetPage(presetMatches, presetPage, coinPresetLimit),
-    [presetMatches, presetPage, coinPresetLimit]);
+  // AV 1m is a fixed top-10 view, regardless of the page size used by other presets.
+  const effectivePresetPageSize = avOneMinuteActive ? 10 : coinPresetLimit;
+  const visiblePresetPage = useMemo(() => getTerminalPresetPage(presetMatches, presetPage, effectivePresetPageSize),
+    [presetMatches, presetPage, effectivePresetPageSize]);
   const coins = useMemo(() => {
     if (!marketCoins.length) return formationCoins;
     const formations = new Map(formationCoins.map(coin => [coinMarketKey(coin), coin]));
@@ -817,7 +820,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     }
   };
 
-  const applyPresetPage = useCallback((selected: TerminalPresetCoin[], requestedPage: number, pageSize = coinPresetLimit) => {
+  const applyPresetPage = useCallback((selected: TerminalPresetCoin[], requestedPage: number, pageSize = effectivePresetPageSize) => {
     if (!selected.length) return;
     const { page, coins: pageCoins } = getTerminalPresetPage(selected, requestedPage, pageSize);
     presetPageRef.current = page;
@@ -831,7 +834,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       const columns = pageCoins.length === 1 ? 1 : pageCoins.length <= 4 ? 2 : pageCoins.length <= 9 ? 3 : 4;
       return current.columns === columns ? current : { ...current, columns };
     });
-  }, [updateBlocks, setConfig, timeframe, coinPresetLimit]);
+  }, [updateBlocks, setConfig, timeframe, effectivePresetPageSize]);
 
   const handleWorkspaceConfigUpdate = useCallback((updated: Partial<TerminalWorkspaceConfig>) => {
     if (updated.showClock === false) setShowTradingSessions(false);
@@ -846,7 +849,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     }
 
     const nextLimit = resolveTerminalPresetPageSize(updated.coinPresetLimit);
-    const nextPage = pageAfterLimitChange(presetPageRef.current, coinPresetLimit, nextLimit);
+    const nextPage = avOneMinuteActive ? 0 : pageAfterLimitChange(presetPageRef.current, coinPresetLimit, nextLimit);
     presetPageRef.current = nextPage;
     // Manual and personal presets keep all their charts visible up to 50.
     // Automatic presets and older oversized imports retain pagination.
@@ -854,11 +857,11 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     setMaximizedBlockId(null);
     if (activeMarketPreset && presetMatches.length) {
       // Auto market presets already page live matches; update their slice now.
-      applyPresetPage(presetMatches, nextPage, nextLimit);
+      applyPresetPage(presetMatches, nextPage, avOneMinuteActive ? 10 : nextLimit);
     }
     chartListRef.current?.scrollTo({ top: 0 });
     setConfig(current => ({ ...current, ...updated, coinPresetLimit: nextLimit }));
-  }, [activeMarketPreset, presetMatches, coinPresetLimit, workspacePageSize, applyPresetPage, setConfig, requestImmediateWorkspaceSync]);
+  }, [activeMarketPreset, avOneMinuteActive, presetMatches, coinPresetLimit, workspacePageSize, applyPresetPage, setConfig, requestImmediateWorkspaceSync]);
 
   const handleDoneWorkspaceSettings = useCallback(() => {
     // All settings control the same per-user workspace. "Done" immediately
@@ -885,7 +888,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     chartListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [applyPresetPage, presetMatches]);
 
-  const handleApplyMarketCoins = useCallback((selected: TerminalPresetCoin[]) => {
+  const handleApplyMarketCoins = useCallback((selected: TerminalPresetCoin[], preset: TerminalMarketPreset) => {
     if (!selected.length) return;
     // Each 30s market refresh creates new quote objects even if the ordered
     // instrument list is unchanged. Keep the previous ranking identity so
@@ -895,8 +898,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         && coin.timeframe === selected[index].timeframe
         && coin.formationId === selected[index].formationId)
       ? current : selected);
-    applyPresetPage(selected, presetPageRef.current);
-  }, [applyPresetPage]);
+    // The click can arrive before React commits activeMarketPreset. Use the
+    // selected ID, not the previous render's preset, for the first page.
+    applyPresetPage(selected, presetPageRef.current, preset === 'av_1m' ? 10 : coinPresetLimit);
+  }, [applyPresetPage, coinPresetLimit]);
 
   const handleActiveMarketPresetChange = useCallback((preset: TerminalMarketPreset | null) => {
     presetPageRef.current = 0;
