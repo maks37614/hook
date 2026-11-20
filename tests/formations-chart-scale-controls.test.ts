@@ -18,7 +18,8 @@ test('Formations quick charts use candle-only Terminal range without changing Te
   assert.match(engine, /\|\|\(formationAutoScale&&vp\.autoY\)\|\|\(vp\.autoY&&vp\.candleFit===true\)/);
   assert.match(engine, /if\(candleAutoScale\)\{/);
   assert.match(engine, /terminalCandlePriceRange\(lo,hi,plotH,showVolumes\)/);
-  assert.match(engine, /if\(!candleAutoScale&&vp\.autoY&&candles\.length&&densities\.length\)/);
+  assert.match(engine, /if\(!candleAutoScale&&vp\.autoY&&candles\.length&&cachedNearDensityPrices\.length\)/);
+  assert.match(engine, /const cachedNearDensityPrices=useMemo\(/);
 });
 
 test('Formations scale drawer only changes its own visibility and floats without reflow', () => {
