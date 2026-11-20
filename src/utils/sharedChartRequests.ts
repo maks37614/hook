@@ -42,12 +42,16 @@ export async function fetchChartJsonWithDeadline(
  */
 export function createSharedChartJsonFetcher(deadlineMs = SHARED_CHART_REQUEST_DEADLINE_MS) {
   const minuteCache = createTimedRequestCache<any>(55_000, 256);
+  // One-minute volume must not reuse an empty/stale response for 55 seconds.
+  // A separate small cache still coalesces simultaneous multi-chart readers.
+  const minuteVolumeCache = createTimedRequestCache<any>(10_000, 128);
   const fundingHistoryCache = createTimedRequestCache<any>(10 * 60_000, 128);
 
   return function fetchSharedJson(
-    url: string, category: 'minute' | 'funding-history' = 'minute',
+    url: string, category: 'minute' | 'minute-volume' | 'funding-history' = 'minute',
   ): Promise<any> {
-    const cache = category === 'funding-history' ? fundingHistoryCache : minuteCache;
+    const cache = category === 'funding-history' ? fundingHistoryCache
+      : category === 'minute-volume' ? minuteVolumeCache : minuteCache;
     // A funding settlement always creates a fresh key even when an earlier
     // response was cached minutes before 00:00, 08:00 or 16:00 UTC.
     const key = category === 'funding-history'
@@ -60,7 +64,7 @@ export function createSharedChartJsonFetcher(deadlineMs = SHARED_CHART_REQUEST_D
       // unchanged; Web Locks/Channel failures fall back to normal requests.
       const desktop = typeof window !== 'undefined' &&
         new URLSearchParams(window.location?.search || '').get('h00kDesktop') === '1';
-      if (desktop && category === 'minute' && isShareableDesktopChartURL(url)) {
+      if (desktop && category !== 'funding-history' && isShareableDesktopChartURL(url)) {
         return sharedDesktopPublicChartJson().read(
           url, () => fetchChartJsonWithDeadline(url, deadlineMs),
           AbortSignal.timeout(Math.max(1, deadlineMs)),

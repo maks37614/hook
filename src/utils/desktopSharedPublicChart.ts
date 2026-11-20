@@ -29,6 +29,7 @@ export function isShareableDesktopChartURL(url: string): boolean {
   try {
     const parsed = new URL(url, 'https://h00k.top');
     if (parsed.pathname !== '/api/chart/trades24h' &&
+        parsed.pathname !== '/api/market/av1m/coin' &&
         parsed.pathname !== '/api/derivatives/oi/history') return false;
     // Sharing is never enabled for any URL carrying an account identifier or
     // secrets, even if a future public endpoint adds optional auth parameters.

@@ -45,8 +45,11 @@ class Locks {
 test('only public, symbol-specific support URLs may be shared between Desktop panes',()=>{
   assert.equal(isShareableDesktopChartURL(url),true);
   assert.equal(isShareableDesktopChartURL(trades),true);
+  assert.equal(isShareableDesktopChartURL('/api/market/av1m/coin?exchange=binance&market=futures&symbol=BTCUSDT'),true);
   for(const endpoint of [
     '/api/klines?symbol=BTCUSDT',
+    '/api/market/av1m/top?symbol=BTCUSDT',
+    '/api/market/av1m/coin?symbol=BTCUSDT&uid=abc',
     '/api/screener/scan?symbol=BTCUSDT',
     '/api/user/profile?symbol=BTCUSDT',
     '/api/chart/trades24h?symbol=BTCUSDT&token=secret',
