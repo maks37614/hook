@@ -96,13 +96,15 @@ test('Terminal scroll checks all cards with one RAF, one root rect and shared li
     pending.clear();
     assert.equal(rootRects,2);
     assert.equal(cardRects,48);
-    assert.equal(changed,48);
+    // The shared scheduler publishes ONLY actual visibility crossings;
+    // unchanged cards must not receive a second React update on scrolling.
+    assert.equal(changed,45);
     assert.equal(visibility.get(0),false,'scrolled-away chart is unmounted');
     assert.equal(visibility.get(20),true,'newly visible chart mounts');
     documentMock.visibilityState='hidden';
     documentEvents.emit('visibilitychange');
     assert.equal(pending.size,0,'no orphaned visibility frames in background tabs');
-    assert.equal(changed,72,'every chart is suspended when the tab is hidden');
+    assert.equal(changed,58,'only the 13 active charts need a suspension update');
     assert.ok([...visibility.values()].every(v=>!v));
   } finally {
     for(const cleanup of cleanups)cleanup();
