@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive, cascadeStrokeAppearance } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -46,7 +46,11 @@ test('the cascade detector keeps original pivot timestamps and price values',()=
   assert.ok(shelf.to.t> shelf.from.t,'source tier keeps original bounded time span');
   assert.equal(shelf.to.p,shelf.from.p,'tier stays at the pivot price');
   assert.equal(scalperRenderedLineEndX(setup.kind,shelf,180,420),420);
-  assert.ok(setup.lines.some(line=>line.role==='upper'));
+  const outer = setup.lines.find(line=>line.role==='upper');
+  assert.ok(outer);
+  assert.equal(outer.from.t, rows[57].t, 'outer tier must originate from the real boundary HIGH wick');
+  assert.equal(outer.from.p, rows[57].h, 'outer line must not begin at a different pivot price');
+  assert.equal(cascadeLineIsActive(outer,setup.touches,rows,'upper'),true);
 });
 
 test('Scalper draw uses the plot boundary, without changing stroke, labels or candle renderer',()=>{
@@ -122,7 +126,7 @@ test('horizontal Scalper strokes align their center without moving diagonal wick
   assert.ok(from >= 0 && to > from);
   assert.match(engine, /scalperRasterStrokeWidth\(normalizeScalperLineWidth\(scalperLineWidth\), scaleX, scaleY\)/);
   assert.match(layer, /const horizontalLine = line\.from\.p === line\.to\.p/);
-  assert.match(layer, /const y0 = horizontalLine \? scalperPixelCenteredHorizontalY\(rawY0, scalperStrokeWidth, scaleY\) : rawY0/);
+  assert.match(layer, /const y0 = horizontalLine \? scalperPixelCenteredHorizontalY\(rawY0, drawStrokeWidth, scaleY\) : rawY0/);
   assert.match(layer, /const y1 = horizontalLine \? y0 : rawY1/);
   assert.match(layer, /q\.lineWidth = scalperStrokeWidth/);
   assert.match(layer, /q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
@@ -150,22 +154,31 @@ test('cascade tiers disappear after the first later wick reaches the price', () 
     'even a gap across the tier cannot leave a stale ray');
 });
 
-test('outer cascade boundary activates at its last matching wick pivot, not its first', () => {
+test('cascade outer boundary begins on its actual wick and never resurrects after a retest', () => {
   const base = 1_700_000_000_000;
-  const boundary:ScalperLine={role:'upper',
-    from:{t:base,p:101.3},to:{t:base+4*60_000,p:101.3}};
-  const touches=[{t:base,p:101.1},{t:base+60_000,p:101.2},{t:base+2*60_000,p:101.3}];
-  const candle=(i:number,h:number):ScalperCandle=>({
+  const candle=(i:number,h:number):ScalperCandle => ({
     t:base+i*60_000,o:100,c:100,h,l:99.5,
   });
+  const touches=[{t:base,p:101.1},{t:base+60_000,p:101.2},{t:base+2*60_000,p:101.3}];
+  const badHistoricalAnchor:ScalperLine = {role:'upper',
+    from:{t:base,p:101.3},to:{t:base+4*60_000,p:101.3}};
+  const outer:ScalperLine={...badHistoricalAnchor,
+    from:{t:base+2*60_000,p:101.3}};
   const initial=[candle(0,101.1),candle(1,101.2),candle(2,101.3),candle(3,100.8)];
-  assert.equal(cascadeLineIsActive(boundary,touches,initial,'upper'),true,
-    'the defining confirmed pivot is not falsely counted as a post-creation crossing');
-  assert.equal(cascadeLineIsActive(boundary,touches,[...initial,candle(4,101.31)],'upper'),false);
+  assert.equal(cascadeLineIsActive(badHistoricalAnchor,touches,initial,'upper'),false,
+    'line cannot start at a candle that never traded the level');
+  assert.equal(cascadeLineIsActive(outer,touches,initial,'upper'),true,
+    'the real defining wick does not invalidate its own level');
+  const retested=[...initial,candle(4,101.3)];
+  assert.equal(cascadeLineIsActive(outer,touches,retested,'upper'),false,
+    'a later wick touch removes the level even if it became a new pivot');
+  assert.equal(cascadeLineIsActive(outer,
+    [...touches,{t:base+4*60_000,p:101.3}],retested,'upper'),false,
+    'more recent matching touches must never shift activation to resurrect a swept level');
   const inner:ScalperLine={role:'cascade-step',
     from:{t:base,p:101.1},to:{t:base+60_000,p:101.1}};
   assert.equal(cascadeLineIsActive(inner,touches,initial,'upper'),false,
-    'an old inner tier crossed by later pivots must not be projected');
+    'earlier tier already crossed by subsequent pivots stays invisible');
 });
 
 test('surviving cascade rays start at historical wick pivots and reach the scale', () => {
@@ -243,4 +256,25 @@ test('lower ascending scalper diagonal vanishes after a later wick crosses it',(
   assert.match(engine,/const activeDiagonalLines = useMemo\(/);
   assert.match(engine,/scalperDiagonalIsActive\(line, setup\.touches, candles, side, setup\.kind === 'trend'\)/);
   assert.match(engine,/!activeDiagonalLines\.has\(line\)\) continue/);
+});
+
+test('cascade is 0.1 CSS px thinner without modifying other Scalper lines',()=>{
+  for(const base of [0.2,0.4,0.5,0.8,1.2]){
+    for(const dpr of [1,2,3,4]){
+      const appearance=cascadeStrokeAppearance(base,dpr,dpr);
+      assert.ok(Math.abs(appearance.cssWidth - (base - 0.1)) < 1e-9);
+      assert.ok(appearance.width >= 1/dpr);
+      assert.ok(appearance.coverage > 0 && appearance.coverage <= 1);
+    }
+  }
+  assert.equal(cascadeStrokeAppearance(0.4,4,4).cssWidth,0.3);
+  assert.equal(cascadeStrokeAppearance(0.4,4,4).width,0.25);
+  assert.ok(cascadeStrokeAppearance(0.4,2,2).coverage < 1,
+    'visible thinning when DPR quantizes 0.3 and 0.4 to the same physical pixel');
+  const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
+  assert.match(engine,/const cascadeStroke = cascadeStrokeAppearance\(scalperLineWidth, scaleX, scaleY\)/);
+  assert.match(engine,/setup.kind === 'cascade' \? cascadeStroke.width : scalperStrokeWidth/);
+  assert.match(engine,/q.lineWidth = scalperStrokeWidth/);
+  assert.match(engine,/if \(setup.kind === 'cascade'\) q.lineWidth = cascadeStroke.width/);
+  assert.match(engine,/setup.kind === 'cascade' \? cascadeStroke.coverage : 1/);
 });
