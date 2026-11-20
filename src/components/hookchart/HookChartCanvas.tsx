@@ -38,6 +38,7 @@ import { GUEST_CANVAS_DPR_KEY, HOOKCHART_CANVAS_DPR_EVENT, normalizeMaxCanvasDpr
 import { TERMINAL_INITIAL_VIEW_APPLY_EVENT, type TerminalInitialViewApplyDetail } from '../terminal/terminalInitialViewApply';
 import { evaluateStrategy, strategyPreset, strategyPreferencePatch } from './strategyEngine';
 import { createScalperAnalyzer } from './scalperMode';
+import { visibleScalperLines } from './scalperLineProjection';
 import { MarketRecurrenceTool } from './MarketRecurrenceTool';
 import { createMarketRecurrenceMarks, type MarketRecurrenceMark, type RecurrenceReport } from './marketRecurrence';
 import { chartMarketStatistics, memoizedAutoLevels, formatUsd, normalizeDensityDistance, type LevelTf } from './marketAnalytics';
@@ -1542,7 +1543,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     if(runtimeSettings.autoPOC)overlays.push('poc');
     if(runtimeSettings.autoChannel)overlays.push('channel');
     if(runtimeSettings.autoStops)overlays.push('stops');
-    const savedScalperLines = scalperResult?.setups.flatMap(setup => setup.lines) || [];
+    // Match the live Canvas visibility: expired/crossed lines are never
+    // serialized into an archive after the screenshot has already hidden them.
+    const savedScalperLines = visibleScalperLines(scalperResult, candles);
     const visibleOverlayKeys = new Set(archiveVisibleOverlayKeys(overlayScene));
     const actuallyVisible = overlays.filter(key => visibleOverlayKeys.has(key));
     return buildArchivedChartSnapshot({
