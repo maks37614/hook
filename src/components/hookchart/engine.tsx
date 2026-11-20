@@ -11,6 +11,7 @@ import { drawTouchMagnifier, magnifierZoomFromPriceDrag, TOUCH_MAGNIFIER_DEFAULT
 import { createChartFrameScheduler } from './frameScheduler';
 import { sameTimeAxisInputs } from './timeAxisMemo';
 import { createAutoPocZoneCache } from './autoPoc';
+import { closestActiveDensityPrices, rankAutoLevelsForPrice } from './chartPanPrecompute';
 import { createVolumeProfileHistogramCache } from './volumeProfileHistogram';
 import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, paintChartCrosshair, paintChartRuler } from './chartCursor';
@@ -703,6 +704,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
 
    return out
  },[candles,tf,roundness,calculateDayOverlays,calculateSupportResistance,autoLocalHL,autoRoundLevels,autoStops,autoChannel,channelModel,archivedOverlayScene]);
+ // Precompute market-dependent orderings once per change in depth/close/levels,
+ // not on each viewport frame while a user moves the chart.
+ const lastCloseForPan=candles.at(-1)?.c;
+ const cachedNearDensityPrices=useMemo(
+   ()=>lastCloseForPan===undefined?[]:closestActiveDensityPrices(densities,lastCloseForPan),
+   [densities,lastCloseForPan],
+ );
+ // The legacy midpoint fallback remains for charts whose last price is zero.
+ const rankedAutoLevelsForPan=useMemo(
+   ()=>lastCloseForPan?rankAutoLevelsForPrice(autoLevels,lastCloseForPan):null,
+   [autoLevels,lastCloseForPan],
+ );
  const AX=HOOKCHART_PRICE_SCALE_WIDTH,TX=0;
  const geometry=()=>{
   const c=ref.current;if(!c||!candles.length)return null;
@@ -723,22 +736,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   let lo=readableExtrema?.low??Infinity,hi=readableExtrema?.high??-Infinity;
   if(!readableExtrema)for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}
   if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
-  if(!candleAutoScale&&vp.autoY&&candles.length&&densities.length){
-    // Geometry runs on every pan/zoom frame. The old filter + full sort copied
-    // and sorted every active depth level merely to expand Y to the four closest.
-    // Keep the same distance, stable tie order and 3% gate in one bounded pass.
-    const cp=candles.at(-1)!.c,limit=Math.max(cp,1e-12)*.03;
-    const nearest:{price:number;distance:number}[]=[];
-    for(let i=0;i<densities.length;i++){
-      const d=densities[i];if(!d.active)continue;
-      const distance=Math.abs(d.p-cp);if(distance>limit)continue;
-      let at=nearest.findIndex(v=>v.distance>distance);
-      if(at<0)at=nearest.length;
-      if(at>=4)continue;
-      nearest.splice(at,0,{price:d.p,distance});
-      if(nearest.length>4)nearest.pop();
-    }
-    for(const d of nearest){if(d.price<lo)lo=d.price;if(d.price>hi)hi=d.price}
+  if(!candleAutoScale&&vp.autoY&&candles.length&&cachedNearDensityPrices.length){
+    // Exact same nearest four levels / 3% gate; only the selection is cached.
+    for(const price of cachedNearDensityPrices){if(price<lo)lo=price;if(price>hi)hi=price}
   }
   if(!candleAutoScale&&(terminalMode||expandPriceScaleToMarkers)&&vp.autoY){for(const marker of markers){if(Number.isFinite(marker.price)&&marker.price>0){lo=Math.min(lo,marker.price);hi=Math.max(hi,marker.price)}}}
   if(candleAutoScale){
@@ -1118,9 +1118,11 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   const chartRank=tfRank[tf]||1;
   const allowedLevel=(l:AutoLevel)=>chartRank===3?l.tf==='1d':chartRank===2?(l.tf==='4h'||l.tf==='1d'):true;
   const currentPrice=candles.at(-1)?.c||((g.hi+g.lo)/2);
-  const rawLevels=autoLevels.filter(l=>allowedLevel(l)&&l.p>=g.lo&&l.p<=g.hi);
+  // Sorting every frame produced the same order until price or levels change.
+  // A price-range filter preserves stable rank among visible levels.
+  const rawLevels=(rankedAutoLevelsForPan||autoLevels).filter(l=>allowedLevel(l)&&l.p>=g.lo&&l.p<=g.hi);
   const quota:{[k:string]:number}=chartRank===3?{'1d':6}:chartRank===2?{'4h':4,'1d':4}:{'5m':3,'15m':3,'30m':3,'1h':3,'4h':3,'1d':3};
-  const rankedLevels=[...rawLevels].sort((a,b)=>{
+  const rankedLevels=rankedAutoLevelsForPan?rawLevels:[...rawLevels].sort((a,b)=>{
     const quality=(l:AutoLevel)=>l.strength*.72+tfPriority(l.tf)*6+(l.broken?-18:0)+Math.max(0,12-Math.abs(l.p-currentPrice)/Math.max(currentPrice,1e-12)*220);
     return quality(b)-quality(a)
   });
