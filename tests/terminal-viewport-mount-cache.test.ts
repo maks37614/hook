@@ -94,7 +94,8 @@ test('Terminal warm cache never replaces the fresh history fetch or changes DPR'
   assert.match(chart, /saveTerminalChartHistory\(/);
   assert.match(chart, /async function loadFullHistory\(\)/);
   assert.match(chart, /await fetchSharedHistoricalKlines\(/);
-  assert.match(widget, /terminalChartMountQueue\.enqueue\(\(\) => setIsMountReady\(true\)\)/);
+  assert.match(widget, /terminalChartMountQueue\.enqueue\(\(\) => \{/);
+  assert.match(widget, /isTerminalWidgetNearViewport\(node\.getBoundingClientRect\(\), bounds, screen\)/);
   assert.match(widget, /const shouldLoadWidgets = !isSuspended && isNearViewport && isMountReady/);
   assert.match(page, /terminalActiveCharts=\{maximizedBlockId \? 1 : visibleChartCount\}/);
   assert.match(page, /visibleChartIdsRef\.current\.has\(block\.id\)/);
