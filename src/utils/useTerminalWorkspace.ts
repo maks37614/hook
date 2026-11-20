@@ -234,11 +234,12 @@ export function useTerminalWorkspace() {
           serverVersion.current = newest.terminalSettings?.version ?? null;
           syncedWorkspaceRef.current = cloud;
           const merged = rebaseTerminalWorkspace(base, workspaceRef.current, cloud);
-          if (JSON.stringify(merged) === JSON.stringify(cloud)) {
+          const matchesCloud = JSON.stringify(merged) === JSON.stringify(cloud);
+          if (matchesCloud) {
             savedRevision.current = revision.current;
             hydrationWorkspaceRef.current = cloud;
           }
-          setWorkspace(merged);
+          setWorkspace(matchesCloud ? cloud : merged);
           if (mounted.current) setSyncError(false);
           return;
         } catch {
@@ -345,7 +346,7 @@ export function useTerminalWorkspace() {
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'h00k-terminal-local-backup.json';
+    anchor.download = 'h00k-terminal-workspace-backup.json';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
