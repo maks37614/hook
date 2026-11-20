@@ -61,7 +61,10 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
   const averageVolumePreset = preset === 'av' || preset === 'av_1m';
   const result = coins.filter(coin => {
     const key = coinMarketKey(coin);
-    if (seen.has(key) || !Number.isFinite(coin.price) || coin.price <= 0 || !Number.isFinite(coin.change24h)) return false;
+    // Volume rankings need a valid turnover and tradable quote, not a 24h
+    // percentage change. Some newly listed pairs do not have change24h yet.
+    if (seen.has(key) || !Number.isFinite(coin.price) || coin.price <= 0
+      || (!averageVolumePreset && !Number.isFinite(coin.change24h))) return false;
     if (selection.exchange !== 'all' && selection.exchange !== coin.exchange) return false;
     if (selection.marketType !== 'all' && selection.marketType !== coin.marketType) return false;
     if (averageVolumePreset && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0 || (preset === 'av_1m' && coin.volumeUsd === 0))) return false;
