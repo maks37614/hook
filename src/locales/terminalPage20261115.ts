@@ -195,6 +195,24 @@ export const terminalPagePhraseRows = [
     "Monety z bieżącej listy formacji lub wczesnego W/M, z uwzględnieniem filtrów i kolejności"
   ],
   [
+    "Завантаження монет зі сторінки Формацій…",
+    "Loading coins from the Formations page…",
+    "Загрузка монет со страницы Формаций…",
+    "Wczytywanie monet ze strony Formacje…"
+  ],
+  [
+    "Сканер формацій зайнятий. Спробуйте знову пізніше.",
+    "The formation scanner is busy. Try again later.",
+    "Сканер формаций занят. Попробуйте позже.",
+    "Skaner formacji jest zajęty. Spróbuj ponownie później."
+  ],
+  [
+    "Не вдалося завантажити формації. Спробуйте знову.",
+    "Could not load formations. Try again.",
+    "Не удалось загрузить формации. Попробуйте снова.",
+    "Nie udało się wczytać formacji. Spróbuj ponownie."
+  ],
+  [
     "У списку Формацій немає монет за поточними фільтрами.",
     "No coins match the current Formations filters.",
     "По текущим фильтрам в списке Формаций нет монет.",
