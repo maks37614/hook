@@ -335,3 +335,77 @@ test('browser-side two books in any group use per-panel writes even with same co
     assert.equal(calls.slice(before).filter(call=>call.path==='/api/change-ticker').length,0);
   }
 });
+
+test('website-to-local-terminal switches both Binance and Bybit books without changing either connection',async(t)=>{
+  mockClipboard(t);
+  const calls: {url:string; method:string; body?:unknown}[]=[];
+  let group=1;
+  const unboundChart='dddddddd-dddd-dddd-dddd-dddddddddddd';
+  mockApi(t,(url,options)=>{
+    calls.push({url:url.pathname,method:options.method??'GET',body:options.body});
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json({windows:[{tabs:[{documents:[
+      {externalId:FUTURES_PANEL,kind:'orderBook',linkNumber:group,connectionId:11,
+        exchange:'binance',marketType:'futures'},
+      {externalId:SPOT_PANEL,kind:'orderBook',linkNumber:group,connectionId:22,
+        exchange:'bybit',marketType:'spot'},
+      {externalId:unboundChart,kind:'chart',linkNumber:group,connectionId:null},
+      {externalId:'cccccccc-cccc-cccc-cccc-cccccccccccc',kind:'orderBook',
+        linkNumber:499,connectionId:33},
+    ]}]}],standaloneCharts:[]});
+    if(url.pathname.includes('/api/ui/documents/'))return json({status:'ok'});
+    throw Error('Unexpected route '+url.pathname);
+  });
+  for(const requestedGroup of [1,2,17,500]) {
+    group=requestedGroup;
+    for(const exchange of ['binance','bybit'] as const) {
+      for(const marketType of ['spot','futures'] as const) {
+        const before=calls.length;
+        const result=await sendTickerToMetaScalp('BTCUSDT',exchange,marketType,
+          {binding:String(group).padStart(3,'0')});
+        assert.equal(result.success,true,exchange+' '+marketType+' '+group);
+        const delta=calls.slice(before);
+        const writes=delta.filter(x=>x.method==='PUT');
+        assert.deepEqual(writes.map(x=>x.url).sort(),[FUTURES_PANEL,SPOT_PANEL].map(
+          id=>'/api/ui/documents/'+id+'/ticker').sort());
+        for(const write of writes)assert.deepEqual(JSON.parse(String(write.body)),{ticker:'BTCUSDT'});
+        assert.equal(delta.some(x=>x.url==='/api/change-ticker'),false,
+          'multi-book linking must not force site exchange or market on every book');
+      }
+    }
+  }
+});
+
+test('website single order book keeps chosen exchange and market even if chart is empty',async(t)=>{
+  mockClipboard(t);
+  const calls: {url:string;method:string;body?:unknown}[]=[];
+  let exchange:'binance'|'bybit'='binance';
+  let marketType:'spot'|'futures'='spot';
+  mockApi(t,(url,options)=>{
+    calls.push({url:url.pathname,method:options.method??'GET',body:options.body});
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json({windows:[{tabs:[{documents:[
+      {externalId:FUTURES_PANEL,kind:'orderBook',linkNumber:8,connectionId:11},
+      {externalId:SPOT_PANEL,kind:'chart',linkNumber:8,connectionId:null},
+    ]}]}],standaloneCharts:[]});
+    if(url.pathname==='/api/change-ticker')return json({status:'ok'});
+    throw Error('Single-book site selection should use the existing group command');
+  });
+  for(const selectedExchange of ['binance','bybit'] as const) {
+    for(const selectedMarket of ['spot','futures'] as const) {
+      exchange=selectedExchange;
+      marketType=selectedMarket;
+      const before=calls.length;
+      const result=await sendTickerToMetaScalp('SOLUSDT',exchange,marketType,{binding:'008'});
+      assert.equal(result.success,true);
+      const delta=calls.slice(before);
+      const posts=delta.filter(x=>x.method==='POST');
+      assert.equal(posts.length,1);
+      assert.deepEqual(JSON.parse(String(posts[0].body)),{
+        tickerPattern:exchange.toUpperCase()+':SOLUSDT'+(marketType==='futures'?'.p':''),
+        binding:'008',
+      });
+      assert.equal(delta.filter(x=>x.method==='PUT').length,0);
+    }
+  }
+});

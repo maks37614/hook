@@ -54,11 +54,13 @@ and Tiger local integrations are kept untouched.
      exchange and market (`BINANCE:BTCUSDT.p` for futures,
      `BINANCE:BTCUSDT` for spot).
    - **Two or more order books**: read `GET /api/ui/state` and switch
-     each linked order book (and any linked charts) with
+     each linked order book (and connected charts) with
      `PUT /api/ui/documents/{externalId}/ticker`, providing only the
-     symbol. The existing connection of every panel — Spot/Futures and
-     its exchange — is preserved. This applies even when two panels
-     report the same connection ID.
+     symbol. Each book keeps its existing connection: **Binance stays
+     Binance, Bybit stays Bybit**, and Spot/Futures remains unchanged
+     regardless of which exchange was selected on h00k.top.
+     Unconnected/empty charts are ignored, so they cannot block the books.
+     This also applies when two panels report the same connection ID.
    The same rule also works for a normal h00k.top page opened directly
    on the Windows computer. MetaScalp versions without the UI inventory
    endpoint fall back to original named-group behavior.
@@ -67,6 +69,9 @@ These changes affect **ticker selection only**, not orders, positions,
 trading or terminal link settings. If the instrument does not actually
 exist in Spot on the configured exchange, the Spot book cannot display it.
 The per-panel API confirms accepting the command, not the rendered result.
+If the requested ticker is listed on Binance but not on Bybit, the Bybit
+book may stay unchanged (likewise for Spot vs Futures); h00k does not
+invent a different market symbol or change exchange connections.
 
 The tablet web browser cannot safely access the Windows process's localhost.
 For browser compatibility this design uses h00k.top HTTPS as a lightweight

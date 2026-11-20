@@ -63,6 +63,11 @@ function linkedTickerDocuments(state, binding) {
   const found = [];
   const ids = new Set();
   for (const doc of matched) {
+    // A blank chart can share this binding without having an exchange yet.
+    // Do not let it block two active order books (e.g. Binance and Bybit).
+    // An unbound order book is still an error: never invent a connection.
+    if (doc.kind === 'chart' && (doc.connectionId === null || doc.connectionId === undefined))
+      continue;
     if (!DOCUMENT_GUID.test(doc.externalId || '') || !Number.isSafeInteger(doc.connectionId)
       || doc.connectionId <= 0) return { error: 'METASCALP_UNBOUND_PANEL' };
     const id = doc.externalId.toLowerCase();
@@ -122,8 +127,9 @@ class MetaScalpTickerSender {
       // existing market/connection, even when the connection IDs coincide.
       // Charts alone never turn a single-book group into mixed-market mode.
       if (linked?.orderBookCount >= 2) {
-        // Only per-document ticker writes: each panel inherits its existing
-        // connection (spot/futures and exchange), so no market gets converted.
+        // Each request includes only {ticker}, NEVER the website's exchange
+        // or a replacement connectionId. MetaScalp inherits the current
+        // Binance/Bybit and Spot/Futures connection of that exact panel.
         const results = await Promise.all(docs.map(async doc => {
           try {
             const response = await jsonFetch(this.fetch,

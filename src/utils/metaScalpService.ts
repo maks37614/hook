@@ -137,6 +137,11 @@ export function linkedMetaScalpPanels(state: unknown, binding: string):
   const found: LinkedMetaScalpPanel[] = [];
   const seen = new Set<string>();
   for (const doc of candidates) {
+    // An empty chart can have a group number but no exchange connection;
+    // ignore it rather than blocking working Binance/Bybit order books.
+    // Never guess a missing connection for an order book.
+    if (doc.kind === 'chart' && (doc.connectionId === null || doc.connectionId === undefined))
+      continue;
     if (typeof doc.externalId !== 'string' || !META_DOCUMENT_GUID.test(doc.externalId)
       || !Number.isSafeInteger(doc.connectionId) || doc.connectionId <= 0)
       return { documents: [], orderBookCount: 0, error: 'UNBOUND_PANEL' };
@@ -178,6 +183,8 @@ async function sendMixedMetaScalpGroup(port: number, binding: string, symbol: st
       const response = await fetch(base + '/api/ui/documents/' + doc.externalId + '/ticker', {
         method: 'PUT', mode: 'cors', signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
+        // No exchange or connectionId override: every panel keeps its
+        // original Binance/Bybit and Spot/Futures connection in MetaScalp.
         body: JSON.stringify({ ticker: symbol.trim().toUpperCase() }),
       });
       const data = await response.json().catch(() => null);
