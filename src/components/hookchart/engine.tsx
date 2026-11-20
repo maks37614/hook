@@ -427,6 +427,41 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    viewportAdjustedByUserRef.current=true;
    setVp(update);
  };
+ // A high-rate pointer stream can deliver several drag events before one
+ // display frame. Only the FINAL absolute gesture position is needed: it is
+ // anchored to the pointer-down viewport, not the preceding pointer event.
+ // Keep wheel/button zoom immediate and preserve the full-fidelity Canvas DPR.
+ const pendingTerminalPointerGesture=useRef<{update:React.SetStateAction<Viewport>;kind:ViewportGesture}|null>(null);
+ const terminalPointerGestureFrame=useRef<number|null>(null);
+ const flushTerminalPointerGesture=()=>{
+   if(terminalPointerGestureFrame.current!==null){
+     window.cancelAnimationFrame(terminalPointerGestureFrame.current);
+     terminalPointerGestureFrame.current=null;
+   }
+   const pending=pendingTerminalPointerGesture.current;
+   pendingTerminalPointerGesture.current=null;
+   if(pending)setGestureVp(pending.update,pending.kind);
+ };
+ const schedulePointerGestureVp=(update:React.SetStateAction<Viewport>,kind:ViewportGesture)=>{
+   if(!terminalMode){setGestureVp(update,kind);return}
+   // Preserve manual price-scale priority even before React commits the frame.
+   if(kind==='price')manualPriceAxisOverride.current=true;
+   viewportAdjustedByUserRef.current=true;
+   pendingTerminalPointerGesture.current={update,kind};
+   if(terminalPointerGestureFrame.current!==null)return;
+   terminalPointerGestureFrame.current=window.requestAnimationFrame(()=>{
+     terminalPointerGestureFrame.current=null;
+     const pending=pendingTerminalPointerGesture.current;
+     pendingTerminalPointerGesture.current=null;
+     if(pending)setGestureVp(pending.update,pending.kind);
+   });
+ };
+ useEffect(()=>()=>{ // A removed or replaced chart must never apply an old gesture.
+   if(terminalPointerGestureFrame.current!==null)
+     window.cancelAnimationFrame(terminalPointerGestureFrame.current);
+   terminalPointerGestureFrame.current=null;
+   pendingTerminalPointerGesture.current=null;
+ },[fitAllScopeKey]);
  useEffect(()=>{
    const kind=gestureKindRef.current;
    gestureKindRef.current=null;
@@ -1886,7 +1921,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      setDrawings(list=>list.map(item=>item.id!==d.drawingId?item:{...item,pts:nextPoints}));
      return;
    }
-   const gestureUpdate=(update:React.SetStateAction<Viewport>)=>setGestureVp(update,d.kind==='pinch'||d.kind==='time'?'zoom':d.kind==='price'?'price':'pan');
+   const gestureUpdate=(update:React.SetStateAction<Viewport>)=>schedulePointerGestureVp(update,d.kind==='pinch'||d.kind==='time'?'zoom':d.kind==='price'?'price':'pan');
    if(d.kind==='editDrawingPoint'){
      if(Math.hypot(z.x-d.x,z.y-d.y)<2&&!d.moved)return;
      d.moved=true;suppressDrawingClick.current=true;
@@ -1952,6 +1987,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    }
  };
  const handlePointerUp=(e:React.PointerEvent<HTMLElement>)=>{
+   // Commit the final pointer position; the last event must not be discarded.
+   flushTerminalPointerGesture();
    const wasLensPointer=magnifierPointer.current===e.pointerId;
    const wasPriceGesture=magnifierPriceDrag.current?.id===e.pointerId;
    if(wasLensPointer){
@@ -1992,6 +2029,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  };
  const focusChart=()=>{const canvas=ref.current;if(canvas&&document.activeElement!==canvas)canvas.focus({preventScroll:true})};
  const handleWheel=(e:WheelEvent)=>{
+   flushTerminalPointerGesture();
    terminalNavigation.current=true;
    e.preventDefault();
    e.stopPropagation();
