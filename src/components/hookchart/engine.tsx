@@ -29,7 +29,7 @@ import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
 import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLineStyle } from './scalperMode';
-import { scalperRenderedLineEndX } from './scalperLineProjection';
+import { scalperCascadeLineWidth, scalperRenderedLineEndX } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -1315,7 +1315,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
         q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
-        q.lineWidth = line.role === 'cascade-step' ? 0.7
+        q.lineWidth = setup.kind === 'cascade' ? scalperCascadeLineWidth(line, setup.status)
           : setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
         q.strokeStyle = color;
         // Project horizontal cascade tiers and the breakout boundary all
