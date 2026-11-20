@@ -171,6 +171,12 @@ export const terminalPagePhraseRows = [
     "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
   ],
   [
+    "10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.",
+    "Top 10 coins by average trading turnover per minute (USDT): 24h turnover / 1440.",
+    "Топ-10 монет по среднему объёму торгов в минуту (USDT): оборот за 24 ч / 1440.",
+    "10 monet o najwyższym średnim obrocie na minutę (USDT): obrót z 24 h / 1440."
+  ],
+  [
     "Топ ріст 24г",
     "Top gainers (24h)",
     "Лидеры роста за 24 ч",
