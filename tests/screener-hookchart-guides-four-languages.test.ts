@@ -46,8 +46,8 @@ test('Screener tour selectors are grounded in the real Header and Screener, incl
   const buttonStart = header.indexOf('data-screener-guide="fullscreen"');
   const helpStart = header.indexOf('id="screener-help-btn"');
   const logoStart = header.indexOf('src="/h00k-robot-logo.svg"');
-  assert.ok(helpStart > 0 && helpStart < logoStart && logoStart < buttonStart,
-    'help must appear before the logo, with fullscreen on the right');
+  assert.ok(logoStart > 0 && logoStart < helpStart && helpStart < buttonStart,
+    'help must appear to the right of the centered logo, before fullscreen');
   assert.match(header, /\{screenerGuideOpen && \(/);
   assert.match(header, /LazyScreenerGuide = React\.lazy/);
   assert.match(header, /setScreenerGuideOpen\(true\)/);
