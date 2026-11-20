@@ -56,7 +56,10 @@ export function createSharedChartJsonFetcher(deadlineMs = SHARED_CHART_REQUEST_D
     // response was cached minutes before 00:00, 08:00 or 16:00 UTC.
     const key = category === 'funding-history'
       ? url + ':' + Math.floor(Date.now() / (5 * 60_000))
-      : url;
+      : category === 'minute-volume'
+        // Turn over cache at the same 3-second safety boundary as the server.
+        ? url + ':minute:' + Math.floor((Date.now() - 3_000) / 60_000)
+        : url;
     return cache.load(key, () => {
       // Desktop uses one persistent Chromium session for every native panel.
       // Share only explicitly allowlisted, public reference JSON. Live klines,
