@@ -60,6 +60,11 @@ export function parseDesktopTickerCommand(input: unknown): Omit<DesktopTickerCom
   };
 }
 
+/** An account can have a different cursor after a VPS restart or session change. */
+export function desktopPollCursor(afterRaw: string, requestEpoch: string, slotEpoch: string): number {
+  return requestEpoch === slotEpoch && /^\d{1,12}$/.test(afterRaw) ? Number(afterRaw) : 0;
+}
+
 export function installDesktopLinkRelay(app: Express) {
   // Authentication always comes from the HttpOnly PostgreSQL session cookie.
   // POST also requires the site's normal same-origin + CSRF guard.
@@ -83,8 +88,7 @@ export function installDesktopLinkRelay(app: Express) {
     const requestEpoch = typeof req.query.epoch === 'string' ? req.query.epoch : '';
     // Ignore a previous VPS instance's cursor on the *first* request after
     // restart, rather than waiting 20s and allowing a fresh command to expire.
-    const after = requestEpoch === slot.epoch && /^\d{1,12}$/.test(afterRaw)
-      ? Number(afterRaw) : 0;
+    const after = desktopPollCursor(afterRaw, requestEpoch, slot.epoch);
     res.set({ 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
     if (slot.latest && slot.latest.seq > after && now - slot.latest.createdAt <= FRESH_MS) {
       return void res.json({ command: slot.latest });
