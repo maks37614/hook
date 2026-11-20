@@ -960,7 +960,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     interactionDrawRef.current();
     return;
   }
- const mouse=mouseRef.current,dpr=effectiveCanvasDpr(window.devicePixelRatio,maxCanvasDpr),w=Math.max(1,g.r.width),h=Math.max(1,g.r.height),pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(c.width!==pw||c.height!==ph){c.width=pw;c.height=ph}const q=c.getContext('2d',{alpha:false})!;const scaleX=pw/w,scaleY=ph/h;q.setTransform(scaleX,0,0,scaleY,0,0);q.imageSmoothingEnabled=false;q.globalCompositeOperation='source-over';q.lineCap='butt';q.lineJoin='miter';const strokeX=(v:number)=>(Math.round(v*scaleX)+.5)/scaleX,strokeY=(v:number)=>(Math.round(v*scaleY)+.5)/scaleY,hairX=1/scaleX,hairY=1/scaleY,hair=Math.max(hairX,hairY);q.clearRect(0,0,w,h);q.fillStyle=backgroundColor;q.fillRect(0,0,w,h);
+ const mouse=mouseRef.current,dpr=effectiveCanvasDpr(window.devicePixelRatio,maxCanvasDpr),w=Math.max(1,g.r.width),h=Math.max(1,g.r.height),pw=Math.max(1,Math.round(w*dpr)),ph=Math.max(1,Math.round(h*dpr));if(c.width!==pw||c.height!==ph){c.width=pw;c.height=ph}const q=c.getContext('2d',{alpha:false})!;const scaleX=pw/w,scaleY=ph/h;q.setTransform(scaleX,0,0,scaleY,0,0);q.imageSmoothingEnabled=false;q.globalCompositeOperation='source-over';q.lineCap='butt';q.lineJoin='miter';const strokeX=(v:number)=>(Math.round(v*scaleX)+.5)/scaleX,strokeY=(v:number)=>(Math.round(v*scaleY)+.5)/scaleY,hairX=1/scaleX,hairY=1/scaleY,hair=Math.max(hairX,hairY);// Most charts use a solid hex background. Painting an opaque full-canvas
+  // rect already overwrites every pixel: avoid an extra DPR-scaled clear pass.
+  // Preserve the old clear-then-paint behavior for potentially translucent CSS colors.
+  q.globalAlpha=1;
+  if(!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(backgroundColor))q.clearRect(0,0,w,h);
+  q.fillStyle=backgroundColor;q.fillRect(0,0,w,h);
   // Clip all candles, drawings, volume and overlays to the region left of the price scale.
   q.save();q.beginPath();q.rect(0,0,g.plotW,g.plotH);q.clip();
   // TradingView-style adaptive price scale: tick spacing follows the current Y range.
