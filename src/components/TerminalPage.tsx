@@ -155,6 +155,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   // Coalesce rapid enter/leave callbacks into one parent update per frame.
   const visibleChartIdsRef = useRef<Set<string>>(new Set());
   const [visibleChartCount, setVisibleChartCount] = useState(1);
+  // Re-render a newly visible tile even if it replaces another tile and the
+  // total count stays unchanged. Hidden tiles receive no changing quote prop.
+  const [, forceVisibleChartRevision] = useState(0);
   const visibleCountFrameRef = useRef<number | null>(null);
   const handleTerminalChartVisibility = useCallback((id: string, visible: boolean) => {
     const set = visibleChartIdsRef.current;
@@ -168,6 +171,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         const actual = Math.max(1, visibleChartIdsRef.current.size);
         return count === actual ? count : actual;
       });
+      forceVisibleChartRevision(revision => revision + 1);
     });
   }, []);
   useEffect(() => () => {
@@ -1821,8 +1825,12 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
               <>
               <div className={`terminal-workspace-grid grid ${gridColsClass} gap-2 sm:gap-3`} style={terminalHeightVariables}>
                 {visibleWorkspaceBlocks.map((block, index) => {
-                  const coinData = getCoinForBlock(block);
                   const isMaximized = maximizedBlockId === block.id;
+                  // On a market-catalog refresh, hidden placeholders must not
+                  // receive changing quote objects and re-render unnecessarily.
+                  // The shared viewport callback wakes each tile before use.
+                  const coinData = isMaximized || visibleChartIdsRef.current.has(block.id)
+                    ? getCoinForBlock(block) : undefined;
 
                   return (
                     <TerminalGridItem
