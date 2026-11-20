@@ -62,25 +62,25 @@ test('PC remains anchored above Terminal on phones and desktop', () => {
   assert.doesNotMatch(pc, /bottom-1\.5 left-1\/2/);
 });
 
-test('mobile question-mark guide is left of the logo at the same height as fullscreen', () => {
+test('mobile question-mark guide is right of the centered logo at the same height as fullscreen', () => {
   const brand = header.slice(header.indexOf('<div data-header-brand-row'), header.indexOf('{/* Navigation Category Tabs */}'));
   const fullscreenAt = brand.indexOf('data-screener-guide="fullscreen"');
   const guideAt = brand.indexOf('id="screener-help-btn"');
   const logoAt = brand.indexOf('src="/h00k-robot-logo.svg"');
-  assert.ok(guideAt > 0 && guideAt < logoAt && logoAt < fullscreenAt,
-    'guide must be left of centered logo, fullscreen remains to the right');
+  assert.ok(logoAt > 0 && logoAt < guideAt && guideAt < fullscreenAt,
+    'guide must be right of the centered logo, fullscreen remains to the right');
   const fullscreen = brand.slice(fullscreenAt, brand.indexOf('</button>', fullscreenAt));
   const guide = brand.slice(guideAt, brand.indexOf('</button>', guideAt));
   for (const button of [fullscreen, guide]) {
-    // The guide also uses justify-self-end for mobile alignment; its placement
-    // class can appear between dimensions and flex alignment without resizing.
+    // Both controls keep identical 32px hit targets on phones and desktop.
     assert.match(button, /inline-flex h-8 w-8/);
     assert.match(button, /shrink-0 items-center justify-center/);
   }
   assert.match(fullscreen, /<Maximize2 className="h-4 w-4"/);
   assert.match(guide, /<CircleHelp className="h-4 w-4"/);
   assert.match(guide, /aria-label=\{pageGuideCopy\.open\}/);
-  assert.match(guide, /justify-self-end/);
+  assert.doesNotMatch(guide, /justify-self-end/);
+  assert.match(brand, /justify-self-center/, 'logo must keep its own symmetric grid column');
   assert.match(guide, /onClick=\{\(\) => setScreenerGuideOpen\(true\)\}/);
   // The icon itself correctly has aria-hidden=true. Only CSS classes that
   // hide the button are forbidden; do not mistake accessibility attributes
