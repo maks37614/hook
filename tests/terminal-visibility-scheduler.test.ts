@@ -119,8 +119,8 @@ test('Terminal scroll checks all cards with one RAF, one root rect and shared li
 
 test('each Terminal card subscribes to a shared visibility tracker without replacing lazy unloading',()=>{
   const widget=readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx',import.meta.url),'utf8');
-  assert.match(widget,/subscribeTerminalWidgetVisibility\(node,/);
-  assert.match(widget,/setIsNearViewport\(current => current === near \? current : near\)/);
+  assert.match(widget,/subscribeTerminalWidgetVisibility\(\s*node,/);
+  assert.match(widget,/setIsNearViewport\(current => current === visible \? current : visible\)/);
   assert.match(widget,/const shouldLoadWidgets = !isSuspended && isNearViewport/);
   assert.match(widget,/useLayoutEffect\(\(\) => \{/);
   assert.match(widget,/isMaximized \|\| compactFullscreenMode/);
