@@ -72,6 +72,10 @@ export function parseSharedKlineMessage(exchange: ExchangeId, payload: any, symb
       time: Number(row.start) / 1000, open: Number(row.open),
       high: Number(row.high), low: Number(row.low),
       close: Number(row.close), volume: Number(row.volume),
+      // Bybit V5 Kline includes quote-currency turnover. Preserve it through
+      // the shared socket so live 1m charts can show verified minute AV
+      // without a redundant REST request (same field Binance calls `q`).
+      quoteVolume: optionalNumber(row.turnover),
       eventTime: Number(payload.ts) || Date.now(),
       ...(row.confirm === true ? { closed: true } : {}),
     };
