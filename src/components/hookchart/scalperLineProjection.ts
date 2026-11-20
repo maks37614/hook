@@ -41,6 +41,21 @@ export function scalperRasterStrokeWidth(cssWidth: number, scaleX: number, scale
 }
 
 /**
+ * Every automatic cascade stroke is 0.1 CSS px thinner than the chosen
+ * Scalper line width (0.4 -> 0.3 by default). Resolve to device pixels to
+ * preserve even coverage along the ray. Subpixel opacity compensation lets
+ * the narrower setting remain visually distinct when DPR rounds both
+ * 0.3px and 0.4px to the same physical-pixel count.
+ */
+export function cascadeStrokeAppearance(
+  scalperCssWidth: number, scaleX: number, scaleY: number,
+): { cssWidth: number; width: number; coverage: number } {
+  const cssWidth = Math.max(0.1, Math.round((normalizeScalperLineWidth(scalperCssWidth) - 0.1) * 1000) / 1000);
+  const width = scalperRasterStrokeWidth(cssWidth, scaleX, scaleY);
+  return { cssWidth, width, coverage: Math.min(1, cssWidth / width) };
+}
+
+/**
  * Only horizontal strokes can be pixel-centered without changing their slope
  * or wick touch geometry. An odd device-pixel width is centered at n + 0.5;
  * an even device-pixel width is centered at n. Diagonals use raw coordinates.
