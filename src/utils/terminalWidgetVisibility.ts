@@ -1,6 +1,7 @@
 /** Geometry fallback for Terminal cards when IntersectionObserver reports stale
  * intersections (notably after iPad Safari scroll and orientation changes).
- * Intersect the scroll container with the real screen before adding preload room.
+ * Only the actual intersection of the scroll container and screen is visible.
+ * No offscreen preload band: charts outside the viewport must stay unmounted.
  */
 export interface TerminalWidgetBounds {
   top: number;
@@ -13,7 +14,7 @@ export function isTerminalWidgetNearViewport(
   widget: TerminalWidgetBounds,
   scrollContainer: TerminalWidgetBounds,
   screen: TerminalWidgetBounds,
-  preloadMargin = 160,
+  preloadMargin = 0,
 ): boolean {
   const top = Math.max(scrollContainer.top, screen.top);
   const bottom = Math.min(scrollContainer.bottom, screen.bottom);
