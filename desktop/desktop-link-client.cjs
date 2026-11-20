@@ -94,6 +94,7 @@ class DesktopTickerRelayClient {
     this.baseUrl=baseUrl;
     this.running=false;
     this.seq=0;
+    this.epoch=null;
     this.currentAbort=null;
     this.pendingDelay=null;
     this.status='disabled';
@@ -144,6 +145,13 @@ class DesktopTickerRelayClient {
           });
         } finally {clearTimeout(timer);this.currentAbort=null;}
         if (!this.running) break;
+        // VPS restarts reset its in-memory sequence. Reset our cursor when its
+        // unique session changes, otherwise a long-lived Desktop misses tickers.
+        const epoch = response.headers?.get?.('X-h00k-Desktop-Epoch');
+        if (epoch && epoch !== this.epoch) {
+          this.epoch=epoch;
+          this.seq=0;
+        }
         if (response.status === 401 || response.status === 403) {
           this.setStatus('sign-in');
           await this.delay(5000);continue;
