@@ -3,10 +3,10 @@ import type { SupportedLanguage } from './types';
 
 export const terminalPagePhraseRows = [
   [
-    "AV 1m TOP 10",
-    "AV 1m TOP 10",
-    "AV 1m TOP 10",
-    "AV 1m TOP 10"
+    "AV 1m",
+    "AV 1m",
+    "AV 1m",
+    "AV 1m"
   ],
   [
     "Навігація термінала",
@@ -177,16 +177,16 @@ export const terminalPagePhraseRows = [
     "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
   ],
   [
-    "Топ-10 монет за середнім хвилинним оборотом (USDT): оборот за 24 години / 1440, мінімум 200 000 USDT за хвилину.",
-    "Top 10 coins by average minute turnover (USDT): 24h turnover / 1440, minimum 200,000 USDT per minute.",
-    "Топ-10 монет по среднему обороту в минуту (USDT): оборот за 24 часа / 1440, минимум 200 000 USDT в минуту.",
-    "Top 10 monet według średniego obrotu na minutę (USDT): obrót z 24 godzin / 1440, minimum 200 000 USDT na minutę."
+    "Усі монети із середнім хвилинним оборотом від 200 000 USDT (24г / 1440), крім BTC, ETH, XAU та SOL. Сортування від більшого до меншого.",
+    "All coins averaging at least 200,000 USDT per minute (24h turnover / 1440), excluding BTC, ETH, XAU and SOL. Highest first.",
+    "Все монеты со средним оборотом от 200 000 USDT в минуту (24 ч / 1440), кроме BTC, ETH, XAU и SOL. По убыванию.",
+    "Wszystkie monety ze średnim obrotem co najmniej 200 000 USDT na minutę (24 h / 1440), bez BTC, ETH, XAU i SOL. Malejąco."
   ],
   [
-    "10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.",
-    "Top 10 coins by average trading turnover per minute (USDT): 24h turnover / 1440.",
-    "Топ-10 монет по среднему объёму торгов в минуту (USDT): оборот за 24 ч / 1440.",
-    "10 monet o najwyższym średnim obrocie na minutę (USDT): obrót z 24 h / 1440."
+    "Середній обсяг торгів за хвилину (USDT): оборот за 24г / 1440.",
+    "Average trading turnover per minute (USDT): 24h turnover / 1440.",
+    "Средний оборот за минуту (USDT): оборот за 24 ч / 1440.",
+    "Średni obrót na minutę (USDT): obrót z 24 h / 1440."
   ],
   [
     "Оновлюємо ринкові котирування для пресету…",
