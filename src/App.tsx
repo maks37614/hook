@@ -1304,6 +1304,19 @@ export default function App() {
     }
   }, [chartPageActive, filters.timeframe, filters.exchange, filters.marketType, reportStrongFormations]);
 
+  // A direct Terminal entry has no ordinary Formations snapshot yet. Only an
+  // explicit click on the Formations preset may request the same shared scan
+  // used by the Formations page. Never start a background Terminal scan.
+  const requestTerminalFormationScan = useCallback((): boolean => {
+    if (earlyMode) return false; // exhaustive early W/M remains Formations-page-only
+    if (isLoading) return true;
+    if (lastUpdated !== null && Date.now() - lastUpdated < 45_000) return false;
+    void fetchScreenerData(filters.timeframe, filters.exchange, filters.marketType);
+    return true;
+  }, [earlyMode, isLoading, lastUpdated, fetchScreenerData, filters.timeframe, filters.exchange, filters.marketType]);
+  const terminalFormationScanStatus = isLoading ? 'loading' : scanBusy ? 'busy'
+    : error ? 'failed' : lastUpdated !== null ? 'ready' : 'idle';
+
   // Abort an in-flight browser scan on route transition, not merely its timer.
   useEffect(() => {
     if (!chartPageActive) return;
@@ -1690,6 +1703,8 @@ export default function App() {
             key={user?.uid || 'guest'}
             coins={coins}
             formationPresetCoins={terminalFormationPresetCoins}
+            onRequestFormationScan={requestTerminalFormationScan}
+            formationScanStatus={terminalFormationScanStatus}
             watchlist={watchlist}
             onToggleWatchlist={handleToggleWatchlist}
             onSendMetaScalp={(coin) => handleSendToMetaScalp(coin, 'terminal')}
