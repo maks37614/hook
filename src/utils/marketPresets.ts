@@ -13,7 +13,7 @@ export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quot
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
   { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
-  { id: 'av_1m', label: 'AV 1m', description: '10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.' },
+  { id: 'av_1m', label: 'AV 1m TOP 10', description: '10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },

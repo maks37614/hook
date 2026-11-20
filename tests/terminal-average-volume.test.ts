@@ -25,7 +25,7 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
   ];
   const all = { exchange: 'all', marketType: 'all' } as const;
   assert.ok(!MARKET_PRESETS.some(p => p.id === 'av'), 'obsolete AV button must not be offered');
-  assert.ok(MARKET_PRESETS.some(p => p.id === 'av_1m' && p.label === 'AV 1m'));
+  assert.ok(MARKET_PRESETS.some(p => p.id === 'av_1m' && p.label === 'AV 1m TOP 10'));
   const ranked = selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY);
   assert.deepEqual(ranked.map(c => [c.symbol, c.exchange, c.marketType]), [
     ['BTCUSDT', 'binance', 'futures'],
@@ -91,7 +91,7 @@ test('AV 1m ranks exactly the top ten markets by cached average minute turnover'
     quote(`C${index}USDT`, (index + 1) * 1_440_000));
   coins.push(quote('BROKENUSDT', Number.NaN), quote('MISSINGUSDT', 0), quote('NEGUSDT', -1));
   const original = [...coins];
-  assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m'));
+  assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m TOP 10'));
   const ranked = selectMarketPresetCoins(coins, 'av_1m', all, Number.POSITIVE_INFINITY);
   assert.equal(ranked.length, 10);
   assert.deepEqual(ranked.map(coin => coin.symbol),
