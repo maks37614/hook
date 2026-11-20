@@ -13,6 +13,7 @@ on:
       - 'src/utils/terminalWidgetVisibility.ts'
       - 'tests/terminal-visibility-scheduler.test.ts'
       - 'tests/hookchart-drag-frame-performance.test.ts'
+      - 'tests/terminal-normal-render-budget.test.ts'
   pull_request:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - 'src/utils/terminalVisibilityScheduler.ts'
       - 'tests/terminal-visibility-scheduler.test.ts'
       - 'tests/hookchart-drag-frame-performance.test.ts'
+      - 'tests/terminal-normal-render-budget.test.ts'
   workflow_dispatch:
 
 jobs:
