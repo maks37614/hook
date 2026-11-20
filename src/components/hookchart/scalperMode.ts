@@ -44,6 +44,7 @@ type Structure = {
   touches: ScalperPoint[];
   atr: number;
   cascadeSteps?: Pivot[];
+  cascadeOrigins?: Pivot[];
 };
 const EMPTY: ScalperScene = { setups: [], closedAt: 0 };
 const MAX_BARS = 90;
@@ -483,7 +484,12 @@ function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
     // Starting the outer boundary there paints a false horizontal level
     // through candles that existed before this price was ever established.
     // Anchor the outer ray to the exact HIGH/LOW wick that defined its price.
-    const boundaryPivot = selected.find(p => p.p === boundary)!;
+    // Repeated wicks at the same price confirm a prior tier; they do not
+    // recreate it. Keep the FIRST same-price swing inside the recent window
+    // as its historical start, so later retests cannot resurrect swept rays.
+    const firstPivotAtPrice = (pivot: Pivot) =>
+      recent.find(older => older.p === pivot.p) ?? pivot;
+    const boundaryPivot = firstPivotAtPrice(selected.find(p => p.p === boundary)!);
     const line = flat(boundary, boundaryPivot, endPivot);
     found.push({
       id: 'cascade:' + side + ':' + selected[0].t,
@@ -491,7 +497,8 @@ function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
         + Math.max(0, 16 - (last - selected[selected.length - 1].i))),
       ...(side === 'upper' ? { upper: line, only: 'up' as const }
         : { lower: line, only: 'down' as const }),
-      touches: uniqueTouches(selected), cascadeSteps: selected, atr: volatility,
+      touches: uniqueTouches(selected), cascadeSteps: selected,
+      cascadeOrigins: selected.map(firstPivotAtPrice), atr: volatility,
     });
   }
   // Keep at most one upper and one lower stack; preserve both when present.
@@ -518,7 +525,8 @@ function presentation(candidate: Structure, rows: readonly ScalperCandle[]): Sca
   if (candidate.lower) lines.push(project(candidate.lower, rows, liveIndex, candidate.kind === 'double-top' ? 'neckline' : 'lower'));
   if (candidate.cascadeSteps) candidate.cascadeSteps.forEach((step, i) => {
     const nextTime = candidate.cascadeSteps![i + 1]?.t ?? rows[liveIndex].t;
-    lines.push({ from: point(step), to: { t: nextTime, p: step.p }, role: 'cascade-step' });
+    const origin = candidate.cascadeOrigins?.[i] ?? step;
+    lines.push({ from: point(origin), to: { t: nextTime, p: step.p }, role: 'cascade-step' });
   });
   const buffer = Math.max(candidate.atr * .14, live.c * .00008);
   type Hit = { state: ScalperStatus; side: ScalperSide; bar: ScalperCandle };
