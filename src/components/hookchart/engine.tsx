@@ -9,6 +9,7 @@ import { CalendarDays, Pencil, Trash2 } from 'lucide-react';
 import { drawingActionsPosition, drawingTextHitDistance, freeDrawingPoint, rayEndPoint, translateDrawingPoints } from './drawingManipulation';
 import { drawTouchMagnifier, magnifierZoomFromPriceDrag, TOUCH_MAGNIFIER_DEFAULT_ZOOM } from './touchMagnifier';
 import { createChartFrameScheduler } from './frameScheduler';
+import { sameTimeAxisInputs } from './timeAxisMemo';
 import { createAutoPocZoneCache } from './autoPoc';
 import { createVolumeProfileHistogramCache } from './volumeProfileHistogram';
 import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
@@ -375,8 +376,10 @@ export function ChartTimeAxis({candles,tf,timezone,language='uk',viewport,rightP
  return <div className="chartTimeAxis" ref={ref}><div className="chartTimePlot" style={{width:plotW}}>{accepted.map((t,i)=><div key={`${t.x}-${i}`} className={`chartTimeTick ${t.major?'major ':''}align-${t.align}`} style={{left:t.x}}><i/><span>{t.label}</span></div>)}{crosshair&&<CrosshairTimeLabel store={crosshair} plotWidth={plotW} timezone={timezone} language={language} seconds={barMs<60000}/>}</div><div className="chartTimeScaleSpacer" ref={countdownRef} style={{width:AX}} aria-hidden={countdownRef?undefined:true}/></div>
 }
 
-// This axis is independent of live depth, liquidation and funding updates.
-export const MemoChartTimeAxis=React.memo(ChartTimeAxis);
+// The time axis uses horizontal viewport geometry only. Vertical price scale
+// gestures must not make it rescan history or rebuild time labels.
+// Horizontal pan/zoom and time-data changes still rebuild it normally.
+export const MemoChartTimeAxis=React.memo(ChartTimeAxis,sameTimeAxisInputs);
 
 export type Viewport={barWidth:number;rightOffset:number;autoY:boolean;manualCenter:number|null;manualRange:number|null;fitAll?:boolean;yZoom?:number;candleFit?:boolean};
 export type ViewportGesture='pan'|'zoom'|'price'|'focus';
