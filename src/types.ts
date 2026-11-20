@@ -856,7 +856,7 @@ export interface ArchivedChartSnapshot {
   scalperEnabled: boolean;
   scalperRegression: boolean;
   scalperLabels: boolean;
-  scalperLines: { from: { t: number; p: number }; to: { t: number; p: number }; role: 'upper'|'lower'|'neckline' }[];
+  scalperLines: { from: { t: number; p: number }; to: { t: number; p: number }; role: 'upper'|'lower'|'neckline'|'cascade-step' }[];
   liquidationMap: { enabled: boolean; period: '24h'|'7d' };
   density?: ArchivedDensityScene;
   tradeLevels: { entry: boolean; target: boolean; stop: boolean };
