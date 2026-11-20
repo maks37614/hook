@@ -256,6 +256,7 @@ test('browser-side MetaScalp mixed group preserves each market and ignores other
   for(const item of writes)assert.deepEqual(JSON.parse(String(item.body)),{ticker:'BTCUSDT'});
   assert.equal(calls.some(x=>x.path==='/api/change-ticker'),false);
   assert.deepEqual(linkedMetaScalpPanels(state,'002')?.documents?.map(d=>d.connectionId),[11,22]);
+  assert.equal(linkedMetaScalpPanels(state,'002')?.orderBookCount,2);
 });
 
 test('browser side distinguishes a partial MetaScalp per-panel update from full success',async(t)=>{
@@ -274,4 +275,63 @@ test('browser side distinguishes a partial MetaScalp per-panel update from full 
   const result=await sendTickerToMetaScalp('BTCUSDT','binance','spot',{binding:'002'});
   assert.equal(result.success,false);
   assert.match(result.message,/1 з 2/);
+});
+
+test('browser-side all groups: one order book opens the selected site market, not the existing book connection', async (t) => {
+  mockClipboard(t);
+  let group = 1;
+  let selectedMarket: 'futures' | 'spot' = 'spot';
+  const calls: { path: string; method: string; body: unknown }[] = [];
+  mockApi(t, (url, opts) => {
+    calls.push({path:url.pathname,method:opts.method ?? 'GET',body:opts.body});
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json({windows:[{tabs:[{documents:[
+      {externalId:FUTURES_PANEL,kind:'orderBook',linkNumber:group,connectionId:11},
+      {externalId:SPOT_PANEL,kind:'chart',linkNumber:group,connectionId:11},
+    ]}]}],standaloneCharts:[]});
+    if(url.pathname==='/api/change-ticker')return json({status:'ok'});
+    throw Error('A single book with a chart must use the market-aware named group endpoint');
+  });
+  for(const requestedGroup of [1,2,17,500]){
+    for(const market of ['spot','futures'] as const) {
+      group=requestedGroup;
+      selectedMarket=market;
+      const before=calls.length;
+      const result=await sendTickerToMetaScalp('BTCUSDT','binance',selectedMarket,{binding:String(group).padStart(3,'0')});
+      assert.equal(result.success,true);
+      const writes=calls.slice(before).filter(call=>call.method==='POST');
+      assert.equal(writes.length,1);
+      assert.deepEqual(JSON.parse(String(writes[0].body)),{
+        tickerPattern:market==='futures'?'BINANCE:BTCUSDT.p':'BINANCE:BTCUSDT',
+        binding:String(group).padStart(3,'0'),
+      });
+      assert.equal(calls.slice(before).filter(call=>call.method==='PUT').length,0);
+    }
+  }
+});
+
+test('browser-side two books in any group use per-panel writes even with same connection ID',async(t)=>{
+  mockClipboard(t);
+  let group=1;
+  const calls: {path:string;method:string;body:unknown}[]=[];
+  mockApi(t,(url,opts)=>{
+    calls.push({path:url.pathname,method:opts.method??'GET',body:opts.body});
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json({windows:[{tabs:[{documents:[
+      {externalId:FUTURES_PANEL,kind:'orderBook',linkNumber:group,connectionId:11},
+      {externalId:SPOT_PANEL,kind:'orderBook',linkNumber:group,connectionId:11},
+    ]}]}],standaloneCharts:[]});
+    if(url.pathname.includes('/api/ui/documents/'))return json({status:'ok'});
+    throw Error('Multi-book group must never force source market onto every book');
+  });
+  for(const requestedGroup of [1,2,17,500]){
+    group=requestedGroup;
+    const before=calls.length;
+    const result=await sendTickerToMetaScalp('ETHUSDT','binance','futures',{binding:String(group).padStart(3,'0')});
+    assert.equal(result.success,true);
+    const writes=calls.slice(before).filter(call=>call.method==='PUT');
+    assert.equal(writes.length,2);
+    assert.ok(writes.every(call=>JSON.parse(String(call.body)).ticker==='ETHUSDT'));
+    assert.equal(calls.slice(before).filter(call=>call.path==='/api/change-ticker').length,0);
+  }
 });
