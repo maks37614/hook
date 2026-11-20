@@ -14,6 +14,7 @@ export interface TerminalGridItemProps {
   responsiveSpanClass?: string;
   isMaximized: boolean;
   isSuspended: boolean;
+  onVisibilityChange?: (blockId: string, visible: boolean) => void;
   terminalAutoScale: boolean;
   terminalEcoMode: boolean;
   terminalRefreshMs: number;
@@ -42,7 +43,7 @@ export interface TerminalGridItemProps {
  */
 export const TerminalGridItem = memo(function TerminalGridItem({
   block, coin, getAllCoins, subscribeAllCoins, index, isOnlyChart = false, responsiveSpanClass, isMaximized, isSuspended,
-  terminalAutoScale, terminalEcoMode, terminalRefreshMs, terminalActiveCharts,
+  onVisibilityChange, terminalAutoScale, terminalEcoMode, terminalRefreshMs, terminalActiveCharts,
   terminalInitialView, terminalFitAllRequest, heightStyle, metaScalpBinding,
   onToggleMaximize, onRemove, onUpdateBlock, onOpenCoinSelector,
   onOpenFullscreenModal, onSendMetaScalp, onOpenTelegramAlerts, onSaveToArchive, isSavingArchive,
@@ -69,6 +70,7 @@ export const TerminalGridItem = memo(function TerminalGridItem({
       responsiveSpanClass={responsiveSpanClass}
       isMaximized={isMaximized}
       isSuspended={isSuspended}
+      onVisibilityChange={onVisibilityChange}
       terminalAutoScale={terminalAutoScale}
       terminalEcoMode={terminalEcoMode}
       terminalRefreshMs={terminalRefreshMs}
