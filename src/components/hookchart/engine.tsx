@@ -13,6 +13,7 @@ import { sameTimeAxisInputs } from './timeAxisMemo';
 import { createAutoPocZoneCache } from './autoPoc';
 import { closestActiveDensityPrices, rankAutoLevelsForPrice } from './chartPanPrecompute';
 import { createVolumeProfileHistogramCache } from './volumeProfileHistogram';
+import { createChartVisibleWindowCache } from './visibleWindowCache';
 import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, paintChartCrosshair, paintChartRuler } from './chartCursor';
 import { DEFAULT_MAX_CANVAS_DPR, effectiveCanvasDpr } from './canvasDpr';
@@ -391,6 +392,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const autoPocCache = useRef(createAutoPocZoneCache());
  // Reuse price bins on pointer movement; screen coordinates still update.
  const volumeProfileCache = useMemo(createVolumeProfileHistogramCache, []);
+ // Pan/zoom often moves by a few pixels without entering another candle.
+ // Retain the same visible rows and OHLC extremes until the bar range changes.
+ const visibleWindowCache = useMemo(()=>createChartVisibleWindowCache<Candle>(), []);
  // Only the painted representation is deduplicated. Underlying markers
  // still contain Entry and the neckline separately for TP/SL and archives.
  const paintedMarkers = useMemo(() => coalesceNecklinePriceMarkers(markers), [markers]);
@@ -722,8 +726,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   const r=c.getBoundingClientRect(),plotW=hookChartPlotWidth(r.width),priceX=plotW,plotH=Math.max(40,r.height-TX);
   const {step,virtualEnd,virtualStart}=hookChartHorizontalRange(candles.length,plotW,vp,rightPaddingBars,rightPadding);
   const dataStart=Math.max(0,Math.floor(virtualStart)-2),dataEnd=Math.min(candles.length,Math.ceil(virtualEnd)+2);
-  const data=dataEnd>dataStart?candles.slice(dataStart,dataEnd):[];
-  const scaleData=data.length?data:candles.slice(-Math.min(80,candles.length));
+  const visibleWindow=visibleWindowCache.get(candles,dataStart,dataEnd);
+  const data=visibleWindow.rows;
+  const scaleWindow=data.length?visibleWindow:visibleWindowCache.get(candles,Math.max(0,candles.length-80),candles.length);
+  const scaleData=scaleWindow.rows;
   // Do not let distant support/resistance markers flatten candles in Formations.
   // A price-axis gesture must take priority over automatic Terminal fitting.
   // Otherwise the manual viewport changes while rendering still uses the
@@ -733,8 +739,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // Avoid letting one flash wick flatten the compact Terminal price scale.
   // No source candle, chart overlay, or backend value is changed.
   const readableExtrema=terminalMode&&candleAutoScale?terminalReadableCandleExtrema(scaleData):null;
-  let lo=readableExtrema?.low??Infinity,hi=readableExtrema?.high??-Infinity;
-  if(!readableExtrema)for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}
+  // Same minimum/maximum as the original per-event scan, now cached by the
+  // immutable candle input and integer visible range.
+  let lo=readableExtrema?.low??scaleWindow.low,hi=readableExtrema?.high??scaleWindow.high;
   if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
   if(!candleAutoScale&&vp.autoY&&candles.length&&cachedNearDensityPrices.length){
     // Exact same nearest four levels / 3% gate; only the selection is cached.
@@ -1573,9 +1580,17 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    // Measurements can be resized from either endpoint or moved by dragging their
    // shaded range / label. Keep ordinary plotting and pinch gestures unchanged.
    if((tool==='cursor'||tool==='ruler')&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
-     const found=[...drawings].reverse().find(d=>d.type==='ruler'&&d.id.startsWith(symbol+':')&&d.pts[1]&&measurementHit(z.g,d.pts[0],d.pts[1],z.x,z.y));
+     // Hit topmost ruler first without allocating a reversed drawings array.
+     // The hit kind is reused to decide which endpoint is being dragged.
+     let found:Drawing|undefined;
+     let hit:ReturnType<typeof measurementHit>=null;
+     for(let i=drawings.length-1;i>=0;i--){
+       const item=drawings[i];
+       if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+       const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+       if(candidate){found=item;hit=candidate;break}
+     }
      if(found){
-       const hit=measurementHit(z.g,found.pts[0],found.pts[1],z.x,z.y);
        hoveredMeasurement.current=found.id;
        if(typeof drawingActions!=='undefined')selectDrawingAt(found,z.x,z.y,z.g);
        else setSelectedDrawingId(found.id);
@@ -1703,8 +1718,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(transient.current){e.preventDefault();return}
    const d=drag.current;
    if(!d&&(tool==='cursor'||tool==='ruler')){
-     const hit=zone(z.x,z.y,z.g)==='plot'?[...drawings].reverse().find(item=>item.type==='ruler'&&item.id.startsWith(symbol+':')&&item.pts[1]&&measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y)):undefined;
-     const action=hit?measurementHit(z.g,hit.pts[0],hit.pts[1],z.x,z.y):null;
+     let hit:Drawing|undefined;
+     let action:ReturnType<typeof measurementHit>=null;
+     if(zone(z.x,z.y,z.g)==='plot'){
+       // Hover is a hot path: do not copy/reverse all drawing objects or
+       // measure the same ruler twice just to identify its drag action.
+       for(let i=drawings.length-1;i>=0;i--){
+         const item=drawings[i];
+         if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+         const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+         if(candidate){hit=item;action=candidate;break}
+       }
+     }
      if(hoveredMeasurement.current!==(hit?.id||null)){hoveredMeasurement.current=hit?.id||null;scheduleDraw()}
      if(hit&&typeof drawingActions!=='undefined'&&hit.id!==selectedDrawingId)selectDrawingAt(hit,z.x,z.y,z.g);
      if(box.current?.style)box.current.style.cursor=action==='start'||action==='end'?'crosshair':action==='body'?'move':'';

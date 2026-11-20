@@ -643,7 +643,12 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
       activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
   });
-  const potentialDensityCount = liveFeed.densities.filter(density => density.reactionTier === 'potential').length;
+  // The heavy chart container also commits for viewport gestures. Density
+  // classification changes with the market feed, not with mouse position.
+  const potentialDensityCount = useMemo(() =>
+    liveFeed.densities.filter(density => density.reactionTier === 'potential').length,
+    [liveFeed.densities],
+  );
   // Only filter the chart. Strategy evaluation and density lists retain the full live book.
   const chartDensities = useMemo(
     () => visibleChartDensities(liveFeed.densities, settings.densityMode, settings.densityAutoDisplay),
