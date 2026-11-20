@@ -1,4 +1,4 @@
-import type { ScalperCandle, ScalperKind, ScalperLine, ScalperPoint } from './scalperMode';
+import type { ScalperCandle, ScalperKind, ScalperLine, ScalperPoint, ScalperScene } from './scalperMode';
 
 /**
  * Visual-only right-edge projection for horizontal cascade tiers.
@@ -165,4 +165,34 @@ export function scalperDiagonalIsActive(
           : bar.c - projected > farThreshold)) return false;
   }
   return true;
+}
+
+
+/**
+ * Select exactly the live geometry that the chart renders. Archive snapshots
+ * use this on demand, so expired cascade tiers / broken trend lines cannot
+ * reappear in a saved chart even when the live screenshot hid them.
+ * This function is never part of a frame loop or network subscription.
+ */
+export function visibleScalperLines(
+  scene: ScalperScene | null,
+  candles: readonly ScalperCandle[],
+): ScalperLine[] {
+  if (!scene?.setups.length || !candles.length) return [];
+  const visible: ScalperLine[] = [];
+  for (const setup of scene.setups) {
+    const cascadeSide = setup.lines.some(line => line.role === 'upper') ? 'upper' : 'lower';
+    for (const line of setup.lines) {
+      if (setup.kind === 'cascade') {
+        if (cascadeLineIsActive(line, setup.touches, candles, cascadeSide)) visible.push(line);
+      } else if (line.from.p === line.to.p) {
+        visible.push(line);
+      } else {
+        const side = line.role === 'upper' ? 'upper' : 'lower';
+        if (scalperDiagonalIsActive(line, setup.touches, candles, side, setup.kind === 'trend'))
+          visible.push(line);
+      }
+    }
+  }
+  return visible;
 }
