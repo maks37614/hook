@@ -479,7 +479,12 @@ function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
       ? Math.max(...selected.map(p => p.p))
       : Math.min(...selected.map(p => p.p));
     const endPivot: Pivot = { i: last, t: rows[last].t, p: price };
-    const line = flat(boundary, selected[0], endPivot);
+    // The first cascade pivot often belongs to a DIFFERENT price tier.
+    // Starting the outer boundary there paints a false horizontal level
+    // through candles that existed before this price was ever established.
+    // Anchor the outer ray to the exact HIGH/LOW wick that defined its price.
+    const boundaryPivot = selected.find(p => p.p === boundary)!;
+    const line = flat(boundary, boundaryPivot, endPivot);
     found.push({
       id: 'cascade:' + side + ':' + selected[0].t,
       kind: 'cascade', score: Math.min(95, 48 + selected.length * 8
