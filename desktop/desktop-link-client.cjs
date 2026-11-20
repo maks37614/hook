@@ -149,7 +149,9 @@ class DesktopTickerRelayClient {
           await this.delay(5000);continue;
         }
         if (response.status === 204) {
-          this.setStatus('connected');continue;
+          if (this.status !== 'metascalp-offline' && this.status !== 'metascalp-error')
+            this.setStatus('connected');
+          continue;
         }
         if (response.status !== 200) throw new Error('Relay response: '+response.status);
         const data=await response.json();
