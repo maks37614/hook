@@ -580,7 +580,7 @@ export async function updateAccountProfile(userId: string, value: unknown) {
         [JSON.stringify(patch), userId, expectedWorkspaceVersion ?? ''],
       );
       if (!result.rowCount) {
-        throw new AuthFailure(409, 'Робочу область змінено на іншому пристрої. Локальні графіки збережені у вашому браузері.', 'TERMINAL_WORKSPACE_CONFLICT');
+        throw new AuthFailure(409, 'Робочу область змінено на іншому пристрої. Оновіть хмарну конфігурацію та повторіть збереження.', 'TERMINAL_WORKSPACE_CONFLICT');
       }
     } else {
       await client.query('UPDATE auth_users SET profile = profile || $1::jsonb, updated_at = now() WHERE id = $2',
