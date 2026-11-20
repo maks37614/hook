@@ -1,6 +1,7 @@
 import { isTerminalWidgetNearViewport } from './terminalWidgetVisibility';
 
 type Listener = (near: boolean) => void;
+type TrackedListener = { listener: Listener; last: boolean | null };
 
 interface VisibilityTracker {
   subscribe: (node: HTMLElement, listener: Listener) => () => void;
@@ -11,8 +12,15 @@ interface VisibilityTracker {
 const trackers = new WeakMap<HTMLElement, VisibilityTracker>();
 
 function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTracker {
-  const listeners = new Map<HTMLElement, Listener>();
+  const listeners = new Map<HTMLElement, TrackedListener>();
   let frame: number | null = null;
+  const publish = (entry: TrackedListener, visible: boolean) => {
+    // Scrolling can fire at 120 Hz on tablets. Never enqueue 50 identical
+    // React setState actions per frame: publish only real entry/exit changes.
+    if (entry.last === visible) return;
+    entry.last = visible;
+    entry.listener(visible);
+  };
   const onChange = () => {
     if (frame === null) frame = window.requestAnimationFrame(check);
   };
@@ -21,7 +29,7 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
     // A background tab has no visible charts. Suspend chart-level feeds and
     // Canvas work even if an observer reports an old intersection.
     if (document.visibilityState === 'hidden') {
-      for (const listener of listeners.values()) listener(false);
+      for (const entry of listeners.values()) publish(entry, false);
       return;
     }
     const screen = {
@@ -29,8 +37,8 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
     };
     // Read the scroll container once per frame for ALL Terminal cards.
     const bounds = root?.getBoundingClientRect() ?? screen;
-    for (const [node, listener] of listeners) {
-      listener(isTerminalWidgetNearViewport(node.getBoundingClientRect(), bounds, screen));
+    for (const [node, entry] of listeners) {
+      publish(entry, isTerminalWidgetNearViewport(node.getBoundingClientRect(), bounds, screen));
     }
   };
   const intersection = typeof IntersectionObserver === 'undefined' ? null
@@ -48,13 +56,13 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
     if (document.visibilityState !== 'hidden') { onChange(); return; }
     if (frame !== null) window.cancelAnimationFrame(frame);
     frame = null;
-    for (const listener of listeners.values()) listener(false);
+    for (const entry of listeners.values()) publish(entry, false);
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   return {
     subscribe(node, listener) {
-      listeners.set(node, listener);
+      listeners.set(node, { listener, last: null });
       intersection?.observe(node);
       resize?.observe(node);
       onChange();
