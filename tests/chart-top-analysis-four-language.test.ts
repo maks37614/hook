@@ -51,14 +51,14 @@ test('all six labels have localized Ukrainian, English, Russian and Polish forms
 });
 
 test('above-chart funding is localized and reuses the existing futures stream', () => {
-  assert.match(source, /normalizeExchangeSymbol\\(coin\\.symbol\\)/);
-  assert.match(source, /subscribeSharedHookChartFunding\\(coin\\.exchange, fundingSymbol, snapshot =>/);
-  assert.match(source, /coin\\.marketType !== 'futures'/);
-  assert.match(source, /fundingReading\\.scope === fundingScope/);
-  assert.match(view, /coin\\.marketType === 'futures'/);
-  assert.match(view, /data-testid="chart-top-funding"/);
-  assert.match(view, /tr\\("Фандинг:"\\)/);
-  assert.match(view, /fundingRate \\* 100\\)\\.toFixed\\(4\\)/);
+  assert.ok(source.includes('normalizeExchangeSymbol(coin.symbol)'));
+  assert.ok(source.includes('subscribeSharedHookChartFunding(coin.exchange, fundingSymbol, snapshot =>'));
+  assert.ok(source.includes("coin.marketType !== 'futures'"));
+  assert.ok(source.includes('fundingReading.scope === fundingScope'));
+  assert.ok(view.includes("coin.marketType === 'futures'"));
+  assert.ok(view.includes('data-testid="chart-top-funding"'));
+  assert.ok(view.includes('tr("Фандинг:")'));
+  assert.ok(view.includes('(fundingRate * 100).toFixed(4)'));
   assert.equal(translatePhrase('uk', 'Фандинг:'), 'Фандинг:');
   assert.equal(translatePhrase('en', 'Фандинг:'), 'Funding:');
   assert.equal(translatePhrase('ru', 'Фандинг:'), 'Фандинг:');
