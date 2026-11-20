@@ -303,3 +303,79 @@ test('every group 001-500: two books keep their connections even when connection
     assert.ok(!calls.some(([url])=>url.endsWith('/api/change-ticker')));
   }
 });
+
+test('Binance and Bybit books in any linked group retain their own venues and markets',async()=>{
+  for (const group of ['001','002','017','500']) {
+    for (const exchange of ['binance','bybit']) {
+      for (const marketType of ['spot','futures']) {
+        const calls=[];
+        const state={windows:[{tabs:[{documents:[
+          {externalId:FIRST,kind:'orderBook',linkNumber:Number(group),connectionId:11,
+            exchange:'binance',market:'futures',ticker:'ETHUSDT'},
+          {externalId:SECOND,kind:'orderBook',linkNumber:Number(group),connectionId:22,
+            exchange:'bybit',market:'spot',ticker:'ETHUSDT'},
+          // An empty chart in the same group must not prevent switching the books.
+          {externalId:'dddddddd-dddd-dddd-dddd-dddddddddddd',kind:'chart',
+            linkNumber:Number(group),connectionId:null},
+          // A separate group must remain untouched.
+          {externalId:EXTRA,kind:'orderBook',linkNumber:499,connectionId:33},
+        ]}]}],standaloneCharts:[]};
+        const sender=new MetaScalpTickerSender(async(url,opts)=>{
+          calls.push([url,opts]);
+          if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+          if(url.endsWith('/api/ui/state'))return {ok:true,json:async()=>state};
+          if(url.includes('/api/ui/documents/'))return {ok:true,json:async()=>({status:'ok'})};
+          throw Error('Unexpected route '+url);
+        });
+        const result=await sender.send({symbol:'BTCUSDT',exchange,marketType,binding:group});
+        assert.equal(result.ok,true,group+' '+exchange+' '+marketType);
+        assert.equal(result.mode,'per-panel');
+        assert.equal(result.panels,2);
+        const writes=calls.filter(([,opts])=>opts.method==='PUT');
+        assert.deepEqual(writes.map(([url])=>url.split('/').at(-2)).sort(),[FIRST,SECOND]);
+        for (const [,opts] of writes) {
+          assert.deepEqual(JSON.parse(opts.body),{ticker:'BTCUSDT'},
+            'must not pass site exchange, site market or replacement connectionId');
+        }
+        assert.equal(calls.some(([url])=>url.endsWith('/api/change-ticker')),false);
+      }
+    }
+  }
+});
+
+test('one linked book still receives website-selected Binance or Bybit market',async()=>{
+  for(const exchange of ['binance','bybit']) {
+    for(const marketType of ['spot','futures']) {
+      const calls=[];
+      const sender=new MetaScalpTickerSender(async(url,opts)=>{
+        calls.push([url,opts]);
+        if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+        if(url.endsWith('/api/ui/state'))return {ok:true,json:async()=>({
+          windows:[{tabs:[{documents:[
+            {externalId:FIRST,kind:'orderBook',linkNumber:18,connectionId:11},
+          ]}]}],standaloneCharts:[],
+        })};
+        if(url.endsWith('/api/change-ticker'))return {ok:true,json:async()=>({status:'ok'})};
+        throw Error('Unexpected route '+url);
+      });
+      const r=await sender.send({symbol:'SOLUSDT',exchange,marketType,binding:'018'});
+      assert.equal(r.ok,true);
+      assert.equal(r.mode,'named-group');
+      const posts=calls.filter(([,opts])=>opts.method==='POST');
+      assert.equal(posts.length,1);
+      assert.deepEqual(JSON.parse(posts[0][1].body),{
+        tickerPattern:exchange.toUpperCase()+':SOLUSDT'+(marketType==='futures'?'.p':''),
+        binding:'018',
+      });
+      assert.equal(calls.filter(([,opts])=>opts.method==='PUT').length,0);
+    }
+  }
+});
+
+test('an order book without exchange connection is rejected instead of guessed',()=>{
+  const state={windows:[{tabs:[{documents:[
+    {externalId:FIRST,kind:'orderBook',linkNumber:2,connectionId:null},
+    {externalId:SECOND,kind:'orderBook',linkNumber:2,connectionId:22},
+  ]}]}],standaloneCharts:[]};
+  assert.equal(linkedTickerDocuments(state,2).error,'METASCALP_UNBOUND_PANEL');
+});
