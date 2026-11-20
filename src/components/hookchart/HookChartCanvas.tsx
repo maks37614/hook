@@ -2187,7 +2187,10 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         liquidationArrowSize={runtimeSettings.liquidationArrowSize ?? 5}
         liquidationSumFontSize={runtimeSettings.liquidationSumFontSize ?? 10}
         liquidationDetailFontSize={runtimeSettings.liquidationDetailFontSize ?? 9}
-        showLiqRiskBlock={!replay && !externalData && !terminalMode && runtimeSettings.showLiqRiskBlock !== false}
+        // The same collapsible Liq/cascade HUD belongs on Terminal charts too.
+        // It reads the existing shared liquidation feed; replay, archive, and ECO
+        // remain excluded without changing the trader's saved preferences.
+        showLiqRiskBlock={!replay && !externalData && !archiveMode && runtimeSettings.showLiqRiskBlock !== false}
         liquidationHudOwner={user?.uid}
         candleLongColor={externalData?.appearance.upColor || runtimeSettings.candleLongColor || '#0ECB81'}
         candleShortColor={externalData?.appearance.downColor || runtimeSettings.candleShortColor || '#F6465D'}
