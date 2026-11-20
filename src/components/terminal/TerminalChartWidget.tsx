@@ -32,6 +32,7 @@ import type { ArchiveChartCapture } from '../../utils/archiveChartSnapshot';
 import { formatTerminalQuotedPrice } from '../../utils/terminalPresets';
 import { normalizeChartProvider } from '../../utils/chartPreferences';
 import { formationChartMarkers } from '../../utils/hookchartData';
+import { isTerminalWidgetNearViewport } from '../../utils/terminalWidgetVisibility';
 
 interface TerminalChartWidgetProps {
   block: TerminalChartBlock;
@@ -133,26 +134,70 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     onDrawingToolsOpenChange: setDrawingToolsOpen,
   }), [extraToolsOpen, drawingToolsOpen]);
   const blockRootRef = useRef<HTMLDivElement>(null);
-  // The first chart must be interactive immediately. Keep isSingleBlock=false
-  // in the grid to preserve its drag/resize/remove controls.
-  const [isNearViewport, setIsNearViewport] = useState(isSingleBlock || isOnlyChart || isMaximized);
-  const shouldLoadWidgets = !isSuspended && (isSingleBlock || isOnlyChart || isMaximized || isNearViewport);
+  // The first chart (and the fullscreen grid's at most four charts) is immediate.
+  // Keep isSingleBlock=false in the Terminal grid to retain all tile controls.
+  const [isNearViewport, setIsNearViewport] = useState(
+    isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode,
+  );
+  const shouldLoadWidgets = !isSuspended
+    && (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode || isNearViewport);
 
-  // Defer charts, feeds, and order books until their block is near the viewport.
+  // Lazy-load only nearby Terminal rows. On iPad Safari IntersectionObserver can
+  // report a stale false value inside nested overflow grids: use actual geometry
+  // as the source of truth, and coalesce checks to one per animation frame.
   useEffect(() => {
     const node = blockRootRef.current;
     if (!node) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode) {
       setIsNearViewport(true);
       return;
     }
 
-    const observer = new IntersectionObserver(([entry]) => {
-      setIsNearViewport(entry.isIntersecting);
-    }, { rootMargin: '160px 0px' });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+    const scrollRoot = node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
+    let pendingFrame: number | null = null;
+    const updateVisibility = () => {
+      pendingFrame = null;
+      const screen = { top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth };
+      const near = isTerminalWidgetNearViewport(
+        node.getBoundingClientRect(),
+        scrollRoot?.getBoundingClientRect() ?? screen,
+        screen,
+      );
+      setIsNearViewport(current => current === near ? current : near);
+    };
+    const scheduleVisibilityCheck = () => {
+      if (pendingFrame === null) pendingFrame = window.requestAnimationFrame(updateVisibility);
+    };
+
+    const observer = typeof IntersectionObserver === 'undefined' ? null
+      : new IntersectionObserver(scheduleVisibilityCheck, {
+        root: scrollRoot,
+        rootMargin: '160px 0px',
+      });
+    observer?.observe(node);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null
+      : new ResizeObserver(scheduleVisibilityCheck);
+    resizeObserver?.observe(node);
+    if (scrollRoot) resizeObserver?.observe(scrollRoot);
+
+    scrollRoot?.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
+    window.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
+    window.addEventListener('resize', scheduleVisibilityCheck);
+    window.addEventListener('orientationchange', scheduleVisibilityCheck);
+    document.addEventListener('visibilitychange', scheduleVisibilityCheck);
+    scheduleVisibilityCheck();
+
+    return () => {
+      observer?.disconnect();
+      resizeObserver?.disconnect();
+      scrollRoot?.removeEventListener('scroll', scheduleVisibilityCheck);
+      window.removeEventListener('scroll', scheduleVisibilityCheck);
+      window.removeEventListener('resize', scheduleVisibilityCheck);
+      window.removeEventListener('orientationchange', scheduleVisibilityCheck);
+      document.removeEventListener('visibilitychange', scheduleVisibilityCheck);
+      if (pendingFrame !== null) window.cancelAnimationFrame(pendingFrame);
+    };
+  }, [isSingleBlock, isOnlyChart, isMaximized, compactFullscreenMode, isSuspended]);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const toolbarMenusRef = useRef<HTMLDivElement>(null);
