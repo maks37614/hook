@@ -998,33 +998,26 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // may share one physical X column; merge only for drawing so ALL-history stays fast and crisp
   // while the underlying candle data / hit-testing / indicators remain untouched.
   const denseBars=g.step*scaleX<1.15,candleRows:{k:Candle;rawX:number}[]=[];
-  // The normal zoom path can rasterize g.data directly: allocating one
-  // temporary row per candle on every pan frame caused avoidable GC pressure.
-  // Keep the exact original aggregate path for subpixel history compression.
-  if(denseBars){let bucketPx=Number.NaN,agg:Candle|null=null,aggX=0;const flush=()=>{if(agg)candleRows.push({k:agg,rawX:aggX})};for(let i=0;i<g.data.length;i++){const k=g.data[i],rawX=g.candleX(i);if(rawX<-1||rawX>g.plotW+1)continue;const px=Math.round(rawX*scaleX);if(px!==bucketPx){flush();bucketPx=px;agg={...k};aggX=px/scaleX}else if(agg){const prevAgg:Candle=agg;agg={...prevAgg,h:Math.max(prevAgg.h,k.h),l:Math.min(prevAgg.l,k.l),c:k.c,v:prevAgg.v+k.v,n:(prevAgg.n||0)+(k.n||0),tb:(prevAgg.tb||0)+(k.tb||0),t:k.t}}}flush()}
+  if(!denseBars){for(let i=0;i<g.data.length;i++)candleRows.push({k:g.data[i],rawX:g.candleX(i)})}
+  else{let bucketPx=Number.NaN,agg:Candle|null=null,aggX=0;const flush=()=>{if(agg)candleRows.push({k:agg,rawX:aggX})};for(let i=0;i<g.data.length;i++){const k=g.data[i],rawX=g.candleX(i);if(rawX<-1||rawX>g.plotW+1)continue;const px=Math.round(rawX*scaleX);if(px!==bucketPx){flush();bucketPx=px;agg={...k};aggX=px/scaleX}else if(agg){const prevAgg:Candle=agg;agg={...prevAgg,h:Math.max(prevAgg.h,k.h),l:Math.min(prevAgg.l,k.l),c:k.c,v:prevAgg.v+k.v,n:(prevAgg.n||0)+(k.n||0),tb:(prevAgg.tb||0)+(k.tb||0),t:k.t}}}flush()}
   q.save();
   q.setTransform(1,0,0,1,0,0);
-  // Bar width, wick width and minimum body height depend only on the frame's
-  // step and DPR, not on OHLC. Compute once with the same pixel-rounding math.
-  const stepPx=denseBars?1:Math.max(2,Math.round(g.step*scaleX));
-  const oneCssPx=Math.max(1,Math.round(scaleX));
-  const gapPx=denseBars?0:Math.max(1,oneCssPx);
-  const desiredBodyPx=denseBars?1:Math.max(1,Math.round(g.step*.78*scaleX));
-  const bodyPx=denseBars?1:Math.max(1,Math.min(stepPx-gapPx,desiredBodyPx));
-  const wickPx=denseBars?1:Math.max(1,Math.round(scaleX*.85));
-  const minimumBodyHPx=denseBars?1:Math.max(1,Math.round(scaleY*.75));
-  const rowCount=denseBars?candleRows.length:g.data.length;
-  for(let i=0;i<rowCount;i++){
-    const k=denseBars?candleRows[i].k:g.data[i];
-    const rawX=denseBars?candleRows[i].rawX:g.candleX(i);
-    const up=k.c>=k.o,col=up?candleLongColor:candleShortColor;
+  for(let i=0;i<candleRows.length;i++){
+    const row=candleRows[i],k=row.k,rawX=row.rawX,up=k.c>=k.o;
+    const col=up?candleLongColor:candleShortColor;
     const centerPx=Math.round(rawX*scaleX);
+    const stepPx=denseBars?1:Math.max(2,Math.round(g.step*scaleX));
+    const oneCssPx=Math.max(1,Math.round(scaleX));
+    const gapPx=denseBars?0:Math.max(1,oneCssPx);
+    const desiredBodyPx=denseBars?1:Math.max(1,Math.round(g.step*.78*scaleX));
+    const bodyPx=denseBars?1:Math.max(1,Math.min(stepPx-gapPx,desiredBodyPx));
     const bodyLeftPx=Math.round(centerPx-bodyPx/2);
+    const wickPx=denseBars?1:Math.max(1,Math.round(scaleX*.85));
     const wickLeftPx=Math.round(centerPx-wickPx/2);
     const yHighPx=Math.round(g.y(k.h)*scaleY),yLowPx=Math.round(g.y(k.l)*scaleY),yOpenPx=Math.round(g.y(k.o)*scaleY),yClosePx=Math.round(g.y(k.c)*scaleY);
     const wickTopPx=Math.min(yHighPx,yLowPx),wickBottomPx=Math.max(yHighPx,yLowPx);
     const bodyTopPx=Math.min(yOpenPx,yClosePx),bodyBottomPx=Math.max(yOpenPx,yClosePx);
-    const bodyHPx=Math.max(minimumBodyHPx,bodyBottomPx-bodyTopPx);
+    const bodyHPx=Math.max(denseBars?1:Math.max(1,Math.round(scaleY*.75)),bodyBottomPx-bodyTopPx);
     const wickHPx=Math.max(1,wickBottomPx-wickTopPx);
     q.fillStyle=col;
     q.fillRect(wickLeftPx,wickTopPx,wickPx,wickHPx);
