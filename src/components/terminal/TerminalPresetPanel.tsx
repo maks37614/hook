@@ -151,7 +151,14 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
     // Opening a draft is not a workspace change. Do not disable a running
     // market preset just because the user wants to save their current view.
     setSource(nextSource);
-    setSelectedBlocks((nextSource === 'favorites' ? favoriteBlocks : blocks).slice(0, MAX_TERMINAL_CHARTS));
+    const seen = new Set<string>();
+    setSelectedBlocks((nextSource === 'favorites' ? favoriteBlocks : blocks)
+      .filter(block => {
+        const key = coinMarketKey(block);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, MAX_TERMINAL_CHARTS));
     setPickerOpen(false);
     setName('');
     setFormError(null);
@@ -162,8 +169,12 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
   const selectAllVisible = () => {
     setSelectedBlocks(current => {
       const known = new Set(current.map(coinMarketKey));
-      const additions = candidates.filter(block => !known.has(coinMarketKey(block)))
-        .slice(0, MAX_TERMINAL_CHARTS - current.length);
+      const additions = candidates.filter(block => {
+        const key = coinMarketKey(block);
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      }).slice(0, MAX_TERMINAL_CHARTS - current.length);
       return additions.length ? [...current, ...additions] : current;
     });
     setFormError(null);
