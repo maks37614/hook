@@ -11,9 +11,14 @@ on:
       - 'src/components/hookchart/engine.tsx'
       - 'src/utils/terminalVisibilityScheduler.ts'
       - 'src/utils/terminalWidgetVisibility.ts'
+      - 'src/utils/terminalChartMountQueue.ts'
+      - 'src/utils/terminalChartHistoryCache.ts'
+      - 'src/components/TradingViewChart.tsx'
       - 'tests/terminal-visibility-scheduler.test.ts'
       - 'tests/hookchart-drag-frame-performance.test.ts'
       - 'tests/terminal-normal-render-budget.test.ts'
+      - 'tests/terminal-viewport-render-churn.test.ts'
+      - 'tests/terminal-viewport-mount-cache.test.ts'
   pull_request:
     branches: [main]
     paths:
@@ -22,9 +27,15 @@ on:
       - 'src/components/terminal/**'
       - 'src/components/hookchart/engine.tsx'
       - 'src/utils/terminalVisibilityScheduler.ts'
+      - 'src/utils/terminalWidgetVisibility.ts'
+      - 'src/utils/terminalChartMountQueue.ts'
+      - 'src/utils/terminalChartHistoryCache.ts'
+      - 'src/components/TradingViewChart.tsx'
       - 'tests/terminal-visibility-scheduler.test.ts'
       - 'tests/hookchart-drag-frame-performance.test.ts'
       - 'tests/terminal-normal-render-budget.test.ts'
+      - 'tests/terminal-viewport-render-churn.test.ts'
+      - 'tests/terminal-viewport-mount-cache.test.ts'
   workflow_dispatch:
 
 jobs:
@@ -49,4 +60,6 @@ jobs:
           tests/hookchart-drag-frame-performance.test.ts
           tests/terminalWidgetVisibility.test.ts
           tests/terminal-normal-render-budget.test.ts
+          tests/terminal-viewport-render-churn.test.ts
+          tests/terminal-viewport-mount-cache.test.ts
           tests/hookchart-viewport-raf-notifications.test.ts
