@@ -24,7 +24,8 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
     quote('NEGATIVEUSDT', -10),
   ];
   const all = { exchange: 'all', marketType: 'all' } as const;
-  assert.ok(MARKET_PRESETS.some(p => p.id === 'av' && p.label === 'AV'));
+  assert.ok(!MARKET_PRESETS.some(p => p.id === 'av'), 'obsolete AV button must not be offered');
+  assert.ok(MARKET_PRESETS.some(p => p.id === 'av_1m' && p.label === 'AV 1m'));
   const ranked = selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY);
   assert.deepEqual(ranked.map(c => [c.symbol, c.exchange, c.marketType]), [
     ['BTCUSDT', 'binance', 'futures'],
