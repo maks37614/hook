@@ -1,4 +1,5 @@
 'use strict';
+const { createHash } = require('node:crypto');
 
 const META_PORT_START = 17845;
 const META_PORT_END = 17855;
@@ -25,7 +26,11 @@ async function jsonFetch(fetchImpl, url, options, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetchImpl(url, {...options, signal:controller.signal, redirect:'error'});
+    const response = await fetchImpl(url, {...options, signal:controller.signal, redirect:'error'});
+    // Reading JSON is also bound by the same deadline. A local service may
+    // send HTTP headers then stall the body indefinitely.
+    const body = await response.json().catch(() => null);
+    return { ok: response.ok, status: response.status, body };
   } finally {
     clearTimeout(timer);
   }
@@ -47,8 +52,7 @@ class MetaScalpTickerSender {
         const response = await jsonFetch(this.fetch, 'http://127.0.0.1:'+port+'/ping',
           {method:'GET',headers:{Accept:'application/json'}}, 450);
         if (!response.ok) continue;
-        const body = await response.json();
-        if (body && body.app === 'MetaScalp') { this.port = port; return port; }
+        if (response.body?.app === 'MetaScalp') { this.port = port; return port; }
       } catch { /* Port not listening, try next */ }
     }
     this.port = null;
@@ -69,8 +73,7 @@ class MetaScalpTickerSender {
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({tickerPattern:command.tickerPattern,binding:command.binding}),
       },1400);
-      const json = await response.json().catch(() => null);
-      if (!response.ok || json?.status !== 'ok') return {ok:false, reason:'METASCALP_REJECTED'};
+      if (!response.ok || response.body?.status !== 'ok') return {ok:false, reason:'METASCALP_REJECTED'};
       this.lastCommandKey=key;
       this.lastCommandAt=Date.now();
       return {ok:true, port};
@@ -95,6 +98,7 @@ class DesktopTickerRelayClient {
     this.running=false;
     this.seq=0;
     this.epoch=null;
+    this.sessionFingerprint=null;
     this.currentAbort=null;
     this.pendingDelay=null;
     this.status='disabled';
@@ -130,19 +134,34 @@ class DesktopTickerRelayClient {
         const cookie = await this.getCookie();
         if (!this.running) break;
         if (!cookie) {
+          this.seq=0;
+          this.epoch=null;
+          this.sessionFingerprint=null;
           this.setStatus('sign-in');
           await this.delay(5000);
           continue;
         }
+        // Different account / renewed session: its server-side sequence may
+        // start at 1. Never carry the previous account's cursor forward.
+        const fingerprint = createHash('sha256').update(cookie).digest('hex');
+        if (fingerprint !== this.sessionFingerprint) {
+          this.sessionFingerprint=fingerprint;
+          this.seq=0;
+          this.epoch=null;
+        }
         const controller = new AbortController();
         this.currentAbort=controller;
         const timer=setTimeout(()=>controller.abort(),POLL_TIMEOUT_MS);
-        let response;
+        let response, data=null;
+        const cursor = '/api/desktop-link/poll?after='+this.seq+
+          (this.epoch ? '&epoch='+encodeURIComponent(this.epoch) : '');
         try {
-          response=await this.fetch(this.baseUrl+'/api/desktop-link/poll?after='+this.seq, {
+          response=await this.fetch(this.baseUrl+cursor, {
             method:'GET', headers:{Cookie:cookie,Accept:'application/json'},
             cache:'no-store',redirect:'error',signal:controller.signal,
           });
+          // Keep AbortController active while reading the response body.
+          if (response.status === 200) data=await response.json();
         } finally {clearTimeout(timer);this.currentAbort=null;}
         if (!this.running) break;
         // VPS restarts reset its in-memory sequence. Reset our cursor when its
@@ -162,13 +181,13 @@ class DesktopTickerRelayClient {
           continue;
         }
         if (response.status !== 200) throw new Error('Relay response: '+response.status);
-        const data=await response.json();
         this.setStatus('connected');
         const command=data?.command;
         if (!command || !Number.isSafeInteger(command.seq) || command.seq<=this.seq) continue;
         this.seq=command.seq;
-        if (!Number.isFinite(command.createdAt)
-          || Math.abs(Date.now()-command.createdAt)>15_000) continue;
+        // Freshness is enforced against the VPS clock before delivery.
+        // The Windows clock may differ from the VPS clock by >15 seconds.
+        if (!Number.isFinite(command.createdAt) || command.createdAt <= 0) continue;
         const result=await this.onCommand(command);
         if (result?.reason === 'METASCALP_OFFLINE' || result?.reason === 'METASCALP_UNREACHABLE')
           this.setStatus('metascalp-offline');
