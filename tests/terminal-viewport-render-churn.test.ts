@@ -25,12 +25,17 @@ test('Terminal widget visibility only publishes transitions during fast scrollin
     documentElement: {},
   });
   const root = Object.assign(new EventTarget(), {
+    scrollTop: 800,
     getBoundingClientRect: () => ({ top: 80, left: 0, bottom: 800, right: 1000 }),
   });
-  let top = 100;
+  let rectReads = 0;
   const tile = {
     closest: (selector: string) => selector === '[data-terminal-scroll-viewport]' ? root : null,
-    getBoundingClientRect: () => ({ top, left: 0, bottom: top + 200, right: 600 }),
+    getBoundingClientRect: () => {
+      rectReads++;
+      const top = 900 - root.scrollTop;
+      return { top, left: 0, bottom: top + 200, right: 600 };
+    },
   } as unknown as HTMLElement;
   function flushFrames() {
     const scheduled = [...frames.values()];
@@ -47,6 +52,7 @@ test('Terminal widget visibility only publishes transitions during fast scrollin
     const unsubscribe = subscribeTerminalWidgetVisibility(tile, value => changes.push(value));
     flushFrames();
     assert.deepEqual(changes, [true]);
+    const initialRectReads = rectReads;
     // Repeated scroll events without a geometry transition must not schedule
     // any React state updates, even though a geometry check is coalesced.
     for (let i = 0; i < 30; i++) browser.dispatchEvent(new Event('scroll'));
@@ -54,8 +60,10 @@ test('Terminal widget visibility only publishes transitions during fast scrollin
     assert.equal(frames.size, 1);
     flushFrames();
     assert.deepEqual(changes, [true]);
+    assert.ok(rectReads <= initialRectReads + 1,
+      'ordinary scroll frames must reuse card geometry instead of measuring all cards');
 
-    top = 801;
+    root.scrollTop = 0;
     root.dispatchEvent(new Event('scroll'));
     flushFrames();
     assert.deepEqual(changes, [true, false]);
@@ -66,7 +74,7 @@ test('Terminal widget visibility only publishes transitions during fast scrollin
     doc.visibilityState = 'hidden';
     doc.dispatchEvent(new Event('visibilitychange'));
     assert.deepEqual(changes, [true, false]);
-    top = 100;
+    root.scrollTop = 800;
     doc.visibilityState = 'visible';
     doc.dispatchEvent(new Event('visibilitychange'));
     flushFrames();
