@@ -914,9 +914,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   );
   // Use the actual exchange-reported quote turnover of a completed 1m candle.
   // Other chart timeframes share a separately cached 1m observation in the footer.
+  // Only the last two candles can be the latest completed minute; no O(history)
+  // copying of thousands of candles on each live HookChart render.
+  const lastMinuteTimestamp = Date.now();
   const recentMinuteQuote = timeframe === '1m'
-    ? [...klines].reverse().find(row => row.time * 1000 + 60_000 <= Date.now() - 2000
-      && row.time * 1000 >= Date.now() - 180_000
+    ? [klines.at(-1), klines.at(-2)].find(row => row
+      && row.time * 1000 + 60_000 <= lastMinuteTimestamp - 2000
+      && row.time * 1000 >= lastMinuteTimestamp - 180_000
       && typeof row.quoteVolume === 'number' && Number.isFinite(row.quoteVolume) && row.quoteVolume >= 0)
     : undefined;
   const recentMinuteAv = recentMinuteQuote ? { minuteStart: recentMinuteQuote.time * 1000, volume1mUsd: recentMinuteQuote.quoteVolume! } : null;
