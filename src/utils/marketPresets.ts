@@ -64,8 +64,8 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     if (seen.has(key) || !Number.isFinite(coin.price) || coin.price <= 0 || !Number.isFinite(coin.change24h)) return false;
     if (selection.exchange !== 'all' && selection.exchange !== coin.exchange) return false;
     if (selection.marketType !== 'all' && selection.marketType !== coin.marketType) return false;
-    if (averageVolumePreset && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd <= (preset === 'av_1m' ? 0 : -1))) return false;
-    if (!averageVolumePreset && !matchesMarketPreset(coin, preset)) return false;
+    if (averageVolumePreset && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0 || (preset === 'av_1m' && coin.volumeUsd === 0))) return false;
+    if (preset !== 'av' && preset !== 'av_1m' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
     return true;
   });
