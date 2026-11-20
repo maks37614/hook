@@ -66,7 +66,10 @@ async function loadMarketCoinsUnshared(
     });
     if (response.headers.get('content-type')?.includes('application/json')) {
       const result = await response.json();
-      if (response.ok && result.success && Array.isArray(result.data)) {
+      // A response can report success while its exchange ticker list is
+      // temporarily empty. Never turn that transient outage into a fake
+      // "no coins match" preset result; try the existing public fallback.
+      if (response.ok && result.success && Array.isArray(result.data) && result.data.length > 0) {
         const warning = sourceWarning(Array.isArray(result.sources) ? result.sources : []);
         return { coins: result.data, timestamp: result.timestamp ?? null, warning };
       }
