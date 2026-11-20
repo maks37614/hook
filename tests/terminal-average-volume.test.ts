@@ -42,7 +42,7 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
 });
 
 test('AV 1m does not reject a tradable market solely for missing 24h change', () => {
-  const candidate = quote('NEWUSDT', 1_440_000, { change24h: Number.NaN });
+  const candidate = quote('NEWUSDT', 1_440_000, { change24h: Number.NaN, volume1mUsd: 220_000 });
   const all = { exchange: 'all', marketType: 'all' } as const;
   assert.deepEqual(selectMarketPresetCoins([candidate], 'av_1m', all, 10).map(c => c.symbol), ['NEWUSDT']);
   assert.deepEqual(selectMarketPresetCoins([candidate], 'top_gainers', all, 10), []);
@@ -89,7 +89,7 @@ test('HookChart AV footer uses only cached 24h quotes or a full day of existing 
 test('AV 1m ranks exactly the top ten markets by cached average minute turnover', () => {
   const all = { exchange: 'all', marketType: 'all' } as const;
   const coins = Array.from({ length: 16 }, (_, index) =>
-    quote(`C${index}USDT`, (index + 1) * 1_440_000, { volume1mUsd: (index + 1) * 25_000 }));
+    quote(`C${index}USDT`, (index + 1) * 1_440_000, { volume1mUsd: (index + 2) * 25_000 }));
   coins.push(quote('BROKENUSDT', Number.NaN), quote('MISSINGUSDT', 0), quote('NEGUSDT', -1));
   const original = [...coins];
   assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m TOP 10'));
@@ -98,7 +98,7 @@ test('AV 1m ranks exactly the top ten markets by cached average minute turnover'
   assert.deepEqual(ranked.map(coin => coin.symbol),
     ['C15USDT','C14USDT','C13USDT','C12USDT','C11USDT',
       'C10USDT','C9USDT','C8USDT','C7USDT','C6USDT']);
-  assert.equal(ranked[0].volume1mUsd, 400_000);
+  assert.equal(ranked[0].volume1mUsd, 425_000);
   assert.equal(ranked[9].volume1mUsd, 200_000);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', all, 4), ranked.slice(0, 4));
   // Legacy internal AV sorting still operates without exposing an AV button.
@@ -110,9 +110,9 @@ test('AV 1m honors exact exchange and Spot/Futures filters, deduplicates and use
   const coins = [
     quote('BTCUSDT', 14_400_000, { volume1mUsd: 210_000 }),
     quote('BTCUSDT', 999_000_000, { volume1mUsd: 990_000 }), // duplicate market must not replace its first authoritative quote
-    quote('BTCUSDT', 43_200_000, { marketType: 'spot' }),
-    quote('ETHUSDT', 72_000_000, { exchange: 'bybit' }),
-    quote('SOLUSDT', 72_000_000, { exchange: 'bybit', marketType: 'spot' }),
+    quote('BTCUSDT', 43_200_000, { marketType: 'spot', volume1mUsd: 220_000 }),
+    quote('ETHUSDT', 72_000_000, { exchange: 'bybit', volume1mUsd: 340_000 }),
+    quote('SOLUSDT', 72_000_000, { exchange: 'bybit', marketType: 'spot', volume1mUsd: 300_000 }),
     quote('XRPUSDT', 0, { exchange: 'bybit', marketType: 'spot' }),
   ];
   const all = { exchange: 'all', marketType: 'all' } as const;
