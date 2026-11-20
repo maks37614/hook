@@ -146,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {/* All utilities are to the RIGHT of the centered mark. */}
-              <div className="flex min-w-0 shrink-0 items-center justify-start gap-0.5 sm:gap-1 xl:pointer-events-auto">
+              <div className="flex min-w-0 shrink-0 items-center justify-start gap-0.5 sm:gap-1 xl:w-max xl:justify-self-start xl:pointer-events-auto">
               <button
                   type="button"
                   id="screener-help-btn"
@@ -283,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
 
 
 
-          <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2 xl:w-auto xl:flex-nowrap xl:gap-1.5 [&>button]:shrink-0">
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-1.5 sm:gap-2 xl:relative xl:z-20 xl:w-auto xl:flex-nowrap xl:gap-1.5 [&>button]:shrink-0">
             <SiteNotificationBell onOpenSettings={onOpenNotificationSettings} onOpenChart={onOpenNotificationChart} onLinkNotification={onLinkNotification} canLinkNotification={canLinkNotification} />
 
             <button
