@@ -42,6 +42,8 @@ export class MinuteTurnoverService {
   private inFlight = new Map<string, Promise<MinuteTurnover>>();
   private topCached: {at:number; minuteStart:number; value: MinuteTop} | null = null;
   private topPending: Promise<MinuteTop> | null = null;
+  private publicMinuteStart = 0;
+  private publicChartSymbols = new Set<string>();
   constructor(
     private readCandles: CandleReader = (exchange, market, symbol) => fetchKlines(exchange, market, symbol, '1m', 10, undefined, undefined, {requireFresh:true}),
     private readMarket: MarketReader = (exchange, market) => marketTickerFeed.get(exchange, market),
@@ -67,6 +69,22 @@ export class MinuteTurnoverService {
       }).finally(() => this.inFlight.delete(key));
     this.inFlight.set(key, operation);
     return operation;
+  }
+  /** Public chart lookups have a separate global distinct-symbol allowance.
+   * This prevents arbitrary client-supplied tickers from exhausting shared
+   * Binance/Bybit IP budgets, while reusing already sampled ranking candles. */
+  async publicCoin(exchange: ExchangeId, market: MarketType, symbol: string): Promise<MinuteTurnover> {
+    const minuteStart = completedMinuteStart(this.now());
+    if (this.publicMinuteStart !== minuteStart) {
+      this.publicMinuteStart = minuteStart;
+      this.publicChartSymbols.clear();
+    }
+    const key = [exchange,market,symbol,minuteStart].join(':');
+    if (!this.readings.has(key) && !this.inFlight.has(key) && !this.publicChartSymbols.has(key)) {
+      if (this.publicChartSymbols.size >= 48) return { minuteStart, volume1mUsd: null };
+      this.publicChartSymbols.add(key);
+    }
+    return this.coin(exchange, market, symbol, minuteStart);
   }
   async top(): Promise<MinuteTop> {
     const minuteStart = completedMinuteStart(this.now());
