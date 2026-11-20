@@ -42,3 +42,14 @@ test('backend 1m response has server time, retry cache is isolated, and API does
   assert.match(footer,/needFallback/);
   assert.doesNotMatch(footer,/subscribeMarketTrades|connectSharedHookChartDepth/);
 });
+
+test('ECO retains real 1m chart turnover without extra requests and distinguishes ECO from missing data', () => {
+  const footer = readFileSync(new URL('../src/components/hookchart/HookChartFooterMinuteVolume.tsx',import.meta.url),'utf8');
+  assert.match(footer, /const chartMinute = freshChartMinute\(observedMinute, Date\.now\(\)\)/);
+  assert.match(footer, /const needFallback = enabled && !chartMinute/);
+  assert.match(footer, /!enabled \? 'ECO' : waiting/);
+  assert.match(footer, /ECO_PAUSED\[language\]/);
+  assert.match(footer, /sharedPublicChartPolling\.subscribe/);
+  const fromChart = {minuteStart,volume1mUsd:230_000};
+  assert.deepEqual(selectMinuteVolume(fromChart,null,serverNow), fromChart);
+});
