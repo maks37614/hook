@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { completedMinuteStart, readOneMinuteTurnover, chooseMinuteCandidates, MinuteTurnoverService } from '../server/minuteTurnoverService';
 import type { RawTicker } from '../server/marketTickerFeed';
@@ -58,4 +59,24 @@ test('public per-symbol footer reads are bounded and cannot exhaust shared IP bu
   assert.equal(calls,48);
   assert.equal((await svc.publicCoin('binance','spot','P0USDT')).volume1mUsd,300_000);
   assert.equal(calls,48);
+});
+
+test('footer minute readings reuse chart-priority Kline fetches instead of bypassing verified chart cache', () => {
+  const service = readFileSync(new URL('../server/minuteTurnoverService.ts', import.meta.url), 'utf8');
+  const market = readFileSync(new URL('../server/marketService.ts', import.meta.url), 'utf8');
+  const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
+  assert.match(service, /fetchKlines\(exchange, market, symbol, '1m', 10, undefined, undefined, \{ chart: true \}\)/);
+  assert.doesNotMatch(service, /fetchKlines\(exchange, market, symbol, '1m', 10, undefined, undefined, \{\s*requireFresh:true\s*\}\)/);
+  assert.match(market, /const marketRequest = options\.chart \? chartExchangeFetch : exchangeFetch;/);
+  assert.match(market, /if \(!options\.requireFresh && cached/);
+  assert.match(server, /minuteTurnoverService\.publicCoin\(/);
+  const now = Date.UTC(2026, 10, 20, 20, 10, 35);
+  const target = completedMinuteStart(now);
+  const recent = [
+    { time:(target - 60_000)/1000, quoteVolume: 12345, open:1, high:1, low:1, close:1, volume:1 },
+    { time:target/1000, quoteVolume: 456789, open:1, high:1, low:1, close:1, volume:1 },
+  ];
+  assert.deepEqual(readOneMinuteTurnover(recent, target), { minuteStart:target, volume1mUsd:456789 });
+  assert.equal(readOneMinuteTurnover(recent, target+60_000).volume1mUsd, null,
+    'older cached candle must never appear as a newer minute');
 });
