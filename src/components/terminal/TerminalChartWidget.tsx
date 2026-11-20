@@ -198,62 +198,40 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     };
   }, [isCoinPickerOpen, isSpanPickerOpen]);
 
-  // Live prices for the order book and Telegram alerts
-  const [currentPrice, setCurrentPrice] = useState<number | null>(coin?.currentPrice || null);
-  const [livePrice, setLivePrice] = useState<number>(coin?.currentPrice || 0);
-  // Update when coin prop changes
-  useEffect(() => {
-    if (coin?.currentPrice) {
-      setCurrentPrice(coin.currentPrice);
-      setLivePrice(coin.currentPrice);
-    }
-  }, [coin?.currentPrice]);
-
-  const pendingHeaderPriceRef = useRef<number | null>(null);
-  const headerPriceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Live candle prices are already painted directly inside HookChart.
+  // Keep the latest price in a ref for click actions instead of re-rendering
+  // an entire high-DPR chart and integrated toolbar every 250 ms.
   const instrumentKey = `${block.exchange}:${block.marketType}:${block.symbol}`;
+  const quotedPrice = coin?.currentPrice;
+  const initialPrice = Number.isFinite(quotedPrice) && (quotedPrice ?? 0) > 0 ? quotedPrice! : 0;
+  const livePriceRef = useRef(initialPrice);
   const previousInstrumentRef = useRef(instrumentKey);
   const activeInstrumentRef = useRef(instrumentKey);
   activeInstrumentRef.current = instrumentKey;
-  const quotedPrice = coin?.currentPrice;
-  useEffect(() => {
-    if (previousInstrumentRef.current === instrumentKey) return;
+  if (previousInstrumentRef.current !== instrumentKey) {
+    // Never show the old instrument's price in a new market's alert or archive.
     previousInstrumentRef.current = instrumentKey;
-    // Old coin prices and delayed HookChart callbacks must never appear on a new instrument.
-    if (headerPriceTimerRef.current !== null) clearTimeout(headerPriceTimerRef.current);
-    headerPriceTimerRef.current = null;
-    pendingHeaderPriceRef.current = null;
-    const nextPrice = Number.isFinite(quotedPrice) && (quotedPrice ?? 0) > 0 ? quotedPrice! : null;
-    setCurrentPrice(nextPrice);
-    setLivePrice(nextPrice ?? 0);
+    livePriceRef.current = initialPrice;
+  }
+  useEffect(() => {
+    // This refresh comes from the existing shared market snapshot, not a new feed.
+    if (Number.isFinite(quotedPrice) && (quotedPrice ?? 0) > 0)
+      livePriceRef.current = quotedPrice!;
   }, [instrumentKey, quotedPrice]);
+
   const handleChartPrice = useCallback((price: number) => {
     // Late data from an unmounted/replaced chart must not update the next coin.
     if (activeInstrumentRef.current !== instrumentKey) return;
     if (!Number.isFinite(price) || price <= 0) return;
-    pendingHeaderPriceRef.current = price;
-    if (headerPriceTimerRef.current !== null) return;
-    // Keep the chart's high-frequency candle updates independent from its
-    // header: rerendering every Terminal card at 12fps is unnecessarily costly.
-    headerPriceTimerRef.current = setTimeout(() => {
-      headerPriceTimerRef.current = null;
-      const latest = pendingHeaderPriceRef.current;
-      if (latest == null) return;
-      setCurrentPrice(previous => previous === latest ? previous : latest);
-      setLivePrice(previous => previous === latest ? previous : latest);
-    }, 250);
+    livePriceRef.current = price;
   }, [instrumentKey]);
-  useEffect(() => () => {
-    if (headerPriceTimerRef.current !== null) clearTimeout(headerPriceTimerRef.current);
-    headerPriceTimerRef.current = null;
-  }, []);
 
   const detailCoin = useMemo<ScannedCoin>(() => {
     if (coin) {
       return {
         ...coin,
         timeframe: block.timeframe,
-        currentPrice: livePrice || coin.currentPrice,
+        currentPrice: coin.currentPrice,
       };
     }
 
@@ -263,7 +241,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       quoteAsset: block.quoteAsset,
       exchange: block.exchange,
       marketType: block.marketType,
-      currentPrice: livePrice || currentPrice || 0,
+      currentPrice: quotedPrice || 0,
       priceChange24h: 0,
       highPrice24h: 0,
       lowPrice24h: 0,
@@ -282,8 +260,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     block.exchange,
     block.marketType,
     block.timeframe,
-    livePrice,
-    currentPrice,
+    quotedPrice,
   ]);
 
   // Active formation if any
@@ -459,7 +436,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
                       symbol: coin.symbol,
                       exchange: coin.exchange,
                       marketType: coin.marketType,
-                      currentPrice: livePrice,
+                      currentPrice: livePriceRef.current || coin.currentPrice,
                       targetPrice: activeFormation?.levels?.targetPrice,
                       formationName: activeFormation?.name,
                     })
@@ -501,7 +478,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
           {onOpenFullscreenModal && (
             <button
               type="button"
-              onClick={() => onOpenFullscreenModal(detailCoin, activeFormation || undefined)}
+              onClick={() => onOpenFullscreenModal({ ...detailCoin, currentPrice: livePriceRef.current || detailCoin.currentPrice }, activeFormation || undefined)}
               className="p-1 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
               title={translatePhrase(language, "Відкрити детальний графік з розширеним аналізом")}
               aria-label={translatePhrase(language, "Відкрити детальний графік з розширеним аналізом")}
@@ -669,7 +646,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`terminal-chart-block ${compactFullscreenMode ? 'fullscreen-multi-terminal-chart' : ''} relative flex min-w-0 flex-col bg-[#090d16] overflow-hidden transition-all duration-150 ${useIntegratedHookChartToolbar ? 'terminal-chart-hookchart border-0 rounded-none shadow-none' : 'border border-slate-800 rounded-xl shadow-lg'} ${colSpanClass} ${
+      className={`terminal-chart-block ${compactFullscreenMode ? 'fullscreen-multi-terminal-chart' : ''} relative flex min-w-0 flex-col bg-[#090d16] overflow-hidden ${useIntegratedHookChartToolbar ? 'terminal-chart-hookchart border-0 rounded-none shadow-none' : 'border border-slate-800 rounded-xl shadow-lg'} ${colSpanClass} ${
         isMaximized ? 'fixed inset-2 sm:inset-4 z-50 rounded-2xl border-cyan-500/50 shadow-2xl shadow-cyan-950/50' : ''
       }`}
       style={{
@@ -699,7 +676,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
               <ExchangeCandlestickChart
                 forceHookChart
                 onAddToArchive={onSaveToArchive ? capture => onSaveToArchive(
-                  block, detailCoin,
+                  block, { ...detailCoin, currentPrice: livePriceRef.current || detailCoin.currentPrice },
                   chosenFormation || availableFormations.find(item => item.id === block.formationId) || null,
                   capture
                 ) : undefined}
