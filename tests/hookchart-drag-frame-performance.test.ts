@@ -6,7 +6,9 @@ const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', im
 
 test('captured HookChart drags reuse bounds rather than forcing layout for every pointermove', () => {
   assert.match(engine, /const activePointerRect=useRef<DOMRect\|null>\(null\)/);
-  assert.match(engine, /pointers\.current\.has\(e\.pointerId\)\?activePointerRect\.current:null/);
+  assert.match(engine, /const captured=pointers\.current\.has\(e\.pointerId\)/);
+  assert.match(engine, /captured\?activePointerRect\.current:null/);
+  assert.match(engine, /if\(captured&&!activePointerRect\.current\)activePointerRect\.current=r/);
   assert.match(engine, /activePointerRect\.current=z\.rect/);
   assert.match(engine, /if\(!pointers\.current\.size\)\{\s*activePointerRect\.current=null/);
   assert.match(engine, /pointers\.current\.clear\(\);activePointerRect\.current=null/);
