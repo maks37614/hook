@@ -36,7 +36,7 @@ export async function sendTickerViaDesktop(input: {
     });
     if (response.status === 202) return {
       success: true,
-      message: 'Команду передано в h00k Desktop. MetaScalp перемкне групу ' + input.binding + '.',
+      message: 'Команду прийнято для h00k Desktop. Перевірте перемикання групи ' + input.binding + '.',
     };
     const data = await response.json().catch(() => null);
     if (response.status === 409 && data?.error === 'DESKTOP_OFFLINE')
