@@ -378,9 +378,10 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
 
   const [effectiveKlines, setEffectiveKlines] = useState<Kline[]>(() =>
     klines.length ? klines : warmTerminalHistory ?? []);
-  // The warm snapshot does not disable fresh history requests or live sockets.
-  const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(
-    klines.length > 1 || (warmTerminalHistory?.length ?? 0) > 1);
+  // A warm viewport snapshot is NOT proof that the newest exchange history
+  // was loaded. Keep gap recovery gated until fresh REST/WS reconciliation,
+  // otherwise a stale warm bar can trigger a redundant second history fetch.
+  const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(klines.length > 1);
   const lastTerminalHistoryRef = useRef(effectiveKlines);
   lastTerminalHistoryRef.current = effectiveKlines;
   useEffect(() => () => {
