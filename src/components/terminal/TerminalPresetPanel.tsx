@@ -122,11 +122,11 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
       // existing charts intact and apply this exact preset when quotes return.
       pendingQuoteSnapshot.current = snapshot;
       setPendingMarketPreset(id);
-      setMessage({ text: 'Оновлюємо ринкові котирування для пресету…' });
+      setMessage({ text: translatePhrase(language, 'Оновлюємо ринкові котирування для пресету…') });
       onRequestMarketRefresh?.();
       return;
     }
-    if ((id !== 'formations' && error) || !readyCoins[id].length) {
+    if (!readyCoins[id].length) {
       setMessage(id === 'formations'
         ? { text: translatePhrase(language, 'У списку Формацій немає монет за поточними фільтрами.') }
         : error ? { text: error } : { key: 'terminal.presets.emptySelection' });
@@ -141,7 +141,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
   useEffect(() => {
     if (!pendingMarketPreset) return;
     const matched = readyCoins[pendingMarketPreset];
-    if (matched.length && !error) {
+    if (matched.length) {
       setPendingMarketPreset(null);
       setMessage(null);
       onActivePresetChange(pendingMarketPreset);
@@ -153,9 +153,9 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
     // that a selected exchange really has no usable ticker rows.
     if (error || snapshot !== pendingQuoteSnapshot.current) {
       setPendingMarketPreset(null);
-      setMessage(error ? { text: error } : { key: 'terminal.presets.emptySelection' });
+      setMessage(error ? { text: error } : { text: translatePhrase(language, 'Для вибраної біржі та ринку зараз немає доступних котирувань. Перевірте фільтри або повторіть.') });
     }
-  }, [pendingMarketPreset, readyCoins, error, snapshot, onActivePresetChange, onPresetChosen]);
+  }, [pendingMarketPreset, readyCoins, error, snapshot, language, onActivePresetChange, onPresetChosen]);
 
   // Favorite keys include an exact exchange/market/symbol identity.
   // Index once per quote refresh instead of scanning the full exchange universe
