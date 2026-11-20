@@ -33,6 +33,7 @@ import { formatTerminalQuotedPrice } from '../../utils/terminalPresets';
 import { normalizeChartProvider } from '../../utils/chartPreferences';
 import { formationChartMarkers } from '../../utils/hookchartData';
 import { subscribeTerminalWidgetVisibility } from '../../utils/terminalVisibilityScheduler';
+import { terminalChartMountQueue } from '../../utils/terminalChartMountQueue';
 
 interface TerminalChartWidgetProps {
   block: TerminalChartBlock;
@@ -49,6 +50,8 @@ interface TerminalChartWidgetProps {
   isMaximized: boolean;
   /** Pause charts obscured by a maximized Terminal chart. */
   isSuspended?: boolean;
+  /** Reports only actual viewport crossings for adaptive paint budgeting. */
+  onVisibilityChange?: (blockId: string, visible: boolean) => void;
   onToggleMaximize: () => void;
   onRemove: () => void;
   onUpdateBlock: (updated: Partial<TerminalChartBlock>) => void;
@@ -91,6 +94,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   responsiveSpanClass,
   isMaximized,
   isSuspended = false,
+  onVisibilityChange,
   onToggleMaximize,
   onRemove,
   onUpdateBlock,
@@ -138,7 +142,18 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   // outside the visible Terminal area. Rendering it again restores its
   // saved panel state and reconnects only its chart-owned feeds.
   const [isNearViewport, setIsNearViewport] = useState(false);
-  const shouldLoadWidgets = !isSuspended && isNearViewport;
+  const [isMountReady, setIsMountReady] = useState(false);
+  const shouldLoadWidgets = !isSuspended && isNearViewport && isMountReady;
+
+  useEffect(() => {
+    if (!isNearViewport || isSuspended) {
+      setIsMountReady(false);
+      return;
+    }
+    // A fast swipe must not initialize 4-8 DPR canvases simultaneously.
+    // Only tiles that remain visible receive a mount slot.
+    return terminalChartMountQueue.enqueue(() => setIsMountReady(true));
+  }, [isNearViewport, isSuspended]);
 
   // Measure all chart cards through the shared viewport scheduler. Do not
   // preload the next row; hidden cards do not allocate a high-DPR canvas,
@@ -147,14 +162,22 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     const node = blockRootRef.current;
     if (!node || isSuspended) {
       setIsNearViewport(false);
+      onVisibilityChange?.(block.id, false);
       return;
     }
-    return subscribeTerminalWidgetVisibility(
+    const unsubscribe = subscribeTerminalWidgetVisibility(
       node,
-      visible => setIsNearViewport(current => current === visible ? current : visible),
+      visible => {
+        setIsNearViewport(current => current === visible ? current : visible);
+        onVisibilityChange?.(block.id, visible);
+      },
       isMaximized || compactFullscreenMode,
     );
-  }, [isMaximized, compactFullscreenMode, isSuspended]);
+    return () => {
+      unsubscribe();
+      onVisibilityChange?.(block.id, false);
+    };
+  }, [isMaximized, compactFullscreenMode, isSuspended, block.id, onVisibilityChange]);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const toolbarMenusRef = useRef<HTMLDivElement>(null);
