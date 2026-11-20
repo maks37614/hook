@@ -27,6 +27,7 @@ import {
 } from '../utils/replayService';
 import { fetchReplayHistoryBoundary, resolveReplayHistoryDate } from '../utils/replayHistoryAvailability';
 import { prependCachedReplayHistory, replayVisibleCandles } from '../utils/replayHistoryExtend';
+import { REPLAY_INTRABAR_PHASES, REPLAY_INTRABAR_TICK_MS, replayIntrabarCandle, replayRemainingCandle } from '../utils/replayIntrabar';
 import { useReplayProfileState } from '../utils/useReplayProfileState';
 import { storeReplayScreenshot, deleteReplayScreenshots, clearReplayScreenshots, replayImageKey } from '../utils/replayScreenshots';
 import {
@@ -77,7 +78,17 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
   // Playback Control
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0); // 1x = 600ms per bar
-  const playbackTimerRef = useRef<any>(null);
+  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Fractional playback is chart-only: the authoritative history cursor
+  // advances exactly once per completed bar, preserving journal/profile writes.
+  const [playbackPhase, setPlaybackPhase] = useState(0);
+  const playbackFractionRef = useRef(0);
+  const nextBarCutoffRef = useRef<{ time: number; phase: number; id: string } | null>(null);
+  const orderCutoffsRef = useRef(new Map<string, { time: number; phase: number }>());
+  const resetIntrabar = useCallback(() => {
+    playbackFractionRef.current = 0;
+    setPlaybackPhase(0);
+  }, []);
   const loadRequestIdRef = useRef(0);
   const randomHistorySelectionRef = useRef(false);
 
@@ -107,17 +118,23 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     loadRequestIdRef.current++;
     historyRequestIdRef.current++;
     setIsPlaying(false);
+    resetIntrabar();
+    nextBarCutoffRef.current = null;
+    orderCutoffsRef.current.clear();
     setAllCandles([]);
     setCurrentIndex(0);
     setCutoffIndex(0);
     setCachedHistoryPrefix([]);
     setHistoryExpanded(false);
     setIsHistoryLoading(false);
-  }, [ownerKey]);
+  }, [ownerKey, resetIntrabar]);
 
   useEffect(() => {
-    if (!isReady) setIsPlaying(false);
-  }, [isReady]);
+    if (!isReady) {
+      setIsPlaying(false);
+      resetIntrabar();
+    }
+  }, [isReady, resetIntrabar]);
   const [legacyJournalCount, setLegacyJournalCount] = useState(0);
   const legacyImportPending = useRef<string | null>(null);
   const legacyImportAfterRevision = useRef(0);
@@ -573,6 +590,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       setIsLoadingCandles(true);
       setLoadError(null);
       setIsPlaying(false);
+      resetIntrabar();
+      nextBarCutoffRef.current = null;
+      orderCutoffsRef.current.clear();
       setAllCandles([]);
       if (!restoringProfile) {
         setPosition(null);
@@ -634,7 +654,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         if (requestId === loadRequestIdRef.current) setIsLoadingCandles(false);
       }
     },
-    [symbol, exchange, marketType, timeframe, showToast, t, uiLocale, language]
+    [symbol, exchange, marketType, timeframe, showToast, t, uiLocale, language, resetIntrabar]
   );
 
   // Wait until the correct account snapshot has loaded before initializing
@@ -666,10 +686,18 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
 
   // Only the chart receives cached older history while History is expanded.
   // Replay playback, dates, journal and simulation indices remain untouched.
-  const visibleCandles = useMemo(
+  const confirmedReplayCandles = useMemo(
     () => replayVisibleCandles(allCandles, currentIndex, historyExpanded, cachedHistoryPrefix),
     [allCandles, currentIndex, historyExpanded, cachedHistoryPrefix],
   );
+  // Only the next candle is reconstructed, from its already fetched OHLC.
+  // The unaltered future candles never enter any renderer, journal or overlay.
+  const partialCandle = useMemo(() => playbackPhase > 0 && currentIndex + 1 < allCandles.length
+    ? replayIntrabarCandle(allCandles[currentIndex + 1], playbackPhase / REPLAY_INTRABAR_PHASES)
+    : null, [allCandles, currentIndex, playbackPhase]);
+  const visibleCandles = useMemo(() => partialCandle
+    ? [...confirmedReplayCandles, partialCandle] : confirmedReplayCandles,
+    [confirmedReplayCandles, partialCandle]);
 
   // History is a viewport mode with an optional cache-only prepend. Never
   // request older candles from Binance, Bybit, or the normal /api/klines route.
@@ -719,9 +747,18 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
 
   const currentCandle = visibleCandles[visibleCandles.length - 1] || null;
   const currentPrice = currentCandle ? currentCandle.close : 0;
+  // Display the simulated last price/PnL while leaving the persisted open
+  // position untouched until the next historical candle is committed.
+  const displayPosition = useMemo(() => {
+    if (!position || !partialCandle) return position;
+    const { pnlUsd, pnlPct } = calculateUnrealizedPnl(position, partialCandle.close);
+    return { ...position, currentPrice: partialCandle.close,
+      unrealizedPnlUsd: pnlUsd, unrealizedPnlPct: pnlPct };
+  }, [position, partialCandle]);
 
-  // Step Forward +1 Candle Logic
+  // Step Forward +1 Candle Logic. Explicit steps always reveal a complete bar.
   const handleStepForward = useCallback(() => {
+    resetIntrabar();
     if (currentIndex >= allCandles.length - 1) {
       setIsPlaying(false);
       showToast('info', t('replay.history.endTitle'), t('replay.history.endDescription'));
@@ -730,6 +767,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
 
     const nextIndex = currentIndex + 1;
     const nextCandle = allCandles[nextIndex];
+    // Capture the active order's in-bar origin before clearing it. The bar
+    // will be committed only after all synthetic animation phases have passed.
+    const currentEntryCutoff = nextBarCutoffRef.current;
+    nextBarCutoffRef.current = null;
     setCurrentIndex(nextIndex);
 
     // 1. Check Pending Orders (Limit / Stop)
@@ -738,7 +779,11 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       if (prevOrders.length === 0) return prevOrders;
       const remaining: ReplayPendingOrder[] = [];
       for (const order of prevOrders) {
-        const isFilled = checkOrderFill(order, nextCandle);
+        const cutoff = orderCutoffsRef.current.get(order.id);
+        const effectiveBar = cutoff?.time === nextCandle.time
+          ? replayRemainingCandle(nextCandle, cutoff.phase) : nextCandle;
+        orderCutoffsRef.current.delete(order.id);
+        const isFilled = checkOrderFill(order, effectiveBar);
         if (isFilled) {
           // Fill order into active position
           const fillPrice = order.price;
@@ -803,7 +848,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       };
 
       // Check triggers on this new candle's High & Low
-      const trigger = checkPositionTriggers(prevPos, nextCandle);
+      const postEntryBar = currentEntryCutoff?.id === prevPos.id && currentEntryCutoff.time === nextCandle.time
+        ? replayRemainingCandle(nextCandle, currentEntryCutoff.phase) : nextCandle;
+      const trigger = checkPositionTriggers(prevPos, postEntryBar);
       if (trigger) {
         // Position closed by SL, TP, or Liquidation!
         const exitPrice = trigger.exitPrice;
@@ -891,6 +938,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     showToast,
     playSound,
     t,
+    resetIntrabar,
   ]);
 
   const handleStepForwardRef = useRef(handleStepForward);
@@ -898,28 +946,36 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     handleStepForwardRef.current = handleStepForward;
   }, [handleStepForward]);
 
-  // Auto-play Timer Loop
+  // Browser-only intra-candle animation. Historical seconds are never fetched
+  // as fake ticks: the user sees an explicitly labelled OHLC approximation.
+  // Maximum 8 paints/bar (up to 25 timer checks/sec); 5x/10x may show fewer
+  // frames to keep the original 600ms-per-bar speed and preserve chart FPS.
   useEffect(() => {
-    if (!isPlaying) {
-      if (playbackTimerRef.current) {
-        clearInterval(playbackTimerRef.current);
-        playbackTimerRef.current = null;
-      }
-      return;
-    }
-
-    const intervalMs = Math.max(80, Math.round(600 / playbackSpeed));
+    if (!isPlaying) return;
+    let lastTickAt = performance.now();
+    const intervalMs = Math.max(80, 600 / playbackSpeed);
     playbackTimerRef.current = setInterval(() => {
-      handleStepForwardRef.current();
-    }, intervalMs);
-
+      const now = performance.now();
+      if (document.visibilityState === 'hidden') { lastTickAt = now; return; }
+      const deltaMs = Math.max(0, Math.min(120, now - lastTickAt));
+      lastTickAt = now;
+      playbackFractionRef.current = Math.min(1, playbackFractionRef.current + deltaMs / intervalMs);
+      if (playbackFractionRef.current >= 1) {
+        resetIntrabar();
+        handleStepForwardRef.current();
+      } else {
+        const phase = Math.max(1, Math.min(REPLAY_INTRABAR_PHASES - 1,
+          Math.floor(playbackFractionRef.current * REPLAY_INTRABAR_PHASES)));
+        setPlaybackPhase(previous => previous === phase ? previous : phase);
+      }
+    }, REPLAY_INTRABAR_TICK_MS);
     return () => {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, playbackSpeed]);
+  }, [isPlaying, playbackSpeed, resetIntrabar]);
 
   // Global Keyboard Shortcuts (Space: Play/Pause, Right Arrow: Step +1)
   useEffect(() => {
@@ -1001,6 +1057,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         entryScreenshot: screenshot,
       };
 
+      if (partialCandle && playbackPhase > 0) {
+        nextBarCutoffRef.current = { time: partialCandle.time,
+          phase: playbackPhase / REPLAY_INTRABAR_PHASES, id: newPos.id };
+      }
       setPosition(newPos);
       playSound('order');
       showToast(
@@ -1009,7 +1069,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.marketOpenDescription', { symbol, size: params.sizeUsd, leverage: params.leverage, price: execPrice.toFixed(2) })
       );
     },
-    [currentPrice, position, settings, symbol, currentCandle, showToast, playSound, t]
+    [currentPrice, position, settings, symbol, currentCandle, partialCandle, playbackPhase, showToast, playSound, t]
   );
 
   // Place Pending Order (Limit / Stop)
@@ -1040,6 +1100,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         createdAtTime: currentCandle ? currentCandle.time : Math.floor(Date.now() / 1000),
       };
 
+      if (partialCandle && playbackPhase > 0) {
+        orderCutoffsRef.current.set(newOrder.id, { time: partialCandle.time,
+          phase: playbackPhase / REPLAY_INTRABAR_PHASES });
+      }
       setPendingOrders((prev) => [...prev, newOrder]);
       showToast(
         'info',
@@ -1047,7 +1111,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.pendingCreatedDescription', { side: params.side.toUpperCase(), price: params.price.toFixed(2) })
       );
     },
-    [symbol, currentCandle, showToast, t]
+    [symbol, currentCandle, partialCandle, playbackPhase, showToast, t]
   );
 
   // Close Position Manually
@@ -1172,6 +1236,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
   // Reset to cutoff index
   const handleResetToCutoff = () => {
     if (!canChangeReplayHistory()) return;
+    resetIntrabar();
+    nextBarCutoffRef.current = null;
+    orderCutoffsRef.current.clear();
     setCurrentIndex(cutoffIndex);
     setIsPlaying(false);
     setFocusTrigger((prev) => prev + 1);
@@ -1305,13 +1372,14 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
             isHistoryLoading={isHistoryLoading}
             onToggleHistory={toggleCachedHistory}
             isPlaying={isPlaying}
+            isIntrabarPreview={partialCandle !== null}
             canAdvance={allCandles.length > 0 && currentIndex < allCandles.length - 1}
             onTogglePlay={toggleReplayPlayback}
             onStepForward={handleStepForward}
             onRandomHistoricalDate={handleRandomHistoricalDate}
             exchange={exchange}
             marketType={marketType}
-            position={position}
+            position={displayPosition}
             pendingOrders={pendingOrders}
             isReplaying={true}
             focusTrigger={focusTrigger}
@@ -1324,7 +1392,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
           <ReplaySimulatorPanel
             currentPrice={currentPrice}
             currentCandle={currentCandle}
-            position={position}
+            position={displayPosition}
             settings={settings}
             onUpdateSettings={setSettings}
             onExecuteMarketOrder={handleExecuteMarketOrder}

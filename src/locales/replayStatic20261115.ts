@@ -51,6 +51,20 @@ export const replayStaticRows = [
     "🎲 Losowo"
   ],
   [
+    "toolbar.intrabarBadge",
+    "OHLC · симуляція",
+    "OHLC · simulated",
+    "OHLC · симуляция",
+    "OHLC · symulacja"
+  ],
+  [
+    "toolbar.intrabarDisclaimer",
+    "Свічка формується поступово за історичними OHLC. Рух усередині неї є приблизною реконструкцією, а не справжніми тиками з біржі.",
+    "The candle develops progressively from historical OHLC. Its intra-candle path is an approximation, not actual exchange ticks.",
+    "Свеча формируется постепенно по историческим OHLC. Движение внутри неё приблизительное, а не настоящие тики биржи.",
+    "Świeca rozwija się stopniowo na podstawie historycznych OHLC. Ruch wewnątrz świecy jest przybliżony, nie pochodzi z rzeczywistych ticków."
+  ],
+  [
     "toolbar.pause",
     "Пауза",
     "Pause",
