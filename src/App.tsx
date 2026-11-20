@@ -42,6 +42,7 @@ import {
   getUserMetaScalpSettings,
 } from './utils/metaScalpService';
 import { getUserTerminalLinkSettings, sendToSelectedTerminal, terminalLabel, notificationTerminalSource, isFreshTerminalNotification, type TerminalLinkSource } from './utils/terminalLinkService';
+import { desktopRemoteLinkEnabled } from './utils/desktopRemoteLink';
 import type { SiteNotificationItem } from './utils/siteNotifications';
 import { notificationChartTarget } from './utils/notificationChartLink';
 import { ScannedCoin, DetectedFormation, ScreenerFilterState, PriceAlert, ArchivedFormation, ActivePageType, type FullEarlyScanSnapshot } from './types';
@@ -750,10 +751,15 @@ export default function App() {
       if (!res.success && lastTerminalCommand.current.key === key)
         lastTerminalCommand.current = { key: '', at: 0 };
       if (metaScalpUserIdRef.current !== user.uid) return;
-      if (res.success && metaScalpSettings.soundFeedback) playMetaScalpClickSound();
+      // The VPS returns 202 when a command has been accepted for delivery.
+      // It does not yet confirm the MetaScalp UI has actually changed.
+      const pendingDesktop = res.terminal === 'metascalp' && desktopRemoteLinkEnabled(user.uid);
+      if (res.success && !pendingDesktop && metaScalpSettings.soundFeedback) playMetaScalpClickSound();
       setMetaScalpToast({
-        id: Date.now(), type: res.success ? 'success' : 'warning',
-        title: res.success ? `${terminalLabel(res.terminal)}: синхронізовано` : terminalLabel(res.terminal),
+        id: Date.now(), type: res.success && !pendingDesktop ? 'success' : 'warning',
+        title: res.success && pendingDesktop
+          ? 'h00k Desktop: команду прийнято'
+          : res.success ? `${terminalLabel(res.terminal)}: синхронізовано` : terminalLabel(res.terminal),
         ticker: res.ticker, binding: res.group,
         message: res.copiedToClipboard ? `${res.message} (Тікер скопійовано)` : res.message,
       });
