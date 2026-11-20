@@ -10,7 +10,7 @@ test('MetaScalp settings, connection states and setup instructions render in sel
   assert.match(source, /const \{ language \} = useLanguage\(\)/);
   assert.match(source, /const tr = \(source: string\) => translatePhrase\(language, source\)/);
   const labels = [...new Set([...source.matchAll(/\btr\((["'])(.*?)\1\)/g)].map(m=>m[2].replace(/\\u0027/g, "'")))];
-  assert.ok(labels.length >= 40, 'expected connection, settings and tutorial labels');
+  assert.ok(labels.length >= 35, 'expected connection, settings and tutorial labels');
   for (const key of labels) {
     assert.ok(translatePhrase('uk',key).trim(), 'missing Ukrainian phrase: ' + key);
     for (const language of ['en','ru','pl'] as const) {
@@ -24,7 +24,8 @@ test('MetaScalp settings, connection states and setup instructions render in sel
   assert.doesNotMatch(masked, /\b(?:title|aria-label|placeholder)="[^"]*[А-Яа-яІіЇїЄєҐґ]/,
     'hard-coded Ukrainian accessibility label remains');
   assert.match(source, /aria-label=\{tr\("Закрити"\)\}/);
-  assert.match(source, /aria-label=\{tr\("Автоперемикання при виборі"\)\}/);
+  assert.doesNotMatch(source, /aria-label=\{tr\("Автоперемикання при виборі"\)\}/);
+  assert.doesNotMatch(source, /handleToggleAutoSwitch/, "retired auto-switch control must stay hidden");
 });
 
 test('every additional MetaScalp phrase has UK, EN, RU and PL forms', () => {
