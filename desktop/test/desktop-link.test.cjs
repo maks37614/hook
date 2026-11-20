@@ -166,11 +166,12 @@ function mixedMetaScalpState() {
 }
 test('UI inventory selects only the requested binding and validates destinations',()=>{
   assert.deepEqual(linkedTickerDocuments(mixedMetaScalpState(),2),{documents:[
-    {externalId:FIRST,connectionId:11},{externalId:SECOND,connectionId:22},
-  ]});
+    {externalId:FIRST,connectionId:11,kind:'orderBook'},
+    {externalId:SECOND,connectionId:22,kind:'orderBook'},
+  ],orderBookCount:2});
   assert.deepEqual(linkedTickerDocuments(mixedMetaScalpState(),3),{documents:[
-    {externalId:EXTRA,connectionId:33},
-  ]});
+    {externalId:EXTRA,connectionId:33,kind:'orderBook'},
+  ],orderBookCount:1});
   assert.equal(linkedTickerDocuments({},2),null,'unsupported inventory must be recognized');
   const malformed=mixedMetaScalpState();
   malformed.windows[0].tabs[0].documents[0].externalId='../../orders';
@@ -214,6 +215,7 @@ test('mixed group includes charts and never changes other groups or empty docume
   });
   const docs=linkedTickerDocuments(state,2);
   assert.equal(docs.documents.length,3);
+  assert.equal(docs.orderBookCount,2);
   assert.ok(docs.documents.some(d=>d.externalId==='dddddddd-dddd-dddd-dddd-dddddddddddd'));
   assert.ok(!docs.documents.some(d=>d.externalId===EXTRA));
 });
@@ -245,4 +247,59 @@ test('legacy MetaScalp without UI inventory keeps the existing named-group route
   assert.equal(r.legacy,true);
   assert.deepEqual(JSON.parse(calls.at(-1)[1].body),
     {tickerPattern:'BINANCE:BTCUSDT.p',binding:'002'});
+});
+
+test('every group 001-500: one book follows the exact site-selected Spot/Futures instrument',async()=>{
+  for(const group of ['001','002','017','500']){
+    for(const marketType of ['spot','futures']){
+      const calls=[];
+      const state={windows:[{tabs:[{documents:[
+        {externalId:FIRST,kind:'orderBook',linkNumber:Number(group),connectionId:11},
+        // A linked chart does not count as a second order book.
+        {externalId:SECOND,kind:'chart',linkNumber:Number(group),connectionId:11},
+      ]}]}],standaloneCharts:[]};
+      const sender=new MetaScalpTickerSender(async(url,opts)=>{
+        calls.push([url,opts]);
+        if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+        if(url.endsWith('/api/ui/state'))return {ok:true,json:async()=>state};
+        if(url.endsWith('/api/change-ticker'))return {ok:true,json:async()=>({status:'ok'})};
+        throw Error('Single-book group must use original market-aware endpoint: '+url);
+      });
+      const r=await sender.send({symbol:'BTCUSDT',exchange:'binance',marketType,binding:group});
+      assert.equal(r.ok,true,group+' '+marketType);
+      assert.equal(r.mode,'named-group');
+      const changes=calls.filter(([url])=>url.endsWith('/api/change-ticker'));
+      assert.equal(changes.length,1);
+      assert.deepEqual(JSON.parse(changes[0][1].body),{
+        tickerPattern:marketType==='futures'?'BINANCE:BTCUSDT.p':'BINANCE:BTCUSDT',
+        binding:group,
+      });
+      assert.equal(calls.filter(([url,opts])=>opts.method==='PUT').length,0);
+    }
+  }
+});
+
+test('every group 001-500: two books keep their connections even when connection IDs match',async()=>{
+  for(const group of ['001','002','017','500']){
+    const calls=[];
+    const state={windows:[{tabs:[{documents:[
+      {externalId:FIRST,kind:'orderBook',linkNumber:Number(group),connectionId:11},
+      {externalId:SECOND,kind:'orderBook',linkNumber:Number(group),connectionId:11},
+      {externalId:EXTRA,kind:'chart',linkNumber:200,connectionId:33},
+    ]}]}],standaloneCharts:[]};
+    const sender=new MetaScalpTickerSender(async(url,opts)=>{
+      calls.push([url,opts]);
+      if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+      if(url.endsWith('/api/ui/state'))return {ok:true,json:async()=>state};
+      if(url.includes('/api/ui/documents/'))return {ok:true,json:async()=>({status:'ok'})};
+      throw Error('Two books must not receive group-wide Spot/Futures override: '+url);
+    });
+    const r=await sender.send({symbol:'ETHUSDT',exchange:'binance',marketType:'futures',binding:group});
+    assert.equal(r.ok,true,group);
+    assert.equal(r.mode,'per-panel');
+    assert.equal(r.panels,2);
+    assert.deepEqual(calls.filter(([url])=>url.includes('/api/ui/documents/'))
+      .map(([url])=>url.split('/').at(-2)).sort(),[FIRST,SECOND]);
+    assert.ok(!calls.some(([url])=>url.endsWith('/api/change-ticker')));
+  }
 });
