@@ -108,7 +108,7 @@ export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuo
     // Exclude large benchmark assets and BTC/ETH price trackers without
     // extra REST, candle history or server-side correlation calculations.
     if (preset === 'av_1m' && isAvOneMinuteExcludedBase(coin.baseAsset)) return false;
-    if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0)) return false;
+    if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd <= 0)) return false;
     if (preset !== 'av' && preset !== 'av_1m' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
     return true;
