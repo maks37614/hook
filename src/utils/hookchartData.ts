@@ -118,10 +118,12 @@ export function mergeLiveChartHistory(history: Kline[], displayed: Kline[]): Kli
 }
 
 /**
- * Repair missing WebSocket minutes from an exchange history page.
- * Only insert genuine, validated exchange candles strictly inside the
- * detected gap. Never replace a newer chart candle or interpolate prices.
- * Runs only after a confirmed feed gap, not during normal stream updates.
+ * Recover an observed kline gap without inventing OHLC.
+ * Reconcile the last candle before disconnection from exchange history:
+ * it may have frozen before close and otherwise appear disconnected from
+ * the next bar. Never overwrite the current, still-forming live candle.
+ *
+ * Called only after a detected missing time interval, not on normal ticks.
  */
 export function mergeMissingExchangeKlines(
   displayed: Kline[],
@@ -131,16 +133,28 @@ export function mergeMissingExchangeKlines(
   limit = 40_000,
 ): Kline[] {
   if (!displayed.length || gapFrom >= gapTo || !recovered.length) return displayed;
-  const existing = new Set(displayed.map(candle => candle.time));
+  const byTime = new Map(displayed.map(candle => [candle.time, candle]));
   const additions: Kline[] = [];
+  let correctedStart: Kline | null = null;
+  const oldStart = byTime.get(gapFrom);
   for (const candle of recovered) {
-    if (!validCandle(candle) || candle.time <= gapFrom || candle.time >= gapTo ||
-        existing.has(candle.time)) continue;
-    existing.add(candle.time);
+    if (!validCandle(candle) || candle.time < gapFrom || candle.time >= gapTo) continue;
+    if (candle.time === gapFrom) {
+      // A closed exchange bar is authoritative when its cumulative volume
+      // is at least that of the last (potentially partial) live snapshot.
+      if (oldStart && candle.volume >= oldStart.volume &&
+          !sameKlineValues(candle, oldStart)) correctedStart = candle;
+      continue;
+    }
+    if (byTime.has(candle.time)) continue;
+    byTime.set(candle.time, candle);
     additions.push(candle);
   }
-  if (!additions.length) return displayed;
-  return [...displayed, ...additions]
+  if (!additions.length && !correctedStart) return displayed;
+  const revised = correctedStart
+    ? displayed.map(candle => candle.time === gapFrom ? correctedStart! : candle)
+    : displayed;
+  return [...revised, ...additions]
     .sort((a, b) => a.time - b.time)
     .slice(-Math.max(2, limit));
 }
