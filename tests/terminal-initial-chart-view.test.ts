@@ -290,7 +290,7 @@ test('legacy workspaces with over 50 charts paginate without discarding saved ch
   assert.doesNotMatch(page.slice(gridStart, gridEnd), /\{blocks\.map\(/);
 });
 
-test('terminal profile sync rejects cross-device changes and keeps a recoverable local backup', () => {
+test('Terminal profile sync reconciles stale edits with the latest cloud version', () => {
   const hook = source('../src/utils/useTerminalWorkspace.ts');
   const panel = source('../src/components/terminal/TerminalPresetPanel.tsx');
   const auth = source('../src/context/AuthContext.tsx');
@@ -298,11 +298,12 @@ test('terminal profile sync rejects cross-device changes and keeps a recoverable
   assert.match(hook, /auth\.updateTerminalWorkspace\(\{/);
   assert.match(hook, /serverVersion\.current/);
   assert.match(hook, /error\.code === 'TERMINAL_WORKSPACE_CONFLICT'/);
-  assert.match(hook, /syncConflictRef\.current/);
-  assert.match(hook, /onDownloadLocalBackup|downloadLocalBackup/);
-  assert.match(panel, /syncConflict \? 'terminal\.drawer\.syncPresetConflict'/);
-  assert.match(panel, /terminal\.drawer\.syncDownload/);
-  assert.match(auth, /updateTerminalWorkspace: \(/);
+  assert.match(hook, /authRef\.current\.refreshProfile\(\)/);
+  assert.match(hook, /rebaseTerminalWorkspace\(base, workspaceRef\.current, cloud\)/);
+  assert.doesNotMatch(hook, /syncConflictRef|saveConflictBackup/);
+  assert.match(panel, /terminal\.drawer\.syncPresetFailed/);
+  assert.doesNotMatch(panel, /syncPresetConflict/);
+  assert.match(auth, /refreshProfile: \(\) => Promise<UserProfile>/);
   assert.match(backend, /COALESCE\(profile -> 'terminalSettings' ->> 'version', ''\) = \$3/);
   assert.match(backend, /new AuthFailure\(409, .*'TERMINAL_WORKSPACE_CONFLICT'\)/);
 });
@@ -332,47 +333,21 @@ test('Terminal always chooses native HookChart, never legacy TradingView even on
   assert.match(widget, /lastUpdated: 0/);
 });
 
-test('Terminal sync conflicts are visible outside hidden menus and can be recovered safely', () => {
+test('Terminal settings show no local/cloud conflict and signed-in users use cloud-only state', () => {
   const page = source('../src/components/TerminalPage.tsx');
   const hook = source('../src/utils/useTerminalWorkspace.ts');
   const settings = source('../src/components/terminal/TerminalSettingsDrawer.tsx');
-  assert.doesNotMatch(page, /<div role="alert" className="z-30 flex shrink-0/);
-  assert.match(page, /syncConflict=\{syncConflict\} backupFailed=\{backupFailed\}/);
-  assert.match(page, /onDownloadLocalBackup=\{downloadLocalBackup\}/);
-  assert.match(page, /onRestoreCloudWorkspace=\{restoreCloudWorkspace\}/);
-  assert.match(settings, /role="alert"/);
-  assert.match(settings, /onClick=\{onDownloadLocalBackup\}/);
-  assert.match(settings, /onClick=\{onRestoreCloudWorkspace\}/);
-  assert.match(settings, /backupFailed/);
-  assert.match(settings, /terminal\.drawer\.conflictBackupFailed/);
-  assert.match(hook, /saveConflictBackup\(uid: string, value: WorkspaceSnapshot\): boolean/);
-  assert.match(hook, /localStorage\.setItem\(terminalStorageKey\(CONFLICT_KEY, uid\)/);
-  assert.match(hook, /if \(uid && syncConflictRef\.current\) \{\s*const stored = saveConflictBackup\(uid, workspace\)/);
-  // Cloud hydration now checks the conflict first and only loads the remote
-  // state if there were no local edits; keep the two safety gates explicit.
-  assert.match(hook, /if \(syncConflictRef\.current\) return;/);
-  // Hydration now normalizes the server workspace before assignment. Assert
-  // both the no-local-edits gate and that the normalized result is applied.
-  assert.match(hook, /if \(revision\.current === 0\) \{[\s\S]*?const hydratedWorkspace = loadTerminalWorkspace\(uid, profile\.terminalSettings\)/);
-  assert.match(hook, /setWorkspace\(hydratedWorkspace\)/);
-  assert.match(hook, /window\.confirm\(/);
-  assert.match(hook, /window\.location\.reload\(\)/);
-});
-
-test('late profile hydration never overwrites a locally edited workspace or claims the cloud version', () => {
-  const hook = source('../src/utils/useTerminalWorkspace.ts');
-  const start = hook.indexOf('if (hydrated.current || !uid || profile?.uid !== uid) return;');
-  const end = hook.indexOf('const setField =', start);
-  assert.ok(start >= 0 && end > start);
-  const hydration = hook.slice(start, end);
-  assert.match(hydration, /revision\.current > 0 \|\| lastCommittedWorkspace\.current !== workspace/);
-  assert.match(hydration, /syncConflictRef\.current = true/);
-  assert.match(hydration, /saveConflictBackup\(uid, workspaceRef\.current\)/);
-  assert.match(hydration, /setSyncConflict\(true\)/);
-  assert.match(hydration, /if \(syncConflictRef\.current\) return;/);
-  assert.match(hydration, /if \(revision\.current === 0\)/);
-  assert.doesNotMatch(hook, /serverVersion\.current = profile\.terminalSettings\?\.version[\s\S]*?serverVersion\.current = profile\.terminalSettings\?\.version/,
-    'the CAS version must not be upgraded by a newer profile update from another device');
+  assert.doesNotMatch(page, /syncConflict|restoreCloudWorkspace|backupFailed/);
+  assert.doesNotMatch(settings, /syncConflict|conflictDetails|restoreCloudWorkspace|role="alert"/);
+  assert.doesNotMatch(hook, /CONFLICT_KEY|saveConflictBackup|readConflictBackup/);
+  assert.match(hook, /const storedBlocks = uid \? null : readCache\(BLOCKS_KEY\)/);
+  assert.match(hook, /const storedConfig = uid \? null : readCache\(CONFIG_KEY\)/);
+  assert.match(hook, /const pendingEdits = revision\.current !== savedRevision\.current/);
+  assert.match(hook, /rebaseTerminalWorkspace\(syncedWorkspaceRef\.current, workspaceRef\.current, cloud\)/);
+  assert.match(hook, /serverVersion\.current = cloudVersion/);
+  assert.match(hook, /setWorkspace\(rebased\)/);
+  assert.match(hook, /if \(!uid\) \{/);
+  assert.match(hook, /downloadLocalBackup/); // Explicit JSON export remains available.
 });
 
 test('the sole chart uses the same identity-bound grid item as multiple charts', () => {
