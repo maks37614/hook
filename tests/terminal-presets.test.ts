@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { MarketCoin, ScannedCoin, TerminalChartBlock } from '../src/types';
 import { MARKET_PRESETS, matchesMarketPreset, selectFormationPresetCoins, selectMarketPresetCoins } from '../src/utils/marketPresets';
-import { blocksForMarketPreset, blocksForSavedFavorites, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, normalizeTerminalPresets, terminalStorageKey, TERMINAL_PRESETS_STORAGE_KEY } from '../src/utils/terminalPresets';
+import { blocksForMarketPreset, blocksForSavedFavorites, normalizeTerminalBlocks, normalizeTerminalMarketPair, formatTerminalQuotedPrice, normalizeTerminalPresets, terminalStorageKey, TERMINAL_PRESETS_STORAGE_KEY, MAX_TERMINAL_CHARTS, toggleTerminalPresetCoin } from '../src/utils/terminalPresets';
 import { loadTerminalWorkspace, parseTerminalWorkspaceBackup } from '../src/utils/useTerminalWorkspace';
 
 const coin = (symbol: string, change24h: number, values: Partial<MarketCoin> = {}): MarketCoin => ({
@@ -448,4 +448,56 @@ test('new preset toggle does not change candle update frequency or WebSocket han
   assert.match(page, /terminalRefreshMs=\{terminalRefreshMs\}/);
   assert.match(page, /ordinaryTimer = setInterval\(\(\) => \{ void load\(\); \}, 30_000\)/);
   assert.doesNotMatch(picker, /onPresetAutoUpdateChange\(true\);\s*onChange/);
+});
+
+
+test('custom preset uses the existing Terminal + picker and never opens live charts while drafting', () => {
+  const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
+  const picker = readFileSync(new URL('../src/components/terminal/AddChartModal.tsx', import.meta.url), 'utf8');
+  assert.match(page, /pickerCoins=\{coins\} pickerFormationCoins=\{formationCoins\}/);
+  assert.match(page, /target\.closest\('\[data-terminal-preset-picker\]'\)/);
+  assert.match(panel, /<AddChartModal[\s\S]*?mode="preset"/);
+  assert.match(panel, /terminalMarketCoins=\{snapshot\.coins\}/);
+  assert.match(panel, /onAddChart=\{chooseMarketFromPicker\}/);
+  assert.match(panel, /toggleTerminalPresetCoin\(current, coin, tf, formationId\)/);
+  assert.match(picker, /mode !== 'preset' && cleanSearchSymbol && !hasExactMatch/);
+  assert.match(picker, /if \(mode !== 'preset'\) onClose\(\)/);
+  assert.match(picker, /presetSelectedKeys\.includes\(coinMarketKey\(coin\)\)/);
+  assert.match(picker, /data-terminal-preset-picker=\{mode === 'preset'/);
+  assert.doesNotMatch(panel, /fetch\(|new WebSocket\(|setInterval\(/);
+});
+
+test('draft preset market selection preserves exact exchange and spot/futures identity', () => {
+  const btc = coin('BTCUSDT', 2);
+  const picked = toggleTerminalPresetCoin([], btc, '5m');
+  assert.equal(picked.length, 1);
+  assert.deepEqual(
+    [picked[0].symbol, picked[0].exchange, picked[0].marketType, picked[0].timeframe],
+    ['BTCUSDT', 'binance', 'futures', '5m'],
+  );
+  const bybitSpot = toggleTerminalPresetCoin(picked, { ...btc, exchange: 'bybit', marketType: 'spot' }, '15m');
+  assert.equal(bybitSpot.length, 2);
+  assert.equal(bybitSpot[0], picked[0], 'previously selected chart details remain unchanged');
+  assert.equal(bybitSpot[1].marketType, 'spot');
+  assert.equal(bybitSpot[1].exchange, 'bybit');
+  const removed = toggleTerminalPresetCoin(bybitSpot, btc, '1m');
+  assert.deepEqual(removed.map(block => block.id), [bybitSpot[1].id]);
+  assert.equal(picked.length, 1, 'draft toggle must never mutate the previous selection');
+  const addedBack = toggleTerminalPresetCoin(removed, btc, '1m', 'pattern-123');
+  assert.equal(addedBack[1].timeframe, '1m');
+  assert.equal(addedBack[1].formationId, 'pattern-123');
+  assert.equal(addedBack[1].colSpan, 1);
+});
+
+test('preset selection stops at 50 entries but allows deselecting an already chosen market', () => {
+  const selected = Array.from({ length: MAX_TERMINAL_CHARTS }, (_, i): TerminalChartBlock => ({
+    id: 'draft-' + i, symbol: 'COIN' + i + 'USDT', baseAsset: 'COIN' + i,
+    quoteAsset: 'USDT', exchange: 'binance', marketType: 'futures', timeframe: '5m', colSpan: 1,
+  }));
+  const extra = coin('EXTRAUSDT', 2);
+  assert.equal(toggleTerminalPresetCoin(selected, extra, '5m'), selected);
+  const fewer = toggleTerminalPresetCoin(selected, selected[0], '5m');
+  assert.equal(fewer.length, 49);
+  assert.equal(toggleTerminalPresetCoin(fewer, extra, '5m').length, 50);
 });
