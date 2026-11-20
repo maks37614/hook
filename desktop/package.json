@@ -1,6 +1,6 @@
 {
   "name": "h00k-desktop",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "h00k Desktop application for Windows trading terminals",
   "private": true,
   "main": "main.cjs",
