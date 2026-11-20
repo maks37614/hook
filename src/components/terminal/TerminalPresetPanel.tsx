@@ -14,6 +14,8 @@ interface Props {
   presets: TerminalSavedPreset[];
   /** Matches the trader-visible Formations page (including early W/M). */
   formationCoins: readonly ScannedCoin[];
+  onRequestFormationScan?: () => boolean;
+  formationScanStatus?: 'idle' | 'loading' | 'ready' | 'busy' | 'failed';
   selection: MarketSelection;
   timeframe: Timeframe;
   activePreset: TerminalMarketPreset | null;
@@ -39,7 +41,7 @@ interface Props {
 const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
-export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
+export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, onRequestFormationScan, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
   onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
@@ -49,6 +51,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ key: string; params?: LocaleParams } | { text: string } | null>(null);
+  const [pendingFormationPreset, setPendingFormationPreset] = useState(false);
   const applyRef = useRef(onApplyCoins);
   applyRef.current = onApplyCoins;
 
@@ -69,13 +72,41 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
 
   useEffect(() => {
     // Do not replace live charts using partial/stale exchange source snapshots.
-    if (activePreset && autoUpdate && readyCoins[activePreset].length
+    if (activePreset && autoUpdate && !pendingFormationPreset && readyCoins[activePreset].length
         && (activePreset === 'formations' || (!error && !snapshot.warning))) {
       applyRef.current(readyCoins[activePreset]);
     }
   }, [activePreset, autoUpdate, readyCoins, error, snapshot.warning]);
 
+  // The active category is kept while a one-shot scan completes. This also
+  // applies the result when periodic preset updates are disabled by the user.
+  useEffect(() => {
+    if (!pendingFormationPreset || activePreset !== 'formations') return;
+    if (readyCoins.formations.length) {
+      setPendingFormationPreset(false);
+      setMessage(null);
+      applyRef.current(readyCoins.formations);
+      onPresetChosen?.();
+      return;
+    }
+    if (formationScanStatus === 'busy' || formationScanStatus === 'failed' || formationScanStatus === 'ready') {
+      setPendingFormationPreset(false);
+      setMessage({ text: formationScanStatus === 'busy'
+        ? 'Сканер формацій зайнятий. Спробуйте знову пізніше.'
+        : formationScanStatus === 'failed'
+          ? 'Не вдалося завантажити формації. Спробуйте знову.'
+          : 'У списку Формацій немає монет за поточними фільтрами.' });
+    }
+  }, [pendingFormationPreset, activePreset, readyCoins.formations, formationScanStatus, onPresetChosen]);
+
   const chooseReadyPreset = (id: TerminalMarketPreset) => {
+    setPendingFormationPreset(false);
+    if (id === 'formations' && !readyCoins.formations.length && onRequestFormationScan?.()) {
+      setMessage({ text: 'Завантаження монет зі сторінки Формацій…' });
+      setPendingFormationPreset(true);
+      onActivePresetChange(id);
+      return;
+    }
     if ((id !== 'formations' && error) || !readyCoins[id].length) {
       setMessage(id === 'formations'
         ? { text: translatePhrase(language, 'У списку Формацій немає монет за поточними фільтрами.') }
