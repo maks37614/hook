@@ -32,7 +32,7 @@ test('Russian time zones are explicit, localized and show the correct UTC direct
   for (const zone of russianZones) {
     assert.ok(choices.some(choice => choice.value === zone), `missing ${zone}`);
   }
-  assert.match(choices.find(choice => choice.value === 'Europe/Moscow')!.label, /Москва \\(UTC\\+3\\)/);
+  assert.match(choices.find(choice => choice.value === 'Europe/Moscow')!.label, /Москва \(UTC\+3\)/);
   assert.match(getTimeZoneChoices('Europe/Moscow', 'en').find(choice => choice.value === 'Europe/Moscow')!.label, /Moscow/);
   assert.match(getTimeZoneChoices('Europe/Moscow', 'pl').find(choice => choice.value === 'Europe/Moscow')!.label, /Moskwa/);
   const reversed = getTimeZoneChoices('Etc/GMT+3', 'ru').find(choice => choice.value === 'Etc/GMT+3');
