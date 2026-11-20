@@ -45,7 +45,13 @@ export class MinuteTurnoverService {
   private publicMinuteStart = 0;
   private publicChartSymbols = new Set<string>();
   constructor(
-    private readCandles: CandleReader = (exchange, market, symbol) => fetchKlines(exchange, market, symbol, '1m', 10, undefined, undefined, {requireFresh:true}),
+    // Reuse the exact 1m candles already served to HookChart by the shared
+    // marketService cache and its chart-priority IP budget. The old
+    // requireFresh:true bypassed a valid chart candle cache and, under heavy
+    // background REST load, returned [] even while /api/klines had a verified
+    // closed minute. readOneMinuteTurnover still requires the exact target
+    // minute, so a cached but stale candle can never masquerade as live AV.
+    private readCandles: CandleReader = (exchange, market, symbol) => fetchKlines(exchange, market, symbol, '1m', 10, undefined, undefined, { chart: true }),
     private readMarket: MarketReader = (exchange, market) => marketTickerFeed.get(exchange, market),
     private now: () => number = Date.now,
   ) {}
