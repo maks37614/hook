@@ -103,7 +103,9 @@ export class MinuteTurnoverService {
     }));
     rows.sort((a,b)=>b.volume1mUsd-a.volume1mUsd ||
       [a.exchange,a.marketType,a.symbol].join(':').localeCompare([b.exchange,b.marketType,b.symbol].join(':')));
-    return { rows: rows.slice(0,10), sampled: candidates.length, universe,
+    // Return all qualifying sampled markets. The Terminal applies exchange/spot
+    // filters BEFORE selecting its top ten; a global cut would hide valid rows.
+    return { rows, sampled: candidates.length, universe,
       partial: candidates.length < universe, minuteStart };
   }
 }
