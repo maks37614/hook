@@ -26,6 +26,13 @@ const UNAVAILABLE: Record<SupportedLanguage, string> = {
   ru: 'Минутный оборот сейчас недоступен. Проверьте соединение и данные биржи.',
 };
 
+const ECO_PAUSED: Record<SupportedLanguage, string> = {
+  uk: 'ECO: додаткові запити хвилинного обсягу вимкнено. Для актуального AV вимкніть ECO або оберіть 1m.',
+  en: 'ECO: extra minute-volume requests are paused. Disable ECO or choose 1m for live AV.',
+  pl: 'ECO: dodatkowe zapytania o wolumen minutowy są wstrzymane. Wyłącz ECO lub wybierz 1m.',
+  ru: 'ECO: дополнительные запросы минутного объёма отключены. Выключите ECO или выберите 1m.',
+};
+
 /**
  * Isolated footer: updates never rerender candle canvas, change timeframes,
  * attach depth/trade sockets, or persist user settings.
@@ -74,7 +81,7 @@ export const HookChartFooterMinuteVolume = memo(function HookChartFooterMinuteVo
   const value = selectMinuteVolume(chartMinute, enabled && reading?.scope === scope ? reading.value : null, Date.now());
   const waiting = enabled && needFallback && (reading === null || reading.scope !== scope);
   const title = value ? `${TOOLTIP[language]} ${new Date(value.minuteStart).toLocaleTimeString()}`
-    : !enabled ? 'ECO: додаткові запити хвилинного обсягу вимкнено.'
+    : !enabled ? ECO_PAUSED[language]
       : `${TOOLTIP[language]} ${UNAVAILABLE[language]}`;
   return <span data-testid="hookchart-footer-av" title={title}>
     AV 1m: <b>{value ? `${formatUsd(value.volume1mUsd)}/min` : !enabled ? 'ECO' : waiting ? '…' : '—'}</b>
