@@ -80,7 +80,7 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
   window.addEventListener('resize', invalidateLayout);
   window.addEventListener('orientationchange', invalidateLayout);
   const onVisibilityChange = () => {
-    if (document.visibilityState !== 'hidden') { onChange(); return; }
+    if (document.visibilityState !== 'hidden') { invalidateLayout(); return; }
     if (frame !== null) window.cancelAnimationFrame(frame);
     frame = null;
     for (const entry of listeners.values()) publish(entry, false);
