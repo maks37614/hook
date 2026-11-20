@@ -1,5 +1,5 @@
 import type { ExchangeId, MarketType, Kline } from '../src/types';
-import { fetchKlines } from './marketService';
+import { fetchKlines, getCachedCompletedMinuteQuoteVolume } from './marketService';
 import { marketTickerFeed, type RawTicker } from './marketTickerFeed';
 
 export const MINUTE_AV_MIN_USD = 200_000;
@@ -10,6 +10,7 @@ export type MinuteRankRow = { exchange: ExchangeId; marketType: MarketType; symb
 export type MinuteTop = { rows: MinuteRankRow[]; sampled: number; universe: number; partial: boolean; minuteStart: number };
 export type CandleReader = (exchange: ExchangeId, market: MarketType, symbol: string) => Promise<Kline[]>;
 export type MarketReader = (exchange: ExchangeId, market: MarketType) => Promise<RawTicker[]>;
+export type CachedMinuteReader = (exchange: ExchangeId, market: MarketType, symbol: string, minuteStart: number) => number | null;
 
 /** Latest *completed* 60s candle; never divide a 24h ticker by 1440. */
 export function completedMinuteStart(now: number): number {
@@ -54,10 +55,20 @@ export class MinuteTurnoverService {
     private readCandles: CandleReader = (exchange, market, symbol) => fetchKlines(exchange, market, symbol, '1m', 10, undefined, undefined, { chart: true }),
     private readMarket: MarketReader = (exchange, market) => marketTickerFeed.get(exchange, market),
     private now: () => number = Date.now,
+    private readCachedMinute: CachedMinuteReader = getCachedCompletedMinuteQuoteVolume,
   ) {}
   async coin(exchange: ExchangeId, market: MarketType, symbol: string, minuteStart = completedMinuteStart(this.now())): Promise<MinuteTurnover> {
     const key = [exchange, market, symbol, minuteStart].join(':');
     const now = this.now();
+    // The regular chart may already have a verified CLOSED candle in its
+    // 1m cache (often at history limit 500, unlike our limit 10). Prefer
+    // that free reading even over a previous transient null.
+    const chartVolume = this.readCachedMinute(exchange, market, symbol, minuteStart);
+    if (chartVolume !== null) {
+      const value = { minuteStart, volume1mUsd: chartVolume };
+      this.readings.set(key, { at: now, value });
+      return value;
+    }
     const cached = this.readings.get(key);
     if (cached && now - cached.at < (cached.value.volume1mUsd === null ? 12_000 : 75_000)) return cached.value;
     const pending = this.inFlight.get(key);
@@ -86,6 +97,11 @@ export class MinuteTurnoverService {
       this.publicChartSymbols.clear();
     }
     const key = [exchange,market,symbol,minuteStart].join(':');
+    // A market already loaded in /api/klines must remain readable even when
+    // 48 other symbols have consumed the global per-minute REST allowance.
+    // This path does not create a new exchange request or consume a slot.
+    const chartVolume = this.readCachedMinute(exchange, market, symbol, minuteStart);
+    if (chartVolume !== null) return { minuteStart, volume1mUsd: chartVolume };
     if (!this.readings.has(key) && !this.inFlight.has(key) && !this.publicChartSymbols.has(key)) {
       if (this.publicChartSymbols.size >= 48) return { minuteStart, volume1mUsd: null };
       this.publicChartSymbols.add(key);
