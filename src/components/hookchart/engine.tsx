@@ -35,7 +35,7 @@ import { paintObservedLiquidationHeatmap, type LiquidationHeatmapBin, type Liqui
 import { liquidationTextPosition } from './liquidationDisplay';
 import { hasObservedLiquidationCascade, liquidationHudPreferenceKey, LIQUIDATION_HUD_PREFERENCE_EVENT, readLiquidationHudExpanded, saveLiquidationHudExpanded } from './liquidationHudPreferences';
 import { paintHistoricalLiqRecurrence, type HistoricalRecurrenceBand } from './historicalLiqRecurrence';
-import { terminalCandlePriceRange, terminalSafeVerticalZoomRange, terminalSafeManualPriceViewport, terminalViewportHistoryPhase } from './terminalAutoScale';
+import { terminalCandlePriceRange, terminalSafeVerticalZoomRange, terminalSafeManualPriceViewport, terminalViewportHistoryPhase, terminalReadableCandleExtrema } from './terminalAutoScale';
 import { latestCandleResetViewport } from './resetViewport';
 import { visibleArchivedDensityScene } from '../../utils/archiveChartSnapshot';
 import { HOOKCHART_PRICE_SCALE_WIDTH, HOOKCHART_PRICE_LABEL_HEIGHT, hookChartPlotWidth, layoutPriceScaleLabels } from './priceScale';
@@ -711,7 +711,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // auto-fit range, making mobile drags appear broken.
   const candleAutoScale=(terminalAutoScale&&!manualPriceAxisOverride.current)
     ||(formationAutoScale&&vp.autoY)||(vp.autoY&&vp.candleFit===true);
-  let lo=Infinity,hi=-Infinity;for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
+  // Avoid letting one flash wick flatten the compact Terminal price scale.
+  // No source candle, chart overlay, or backend value is changed.
+  const readableExtrema=terminalMode&&candleAutoScale?terminalReadableCandleExtrema(scaleData):null;
+  let lo=readableExtrema?.low??Infinity,hi=readableExtrema?.high??-Infinity;
+  if(!readableExtrema)for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}
+  if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
   if(!candleAutoScale&&vp.autoY&&candles.length&&densities.length){const cp=candles.at(-1)!.c;const near=[...densities].filter(d=>d.active&&Math.abs(d.p-cp)/Math.max(cp,1e-12)<=.03).sort((a,b)=>Math.abs(a.p-cp)-Math.abs(b.p-cp)).slice(0,4);for(const d of near){if(d.p<lo)lo=d.p;if(d.p>hi)hi=d.p}}
   if(!candleAutoScale&&(terminalMode||expandPriceScaleToMarkers)&&vp.autoY){for(const marker of markers){if(Number.isFinite(marker.price)&&marker.price>0){lo=Math.min(lo,marker.price);hi=Math.max(hi,marker.price)}}}
   if(candleAutoScale){
@@ -1947,12 +1952,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // A reset should focus the current candles, not force distant DOM levels or
   // TP/SL markers into the price range. Preserve Terminal's formation anchor.
   setVp(terminalMode
-    ? {...terminalHookViewport(candles,width,focusFormation,rightPaddingBars),yZoom:1,candleFit:true}
+    ? {...(focusFormation?terminalHookViewport(candles,width,focusFormation,rightPaddingBars):candleView),yZoom:1,candleFit:true}
     : formationAutoScale?candleView
     : visualProfile?candleView
     : {barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:false});
  };
- const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true}),'focus')};
+ const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true,candleFit:terminalMode?true:v.candleFit}),'focus')};
  // The Terminal drawer's Apply button uses exactly the same action as the
  // per-chart "Show all history" control. Run after the saved profile layout
  // effect so fitting all candles wins over the just-applied startup view.
@@ -1975,7 +1980,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      ...v,...resizeHookChartViewport(candles.length,plotW,v,factor,v.fitAll?plotW/2:plotW,rightPaddingBars,rightPadding),
    }),'zoom');
  };
- const handleDoubleClick=(e:React.MouseEvent<HTMLElement>)=>{const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height)return;if(zone(x,y,g)==='price'){viewportAdjustedByUserRef.current=true;manualPriceAxisOverride.current=false;setVp(v=>({...v,autoY:true,manualCenter:null,manualRange:null}))}else reset()};
+ const handleDoubleClick=(e:React.MouseEvent<HTMLElement>)=>{const g=geometry();if(!g)return;const x=e.clientX-g.r.left,y=e.clientY-g.r.top;if(x<0||x>g.r.width||y<0||y>g.r.height)return;if(zone(x,y,g)==='price'){viewportAdjustedByUserRef.current=true;manualPriceAxisOverride.current=false;setVp(v=>({...v,autoY:true,manualCenter:null,manualRange:null,yZoom:1,candleFit:terminalMode?true:v.candleFit}))}else reset()};
  const handleTouchEnd=(e:React.PointerEvent<HTMLElement>)=>{
    if((drag.current?.kind==='drawingRangePlacement'||drag.current?.kind==='drawingPointPlacement')
       &&drag.current.pointerId===e.pointerId){
@@ -2110,7 +2115,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    return null;
  };
  archiveScreenshotRef.current=takeArchiveScreenshot;
- useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:fitAllHistory,zoomToLatest:reset,focusLatest:()=>{fitAllScopeRef.current=null;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false}))},zoom:zoomButton}),[candles,vp]);
+ useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:fitAllHistory,zoomToLatest:reset,focusLatest:()=>{fitAllScopeRef.current=null;manualPriceAxisOverride.current=false;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:terminalMode?true:v.candleFit}))},zoom:zoomButton}),[candles,vp]);
  const actionDrawing=drawingActions?.id===selectedDrawingId?drawings.find(d=>d.id===selectedDrawingId&&d.id.startsWith(symbol+':')):null;
  // Ruler actions belong to its measurement label, not to the point last tapped.
  // Compute only for the selected ruler and reuse the same geometry as its canvas.
