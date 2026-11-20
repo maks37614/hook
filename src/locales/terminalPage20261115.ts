@@ -177,10 +177,10 @@ export const terminalPagePhraseRows = [
     "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
   ],
   [
-    "Усі монети із середнім AV від 200 000 USDT/хв (24г / 1440), крім великих BTC/ETH та інших базових активів і токенів, прив’язаних до BTC/ETH. За спаданням AV.",
-    "All coins with average AV from 200,000 USDT/min (24h / 1440), excluding large benchmark assets and BTC/ETH-pegged tokens. Ranked by descending AV.",
-    "Все монеты со средним AV от 200 000 USDT/мин (24 ч / 1440), кроме крупных базовых активов и токенов, привязанных к BTC/ETH. По убыванию AV.",
-    "Wszystkie monety ze średnim AV od 200 000 USDT/min (24 h / 1440), bez dużych aktywów bazowych i tokenów powiązanych z BTC/ETH. Malejąco według AV."
+    "Усі монети із середнім AV від 200 000 USDT/хв (24г / 1440), крім великих активів, BTC/ETH-похідних та виключених інструментів. За спаданням AV.",
+    "All coins averaging at least 200,000 USDT/min (24h / 1440), excluding large assets, BTC/ETH derivatives and specified instruments. Descending AV.",
+    "Все монеты со средним AV от 200 000 USDT/мин (24 ч / 1440), кроме крупных активов, производных BTC/ETH и исключённых инструментов. По убыванию AV.",
+    "Wszystkie monety ze średnim AV od 200 000 USDT/min (24 h / 1440), bez dużych aktywów, pochodnych BTC/ETH i wykluczonych instrumentów. Malejąco według AV."
   ],
   [
     "Середній обсяг торгів за хвилину (USDT): оборот за 24г / 1440.",
