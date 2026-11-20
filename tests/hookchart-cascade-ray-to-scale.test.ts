@@ -56,10 +56,28 @@ test('Scalper draw uses the plot boundary, without changing stroke, labels or ca
   assert.ok(start>=0&&end>start);
   const layer=engine.slice(start,end);
   assert.match(layer,/scalperRenderedLineEndX\(setup\.kind, line, x1, g\.plotW\)/);
+  assert.match(layer,/if \(cascadeRay && x0 > g\.plotW\) continue/);
+  assert.match(layer,/q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
+  assert.match(layer,/q\.lineTo\(renderedEndX, y1\)/);
+  assert.match(layer,/if \(cascadeRay && y1 >= 0 && y1 <= g\.plotH\)/);
+  assert.match(layer,/q\.moveTo\(Math\.max\(0, g\.plotW - 2\), y1\)/);
+  assert.match(layer,/q\.lineTo\(g\.plotW, y1\)/);
   assert.match(layer,/q\.lineWidth = line\.role === 'cascade-step' \? 0\.7/);
   assert.match(layer,/q\.setLineDash\(scalperLineDash\(scalperLineStyle, setup\.status\)\)/);
   assert.match(layer,/q\.strokeStyle = color/);
   assert.match(layer,/if \(anchor && showScalperLabels\)/);
   assert.match(engine,/q\.fillRect\(wickLeftPx,wickTopPx,wickPx,wickHPx\)/);
   assert.match(engine,/q\.fillRect\(bodyLeftPx,bodyTopPx,bodyPx,bodyHPx\)/);
+});
+
+test('cascade outer boundary has a real scale price badge but tiers do not flood the scale',()=>{
+  const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
+  const start=engine.indexOf('// Mark the actionable outer tier');
+  const end=engine.indexOf('for(const marker of paintedMarkers)',start);
+  assert.ok(start>=0 && end>start);
+  const overlay=engine.slice(start,end);
+  assert.match(overlay,/setup\.kind !== 'cascade'/);
+  assert.match(overlay,/setup\.lines\.find\(line => line\.role === 'upper' \|\| line\.role === 'lower'\)/);
+  assert.match(overlay,/g\.x\(boundary\.from\.t\) > g\.plotW/);
+  assert.match(overlay,/priceTag\(boundary\.from\.p, '', color/);
 });
