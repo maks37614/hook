@@ -28,7 +28,7 @@ test('Surveillance provider tears down and resumes Desktop UI stream on visibili
   assert.match(source, /isDesktopSurveillanceView\(window\.location\.search\)/);
   assert.match(source, /document\.addEventListener\('visibilitychange', onVisibilityChange\)/);
   assert.match(source, /document\.removeEventListener\('visibilitychange', onVisibilityChange\)/);
-  assert.match(source, /if \(visible && user\) void fetchCoins\(\)/);
+  assert.match(source, /if \(visible && user\?\.uid\) void fetchCoins\(\)/);
   assert.match(source, /if \(!keepSurveillanceSSE \|\| !user\?\.uid\)/);
   assert.match(source, /const unsubscribe = subscribeUserSignalStream\(user\.uid/);
   assert.match(source, /unsubscribe\(\)/);

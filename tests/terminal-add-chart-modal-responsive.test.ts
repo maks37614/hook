@@ -85,5 +85,7 @@ test('Terminal Add Chart visibly enforces the workspace chart limit without sile
   assert.match(page, /prev\.length >= MAX_TERMINAL_CHARTS \? prev : \[\.\.\.prev, newBlock\]/);
   assert.match(source, /Досягнуто ліміт 50 графіків/);
   assert.match(source, /disabled=\{atChartLimit\}/);
-  assert.match(source, /if \(atChartLimit\) return;/);
+  assert.match(source, /if \(mode === 'preset' \|\| atChartLimit\) return;/);
+  assert.match(source, /const rowAtLimit = atChartLimit && !inPreset/);
+  assert.match(source, /if \(rowAtLimit\) return;/);
 });

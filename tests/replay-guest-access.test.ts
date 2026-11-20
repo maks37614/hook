@@ -11,7 +11,7 @@ test('Replay navigation requires an authenticated user, including direct hashes'
   // #pc is public, but #replay must pass the same guest guard as Terminal.
   assert.match(app, /if \(hash === '#pc'\) \{/);
   assert.doesNotMatch(app, /hash === '#replay' \|\| hash === '#pc'/);
-  assert.match(app, /if \(!user\) \{[\s\S]*?handleOpenAuthModal\('signin', 'general'\);[\s\S]*?window\.location\.hash = 'screener';/);
+  assert.match(app, /if \(!user\?\.uid\) \{[\s\S]*?handleOpenAuthModal\('signin', 'general'\);[\s\S]*?window\.location\.hash = 'screener';/);
   assert.match(app, /if \(!user && page !== 'screener' && page !== 'pc'\)/);
 });
 

@@ -28,7 +28,7 @@ test('Screener keeps genuine network errors but does not promote partial exchang
 });
 
 test('Terminal preset safety gate is unchanged and raw source diagnostics are not printed', () => {
-  assert.match(terminal, /activePreset && autoUpdate && readyCoins\[activePreset\]\.length/);
+  assert.match(terminal, /activePreset && autoUpdate && !pendingFormationPreset && readyCoins\[activePreset\]\.length/);
   assert.match(terminal, /activePreset === 'formations' \|\| \(!error && !snapshot\.warning\)/,
     'cached Formations can update while stale external market snapshots stay gated');
   assert.doesNotMatch(terminal, /localizeTerminalMarketWarning/);

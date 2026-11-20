@@ -63,5 +63,5 @@ test('Terminal clock preference survives backup restore and safely defaults to v
   assert.equal(parseTerminalWorkspaceBackup(backup({ showClock: 'false' })).config.showClock, true);
   assert.match(storage, /showClock: true/);
   assert.match(storage, /typeof source\.showClock === 'boolean'/);
-  assert.match(storage, /localStorage\.setItem\(terminalStorageKey\(CONFIG_KEY, uid\), JSON\.stringify\(workspace\.config\)\)/);
+  assert.match(storage, /localStorage\.setItem\(terminalStorageKey\(CONFIG_KEY\), JSON\.stringify\(workspace\.config\)\)/);
 });

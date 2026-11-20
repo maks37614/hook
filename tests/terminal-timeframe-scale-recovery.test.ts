@@ -28,7 +28,7 @@ test('Terminal viewport responds to seed-to-history transition, not live candle 
   const canvas=read('src/components/hookchart/HookChartCanvas.tsx');
   assert.match(engine,/const terminalHistoryPhase=terminalViewportHistoryPhase\(tf,candles\.length,/);
   assert.match(engine,/const signature=`\$\{profilePrefix\}:\$\{historyPhase\}:\$\{Math\.round\(width\)\}`/);
-  assert.match(engine,/!!candles\.length,terminalHistoryPhase,initialLogicalRange/);
+  assert.match(engine,/hasHistoryCandles,terminalHistoryPhase,initialLogicalRange/);
   assert.match(engine,/terminalHistoryReady\)/);
   assert.match(live,/setInitialHistoryLoaded\(true\)/);
   assert.match(live,/terminalHistoryReady=\{terminalTradeCandles \|\| initialHistoryLoaded \|\| klines\.length > 1\}/);

@@ -22,7 +22,7 @@ test('Deleting a trade and resetting balance also deletes its screenshot bytes',
 });
 
 test('Failed physical PNG deletion is surfaced instead of claiming complete cleanup', () => {
-  assert.match(source, /queueImageOperation\(clean\)\.catch\(reportScreenshotCleanupError\)/);
+  assert.match(source, /queueImageOperation\(clean\)\.catch\(\(\) => screenshotCleanupErrorRef\.current\(\)\)/);
   assert.match(source, /deleteReplayScreenshots\(owner, item\.tradeIds\)/);
   assert.match(source, /schedulePngCleanupAfterSync\(journalItems\.map\(item => item\.id\), true\)/);
   assert.match(source, /showToast\('danger', 'Replay', message\)/);

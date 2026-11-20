@@ -27,7 +27,7 @@ test('fit-history request reaches every chart, including previously lazy-mounted
   const canvas = read('src/components/hookchart/HookChartCanvas.tsx');
   assert.match(grid, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(widget, /terminalFitAllRequest=\{useIntegratedHookChartToolbar \? terminalFitAllRequest : undefined\}/);
-  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /const shouldLoadWidgets = !isSuspended && isNearViewport && isMountReady/);
   assert.match(exchange, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(wrapper, /terminalFitAllRequest=\{terminalFitAllRequest\}/);
   assert.match(canvas, /terminalFitAllRequest=\{terminalInitialViewTarget \? terminalFitAllRequest : undefined\}/);
@@ -44,7 +44,7 @@ test('same fit-all callback powers the scale-history icon and Terminal Apply', (
   assert.match(engine, /if\(!terminalFitAllRequest\)\{\s*lastTerminalFitAllRequestRef\.current=null;\s*return;\s*\}/);
   assert.match(engine, /if\(!candles\.length\)return;/);
   assert.match(engine, /previousFit\?\.request===terminalFitAllRequest&&previousFit\.scope===fitAllScopeKey/);
-  assert.match(engine, /lastTerminalFitAllRequestRef\.current=\{request:terminalFitAllRequest,scope:fitAllScopeKey\};\s*fitAllHistory\(\);/);
+  assert.match(engine, /lastTerminalFitAllRequestRef\.current=\{request:terminalFitAllRequest,scope:fitAllScopeKey\};\s*fitAllHistoryRef\.current\(\);/);
   assert.match(engine, /\},\[terminalFitAllRequest,candles\.length,fitAllScopeKey\]\);/);
   // Profile refresh runs first; the fit-all click must win over the saved
   // number-of-bars setting rather than collapsing back to a narrow window.

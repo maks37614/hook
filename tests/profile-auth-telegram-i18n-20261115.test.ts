@@ -35,8 +35,10 @@ test('auth form and CAPTCHA use selected language for visible feedback and the c
   assert.match(captcha, /size: 'flexible',\s+language,/);
   assert.match(captcha, /\[siteKey, retry, language\]/);
   assert.match(captcha, /onChangeRef\.current\(null\)/);
-  assert.match(captcha, /translatePhrase\(language, "Перевірка CAPTCHA"\)/);
-  assert.match(captcha, /translatePhrase\(language, 'Повторити'\)/);
+  assert.match(captcha, /translatePhrase\(language, 'Перевірка CAPTCHA'\)/);
+  assert.match(captcha, /retry: 'Повторити'/);
+  assert.match(captcha, /\{messages\.retry\}/);
+  assert.match(captcha, /const messages = feedback\[language\] \|\| feedback\.uk/);
 });
 
 test('Telegram alerts localize counts, profile status, and parameterized messages without translating symbols or user names', () => {

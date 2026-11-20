@@ -9,7 +9,7 @@ test('Replay keeps PNG locally until PostgreSQL acknowledges deletion', () => {
   assert.match(page, /afterRevision: lastSyncedRevision/);
   assert.match(page, /lastSyncedRevision <= item\.afterRevision/);
   assert.match(page, /item\.tradeIds\.some\(id => lastSyncedTradeIds\.includes\(id\)\)/);
-  assert.match(page, /queueImageOperation\(clean\)\.catch\(reportScreenshotCleanupError\)/);
+  assert.match(page, /queueImageOperation\(clean\)\.catch\(\(\) => screenshotCleanupErrorRef\.current\(\)\)/);
   assert.match(page, /schedulePngCleanupAfterSync\(\[id\]\)/);
   assert.doesNotMatch(page, /queueImageOperation\(\(\) => deleteReplayScreenshot\(owner, id\)\)/);
 });

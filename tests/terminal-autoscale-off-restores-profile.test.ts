@@ -55,7 +55,7 @@ test('switching off auto-scale reapplies the saved Terminal profile, not a hardc
   assert.match(terminal, /terminalAutoScale=\{autoScaleCharts && chartProvider === 'hookchart'\}/);
   assert.match(widget, /terminalInitialView=\{useIntegratedHookChartToolbar \? terminalInitialView : undefined\}/);
   assert.match(hook, /const selectedTerminalInitialView = appliedTerminalInitialView\?\.view \?\? terminalInitialView/);
-  assert.match(engine, /visualProfile\.visibleBars,visualProfile\.verticalZoom,visualProfile\.autoPriceScale,visualProfile\.rightGapBars,terminalAutoScale/);
+  assert.match(engine, /profile\.visibleBars,profile\.verticalZoom,profile\.autoPriceScale,profile\.rightGapBars,terminalAutoScale/);
   assert.match(engine, /if\(visualAppliedRef\.current===signature\)return;/);
   assert.match(engine, /const priceAuto=terminalAutoScale\|\|visualProfile\.autoPriceScale/);
   assert.match(engine, /const terminalManualProfile=!priceAuto&&\(terminalMode\|\|visualProfileKey\.startsWith\('terminal'\)\)/);
@@ -78,5 +78,5 @@ test('restore uses existing visible candles only, without touching WebSockets or
   assert.match(body, /terminalSafeVerticalZoomRange\(/);
   assert.doesNotMatch(body, /for\s*\(|while\s*\(/);
   const engine = read('src/components/hookchart/engine.tsx');
-  assert.match(engine, /const recent=candles\.slice\(-count\)/);
+  assert.match(engine, /const recent=latestCandles\.slice\(-count\)/);
 });

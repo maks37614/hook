@@ -63,7 +63,7 @@ test('Footer stays below the same chart grid for one or multiple coins', () => {
     'the shared controls render only below a populated chart grid');
   assert.doesNotMatch(source.slice(list, footerPlacement), /min-h-\[320px\]/);
   assert.doesNotMatch(source, /ref=\{chartListRef\} className="h-full w-full overflow-y-auto no-scrollbar"/);
-  assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);
+  assert.match(source, /ref=\{chartListRef\} data-terminal-scroll-viewport className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/);
   assert.match(read('../src/components/SiteFooter.tsx'), /getLegalCopy\(language\)/);
 });
 
@@ -108,6 +108,6 @@ test('empty grid stretches its bordered frame above the footer on short and tall
   assert.match(empty, /min-h-\[240px\] flex-1/);
   assert.match(empty, /border border-dashed border-slate-800/);
   assert.ok(empty.indexOf('{terminalChartActions}') < empty.indexOf('<SiteFooter />'));
-  assert.match(source, /ref=\{chartListRef\} className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/,
+  assert.match(source, /ref=\{chartListRef\} data-terminal-scroll-viewport className="w-full h-full p-2 sm:p-3 overflow-y-auto no-scrollbar"/,
     'the normal charts keep their original scrolling behavior');
 });
