@@ -70,3 +70,26 @@ test('all HookChart instances use a shared preference event and a single display
   assert.match(engine, /saveLiquidationHudExpanded\(liqHudKey,next\)/);
   assert.match(engine, /hasObservedLiquidationCascade\(cascadeRisk,liquidationStreamLive\)/);
 });
+
+test('Terminal HookChart restores the Liq/cascade chevron and respects the existing setting and ECO mode', () => {
+  const canvas = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
+  const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
+  const settings = readFileSync(new URL('../src/components/hookchart/OriginalHookChartSettings.tsx', import.meta.url), 'utf8');
+  const eco = readFileSync(new URL('../src/components/hookchart/terminalEcoPreferences.ts', import.meta.url), 'utf8');
+  const terminal = readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx', import.meta.url), 'utf8');
+  // All live HookCharts, including terminal tiles, pass through the same
+  // user-configurable display guard. No unconditional terminal exclusion.
+  assert.match(canvas, /showLiqRiskBlock=\{!replay && !externalData && !archiveMode && runtimeSettings\.showLiqRiskBlock !== false\}/);
+  assert.doesNotMatch(canvas, /showLiqRiskBlock=\{[^\n]*!terminalMode/);
+  assert.match(settings, /showLiqRiskBlock: true/);
+  assert.match(settings, /label="Блок Liq \+ каскад"/);
+  assert.match(eco, /showLiqRiskBlock: false/);
+  assert.match(canvas, /const next = terminalEcoPreferences\(settings, ecoActive\)/);
+  assert.match(terminal, /terminalMode/);
+  // Collapsing never unmounts the chevron, even with no live Liq events.
+  assert.match(engine, /\{showLiqRiskBlock&&<div className=\{'liqRiskHud '/);
+  assert.match(engine, /className="liqRiskToggle"/);
+  assert.match(engine, /aria-expanded=\{liqHudOpen\}/);
+  assert.match(engine, /onClick=\{toggleLiqHud\}/);
+  assert.match(engine, /\{liqHudOpen&&<div className="liqRiskContent"/);
+});
