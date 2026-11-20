@@ -42,11 +42,11 @@ function findOrCreateSlot(uid: string): DesktopSlot | null {
   slots.set(uid, slot);
   return slot;
 }
-function validCommand(input: unknown): Omit<DesktopTickerCommand, 'seq' | 'createdAt'> | null {
+export function parseDesktopTickerCommand(input: unknown): Omit<DesktopTickerCommand, 'seq' | 'createdAt'> | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const source = input as Record<string, unknown>;
   const symbol = typeof source.symbol === 'string' ? source.symbol.trim().toUpperCase() : '';
-  const bindingNumber = typeof source.binding === 'string' && /^\\d{1,3}$/.test(source.binding.trim())
+  const bindingNumber = typeof source.binding === 'string' && /^\d{1,3}$/.test(source.binding.trim())
     ? Number(source.binding.trim()) : NaN;
   if (!/^[A-Z0-9]{2,30}$/.test(symbol) || !Number.isInteger(bindingNumber)
     || bindingNumber < 1 || bindingNumber > 500
@@ -72,10 +72,12 @@ export function installDesktopLinkRelay(app: Express) {
     const slot = findOrCreateSlot(uid);
     if (!slot) return void res.status(503).json({ error: 'BUSY' });
     const now = Date.now();
+    // Bound concurrent long polls per account to avoid hanging-request abuse.
+    if (slot.waiters.size >= 2) return void res.status(429).json({ error: 'TOO_MANY_CLIENTS' });
     slot.lastPollAt = now;
     // The cursor belongs to this desktop client's current connection only.
     const afterRaw = typeof req.query.after === 'string' ? req.query.after : '';
-    const after = /^\\d{1,12}$/.test(afterRaw) ? Number(afterRaw) : 0;
+    const after = /^\d{1,12}$/.test(afterRaw) ? Number(afterRaw) : 0;
     res.set({ 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
     if (slot.latest && slot.latest.seq > after && now - slot.latest.createdAt <= FRESH_MS) {
       return void res.json({ command: slot.latest });
@@ -109,7 +111,7 @@ export function installDesktopLinkRelay(app: Express) {
 
   app.post('/api/desktop-link/push', requireUserAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
-    const commandFields = validCommand(req.body);
+    const commandFields = parseDesktopTickerCommand(req.body);
     if (!commandFields) return void res.status(400).json({ error: 'INVALID_TICKER' });
     const slot = slots.get(res.locals.userId as string);
     const now = Date.now();
