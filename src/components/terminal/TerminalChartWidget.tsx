@@ -156,6 +156,8 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       near => setIsNearViewport(current => current === near ? current : near));
   }, [isSingleBlock, isOnlyChart, isMaximized, compactFullscreenMode, isSuspended]);
 
+  const headerRef = useRef<HTMLDivElement>(null);
+  const toolbarMenusRef = useRef<HTMLDivElement>(null);
   const toolbarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
