@@ -117,6 +117,34 @@ export function mergeLiveChartHistory(history: Kline[], displayed: Kline[]): Kli
   return start === displayed.length ? history : [...history, ...displayed.slice(start)];
 }
 
+/**
+ * Repair missing WebSocket minutes from an exchange history page.
+ * Only insert genuine, validated exchange candles strictly inside the
+ * detected gap. Never replace a newer chart candle or interpolate prices.
+ * Runs only after a confirmed feed gap, not during normal stream updates.
+ */
+export function mergeMissingExchangeKlines(
+  displayed: Kline[],
+  recovered: readonly Kline[],
+  gapFrom: number,
+  gapTo: number,
+  limit = 40_000,
+): Kline[] {
+  if (!displayed.length || gapFrom >= gapTo || !recovered.length) return displayed;
+  const existing = new Set(displayed.map(candle => candle.time));
+  const additions: Kline[] = [];
+  for (const candle of recovered) {
+    if (!validCandle(candle) || candle.time <= gapFrom || candle.time >= gapTo ||
+        existing.has(candle.time)) continue;
+    existing.add(candle.time);
+    additions.push(candle);
+  }
+  if (!additions.length) return displayed;
+  return [...displayed, ...additions]
+    .sort((a, b) => a.time - b.time)
+    .slice(-Math.max(2, limit));
+}
+
 /** A later trade can update the close and wicks, while cumulative fields come from Kline. */
 export function withNewerTradePrice(candle: Kline, current: Kline): Kline {
   return {
