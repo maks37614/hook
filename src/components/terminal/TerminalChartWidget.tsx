@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase } from '../../locales';
 import {
@@ -134,27 +134,27 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     onDrawingToolsOpenChange: setDrawingToolsOpen,
   }), [extraToolsOpen, drawingToolsOpen]);
   const blockRootRef = useRef<HTMLDivElement>(null);
-  // The first chart (and the fullscreen grid's at most four charts) is immediate.
-  // Keep isSingleBlock=false in the Terminal grid to retain all tile controls.
-  const [isNearViewport, setIsNearViewport] = useState(
-    isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode,
-  );
-  const shouldLoadWidgets = !isSuspended
-    && (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode || isNearViewport);
+  // Strict viewport-only mounting: even a single chart is suspended while
+  // outside the visible Terminal area. Rendering it again restores its
+  // saved panel state and reconnects only its chart-owned feeds.
+  const [isNearViewport, setIsNearViewport] = useState(false);
+  const shouldLoadWidgets = !isSuspended && isNearViewport;
 
-  // Every card still suspends its offscreen HookChart independently, but
-  // all Terminal tiles share one scroll/resize observer and one geometry pass
-  // per animation frame (including the iPad Safari nested-scroll fallback).
-  useEffect(() => {
+  // Measure all chart cards through the shared viewport scheduler. Do not
+  // preload the next row; hidden cards do not allocate a high-DPR canvas,
+  // run scalper overlays or subscribe to their individual market feeds.
+  useLayoutEffect(() => {
     const node = blockRootRef.current;
-    if (!node) return;
-    if (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode) {
-      setIsNearViewport(true);
+    if (!node || isSuspended) {
+      setIsNearViewport(false);
       return;
     }
-    return subscribeTerminalWidgetVisibility(node,
-      near => setIsNearViewport(current => current === near ? current : near));
-  }, [isSingleBlock, isOnlyChart, isMaximized, compactFullscreenMode, isSuspended]);
+    return subscribeTerminalWidgetVisibility(
+      node,
+      visible => setIsNearViewport(current => current === visible ? current : visible),
+      isMaximized || compactFullscreenMode,
+    );
+  }, [isMaximized, compactFullscreenMode, isSuspended]);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const toolbarMenusRef = useRef<HTMLDivElement>(null);
