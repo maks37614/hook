@@ -25,6 +25,7 @@ import { ScannedCoin, Timeframe, ExchangeId, MarketType, MarketCoin } from '../.
 import { formatVolume } from '../../utils/formatters';
 import { fetchDirectBinanceTickers, fetchDirectBybitTickers } from '../../utils/directExchangeClient';
 import { normalizeTerminalMarketPair, formatTerminalQuotedPrice } from '../../utils/terminalPresets';
+import { coinMarketKey } from '../../utils/marketPresets';
 
 interface AddChartModalProps {
   isOpen: boolean;
@@ -37,10 +38,12 @@ interface AddChartModalProps {
   /** Existing workspaces are preserved, but new additions stop at the chart limit. */
   atChartLimit?: boolean;
   /** Label/limit override when the Terminal picker is reused on a fullscreen chart. */
-  context?: 'terminal' | 'fullscreen';
+  context?: 'terminal' | 'fullscreen' | 'preset';
   maxCharts?: number;
   /** Reuse this picker for replacing an existing chart instead of adding a new one. */
-  mode?: 'add' | 'replace';
+  mode?: 'add' | 'replace' | 'preset';
+  /** Used only for draft selection. Data comes from the same Terminal + picker. */
+  presetSelectedKeys?: readonly string[];
   initialTimeframe?: Timeframe;
   watchlist: string[];
   onAddChart: (
@@ -103,6 +106,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   context = 'terminal',
   maxCharts = 50,
   mode = 'add',
+  presetSelectedKeys = [],
   initialTimeframe,
   watchlist,
   onAddChart,
@@ -138,7 +142,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     if (isOpen) {
       setDisplayCount(80);
       if (initialTimeframe) setSelectedTimeframe(initialTimeframe);
-      if (mode === 'replace') {
+      if (mode === 'replace' || mode === 'preset') {
         // A chart switch starts with all available markets, not stale add filters.
         setSearch('');
         setFilterTab('all');
@@ -422,7 +426,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
@@ -447,7 +451,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
     c.symbol === cleanSearchSymbol || c.symbol === quickAddInstrument.symbol);
 
   const handleQuickAddCustom = (ex: ExchangeId, mt: MarketType) => {
-    if (atChartLimit) return;
+    if (mode === 'preset' || atChartLimit) return;
     const exactMarket = unifiedCoins.find(c => c.symbol === cleanSearchSymbol && c.exchange === ex && c.marketType === mt);
     const { symbol, quoteAsset } = normalizeTerminalMarketPair(
       cleanSearchSymbol, exactMarket?.quoteAsset || inferredQuote,
@@ -460,7 +464,15 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 z-[260] flex items-center justify-center overflow-x-hidden bg-black/80 p-2 backdrop-blur-sm sm:p-4"
+      data-terminal-preset-picker={mode === 'preset' ? 'true' : undefined}
       onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
+      onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
     >
       <div
         role="dialog"
@@ -479,6 +491,8 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
                 <h3 id="terminal-add-chart-title" className="min-w-0 break-words text-sm font-bold leading-snug text-white sm:text-base">
                   {mode === 'replace'
                     ? ({ uk: 'Змінити монету на графіку', en: 'Change chart coin', pl: 'Zmień monetę na wykresie', ru: 'Изменить монету на графике' } as const)[language]
+                    : mode === 'preset'
+                      ? ({ uk: 'Монети для мого пресета', en: 'Coins for my preset', pl: 'Monety do mojego presetu', ru: 'Монеты для моего пресета' } as const)[language]
                     : context === 'fullscreen' ? {
                       uk: 'Додати графік', en: 'Add chart', pl: 'Dodaj wykres', ru: 'Добавить график',
                     }[language] : 'Додати графік у термінал'}
@@ -490,6 +504,9 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
               <p className="break-words text-[11px] leading-snug text-slate-400 sm:text-xs">
                 Повний список монет на біржі від $50k до $10B (Binance & Bybit, Futures & Spot)
               </p>
+              {mode === 'preset' && <p role="status" className="mt-1 text-xs font-semibold text-cyan-300">
+                {({ uk: 'Обрано', en: 'Selected', pl: 'Wybrano', ru: 'Выбрано' } as const)[language]}: {presetSelectedKeys.length}/50
+              </p>}
             </div>
           </div>
           <button
@@ -502,7 +519,12 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
 
         {atChartLimit && (
           <p role="status" className="border-b border-amber-500/30 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
-            {context === 'fullscreen' ? {
+            {mode === 'preset'
+              ? ({ uk: 'Ліміт 50 монет у пресеті. Щоб додати іншу, спершу зніміть вибір з однієї.',
+                   en: 'Maximum 50 preset coins. Deselect one to add another.',
+                   pl: 'Maksymalnie 50 monet w presecie. Odznacz jedną, aby dodać następną.',
+                   ru: 'Максимум 50 монет в пресете. Уберите одну, чтобы добавить другую.' } as const)[language]
+              : context === 'fullscreen' ? {
               uk: `Максимум ${maxCharts} графіки на екрані. Закрийте додатковий графік, щоб додати інший.`,
               en: `Maximum ${maxCharts} charts on screen. Close an extra chart to add another.`,
               pl: `Maksymalnie ${maxCharts} wykresy na ekranie. Zamknij dodatkowy wykres, aby dodać kolejny.`,
@@ -539,7 +561,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
           </div>
 
           {/* Quick Add Custom Symbol Card if typing a symbol */}
-          {cleanSearchSymbol && !hasExactMatch && (
+          {mode !== 'preset' && cleanSearchSymbol && !hasExactMatch && (
             <div className="p-2.5 rounded-xl bg-gradient-to-r from-cyan-950/40 via-slate-900 to-indigo-950/40 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -772,19 +794,22 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
 
               {filteredCoins.slice(0, displayCount).map((coin) => {
                 const isPositive = coin.priceChange24h >= 0;
+                const inPreset = mode === 'preset' && presetSelectedKeys.includes(coinMarketKey(coin));
+                const rowAtLimit = atChartLimit && !inPreset;
                 const hasFormations = coin.formations && coin.formations.length > 0;
                 const firstFormation = hasFormations ? coin.formations[0] : null;
 
                 return (
                   <div
                     key={`${coin.exchange}-${coin.symbol}-${coin.marketType}`}
-                    aria-disabled={atChartLimit}
+                    aria-disabled={rowAtLimit}
+                    aria-pressed={mode === 'preset' ? inPreset : undefined}
                     onClick={() => {
-                      if (atChartLimit) return;
+                      if (rowAtLimit) return;
                       onAddChart(coin, selectedTimeframe, firstFormation?.id);
-                      onClose();
+                      if (mode !== 'preset') onClose();
                     }}
-                    className="terminal-add-chart-coin-row group flex min-w-0 cursor-pointer items-center justify-between gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-slate-800/60 sm:px-3"
+                    className={`terminal-add-chart-coin-row group flex min-w-0 items-center justify-between gap-3 rounded-xl px-2 py-2.5 transition-colors sm:px-3 ${inPreset ? 'bg-cyan-500/10 ring-1 ring-cyan-500/40' : 'hover:bg-slate-800/60'} ${rowAtLimit ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                   >
                     <div className="terminal-add-chart-coin-main flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                       <div data-no-translate className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/50 flex items-center justify-center font-bold text-xs font-mono text-white group-hover:bg-cyan-600/20 group-hover:text-cyan-300 group-hover:border-cyan-500/40 transition-colors shrink-0 shadow-sm">
@@ -850,11 +875,14 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
 
                       <button
                         type="button"
-                        disabled={atChartLimit}
+                        disabled={rowAtLimit}
                         className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer group-hover:bg-cyan-600 group-hover:text-white"
                       >
-                        {mode === 'replace' ? <ArrowUpDown className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                        <span>{mode === 'replace' ? ({ uk: 'Змінити', en: 'Replace', pl: 'Zmień', ru: 'Заменить' } as const)[language] : 'Додати'}</span>
+                        {mode === 'replace' ? <ArrowUpDown className="w-3.5 h-3.5" /> : inPreset ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        <span>{mode === 'preset'
+                          ? (inPreset ? ({ uk: 'Прибрати', en: 'Remove', pl: 'Usuń', ru: 'Убрать' } as const)[language]
+                            : ({ uk: 'Обрати', en: 'Select', pl: 'Wybierz', ru: 'Выбрать' } as const)[language])
+                          : mode === 'replace' ? ({ uk: 'Змінити', en: 'Replace', pl: 'Zmień', ru: 'Заменить' } as const)[language] : 'Додати'}</span>
                       </button>
                     </div>
                   </div>
