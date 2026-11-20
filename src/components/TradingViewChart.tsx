@@ -26,6 +26,7 @@ import { FormationArchiveIcon } from './FormationArchiveIcon';
 import { Kline, DetectedFormation, Timeframe, ExchangeId, MarketType, ChartMarkerInfo, ChartRestoreParams } from '../types';
 import { getChartPriceFormat, formatCryptoPrice } from '../utils/formatters';
 import { fetchSharedHistoricalKlines } from '../utils/sharedHistoricalKlines';
+import { readTerminalChartHistory, saveTerminalChartHistory } from '../utils/terminalChartHistoryCache';
 import { terminalChartUiIntervalMs } from '../utils/terminalChartRefresh';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -238,7 +239,12 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  const currentCandleRef = useRef<Kline | null>(klines.at(-1) ?? null);
+  // Virtualized Terminal tiles can paint verified cached candles immediately.
+  // Only this page uses the warm cache; the normal shared REST/WS flow still
+  // revalidates history every time the chart remounts.
+  const [warmTerminalHistory] = useState<Kline[] | null>(() => terminalMode
+    ? readTerminalChartHistory({ exchange, marketType, symbol, timeframe }) : null);
+  const currentCandleRef = useRef<Kline | null>(klines.at(-1) ?? warmTerminalHistory?.at(-1) ?? null);
   const latestPriceRef = useRef<number | null>(currentCandleRef.current?.close ?? null);
   const hasLiveCandleRef = useRef(false);
   const onClosedCandleRef = useRef(onClosedCandle);
@@ -370,10 +376,17 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     return () => clearInterval(interval);
   }, [timeframe, chartProvider]);
 
-  const [effectiveKlines, setEffectiveKlines] = useState<Kline[]>(klines);
-  // This component remounts per instrument/timeframe. A live candle does not
-  // mean that the initial historical batch has been received.
-  const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(klines.length > 1);
+  const [effectiveKlines, setEffectiveKlines] = useState<Kline[]>(() =>
+    klines.length ? klines : warmTerminalHistory ?? []);
+  // The warm snapshot does not disable fresh history requests or live sockets.
+  const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(
+    klines.length > 1 || (warmTerminalHistory?.length ?? 0) > 1);
+  const lastTerminalHistoryRef = useRef(effectiveKlines);
+  lastTerminalHistoryRef.current = effectiveKlines;
+  useEffect(() => () => {
+    if (terminalMode) saveTerminalChartHistory(
+      { exchange, marketType, symbol, timeframe }, lastTerminalHistoryRef.current);
+  }, [terminalMode, exchange, marketType, symbol, timeframe]);
   const [liveCandles] = useState(() => createLiveCandlePublisher((latest, completed) => {
     setEffectiveKlines(previous => mergeLiveCandle(
       completed ? mergeLiveCandle(previous, completed) : previous, latest,
