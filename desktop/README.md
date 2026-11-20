@@ -32,6 +32,35 @@ command protocol is not. Ticker-linking is intentionally not claimed or attempte
 until a verified API specification is available. The existing website MetaScalp
 and Tiger local integrations are kept untouched.
 
+## MetaScalp linking from a tablet (opt-in)
+
+1. On Windows, start MetaScalp and h00k Desktop. In MetaScalp, assign the
+   order book, trade feed and charts to one **named link group**, for example
+   **002**. Check the MetaScalp version: the `Active window` binding is
+   different from a named link group and is not notified by this API.
+2. In h00k Desktop click **Separate window**, sign in to your h00k.top
+   account (email/password), then enable **Receive ticker selections from
+   tablet** in Desktop settings. The remote-control feature is off by default.
+3. Sign into the **same** account at h00k.top on the tablet. In Profile →
+   Terminal linking select MetaScalp and the matching group (e.g. 002).
+   Turn on **Send to h00k Desktop instead of local MetaScalp** on that tablet.
+4. Select a coin via an existing site ticker-link action. The tablet uses
+   a protected account route, and the Electron main process forwards only
+   `tickerPattern` and `binding` to `127.0.0.1:17845..17855/api/change-ticker`.
+
+The tablet web browser cannot safely access the Windows process's localhost.
+For browser compatibility this design uses h00k.top HTTPS as a lightweight
+**control-only relay**: a single 20-second long-poll per enabled Desktop
+(maximum two per user on the backend), plus one brief POST for each clicked
+symbol. It is not LAN peer-to-peer even when both devices share Wi-Fi.
+No exchange market streams, orders, API keys, or local-server ports are
+exposed. Desktop gets its h00k login via the existing Electron website
+session partition; a login in an unrelated Windows browser does not count.
+The server keeps only a recent, at-most-one ticker command per account in
+memory; it is not a durable queue. The accepted status means queued for
+delivery, not independently verified in MetaScalp. On Windows, run a real
+end-to-end acceptance check with live MetaScalp before relying on this link.
+
 ## Installer size, disk usage and resource safety
 
 There are **two different Windows downloads**:
