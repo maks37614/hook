@@ -1580,9 +1580,17 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    // Measurements can be resized from either endpoint or moved by dragging their
    // shaded range / label. Keep ordinary plotting and pinch gestures unchanged.
    if((tool==='cursor'||tool==='ruler')&&e.button===0&&zone(z.x,z.y,z.g)==='plot'){
-     const found=[...drawings].reverse().find(d=>d.type==='ruler'&&d.id.startsWith(symbol+':')&&d.pts[1]&&measurementHit(z.g,d.pts[0],d.pts[1],z.x,z.y));
+     // Hit topmost ruler first without allocating a reversed drawings array.
+     // The hit kind is reused to decide which endpoint is being dragged.
+     let found:Drawing|undefined;
+     let hit:ReturnType<typeof measurementHit>=null;
+     for(let i=drawings.length-1;i>=0;i--){
+       const item=drawings[i];
+       if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+       const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+       if(candidate){found=item;hit=candidate;break}
+     }
      if(found){
-       const hit=measurementHit(z.g,found.pts[0],found.pts[1],z.x,z.y);
        hoveredMeasurement.current=found.id;
        if(typeof drawingActions!=='undefined')selectDrawingAt(found,z.x,z.y,z.g);
        else setSelectedDrawingId(found.id);
@@ -1710,8 +1718,18 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(transient.current){e.preventDefault();return}
    const d=drag.current;
    if(!d&&(tool==='cursor'||tool==='ruler')){
-     const hit=zone(z.x,z.y,z.g)==='plot'?[...drawings].reverse().find(item=>item.type==='ruler'&&item.id.startsWith(symbol+':')&&item.pts[1]&&measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y)):undefined;
-     const action=hit?measurementHit(z.g,hit.pts[0],hit.pts[1],z.x,z.y):null;
+     let hit:Drawing|undefined;
+     let action:ReturnType<typeof measurementHit>=null;
+     if(zone(z.x,z.y,z.g)==='plot'){
+       // Hover is a hot path: do not copy/reverse all drawing objects or
+       // measure the same ruler twice just to identify its drag action.
+       for(let i=drawings.length-1;i>=0;i--){
+         const item=drawings[i];
+         if(item.type!=='ruler'||!item.id.startsWith(symbol+':')||!item.pts[1])continue;
+         const candidate=measurementHit(z.g,item.pts[0],item.pts[1],z.x,z.y);
+         if(candidate){hit=item;action=candidate;break}
+       }
+     }
      if(hoveredMeasurement.current!==(hit?.id||null)){hoveredMeasurement.current=hit?.id||null;scheduleDraw()}
      if(hit&&typeof drawingActions!=='undefined'&&hit.id!==selectedDrawingId)selectDrawingAt(hit,z.x,z.y,z.g);
      if(box.current?.style)box.current.style.cursor=action==='start'||action==='end'?'crosshair':action==='body'?'move':'';
