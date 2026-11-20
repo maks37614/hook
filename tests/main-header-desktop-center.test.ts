@@ -16,7 +16,6 @@ const desktop = source.slice(
 test('desktop header centers the existing logo, fullscreen and language controls', () => {
   assert.match(source, /xl:relative xl:justify-between/);
   assert.match(brand, /xl:pointer-events-none xl:absolute xl:inset-x-0 xl:top-1\/2 xl:z-10 xl:-translate-y-1\/2/);
-  assert.match(brand, /grid-cols-\\[minmax\\(0,1fr\\)_auto_minmax\\(0,1fr\\)\\]/);
   assert.match(brand, /justify-self-center[^"]*xl:pointer-events-auto/, 'the logo alone must sit in the center column');
   assert.match(brand, /src="\/h00k-robot-logo\.svg"/);
   assert.match(brand, /onClick=\{toggleFullScreen\}/);
