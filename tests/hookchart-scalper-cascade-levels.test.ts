@@ -60,6 +60,10 @@ test('cascade marks respect invalid bars and do not cross a recent candle gap', 
   const rows = cascadeFixture();
   rows[60].h = NaN;
   assert.equal(cascade(analyzer.evaluate(rows, scope, false, true)), undefined);
+  const oldInvalid = cascadeFixture();
+  oldInvalid[20].h = NaN;
+  assert.equal(cascade(analyzer.evaluate(oldInvalid, scope, false, true)), undefined,
+    'an invalid historical candle outside the ATR window must reject all cascade geometry');
   const gapped = cascadeFixture().map((bar, i) => i > 60 ? { ...bar, t: bar.t + 60_000 } : bar);
   assert.equal(cascade(analyzer.evaluate(gapped, scope, false, true)), undefined);
 });

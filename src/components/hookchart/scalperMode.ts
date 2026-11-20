@@ -419,6 +419,8 @@ function structureCandidates(rows: readonly ScalperCandle[], averagedRegression 
  * can create tiers; the newest completed bar is reserved for confirmation.
  */
 function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
+  if (rows.length < MIN_BARS || !rows.every(validBar)) return [];
+  for (let i = 1; i < rows.length; i++) if (rows[i].t <= rows[i - 1].t) return [];
   const volatility = atr(rows);
   if (!Number.isFinite(volatility) || volatility <= 0) return [];
   const { highs, lows } = pivots(rows);
