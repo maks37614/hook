@@ -27,6 +27,10 @@ test('Russian time zones are explicit, localized and show the correct UTC direct
     'Asia/Krasnoyarsk', 'Asia/Irkutsk', 'Asia/Yakutsk',
     'Asia/Vladivostok', 'Asia/Magadan', 'Asia/Kamchatka',
     'Asia/Anadyr', 'Asia/Sakhalin',
+    'Europe/Kirov', 'Europe/Volgograd', 'Europe/Astrakhan',
+    'Europe/Saratov', 'Europe/Ulyanovsk',
+    'Asia/Barnaul', 'Asia/Tomsk', 'Asia/Novokuznetsk',
+    'Asia/Chita', 'Asia/Khandyga', 'Asia/Ust-Nera', 'Asia/Srednekolymsk',
   ];
   const choices = getTimeZoneChoices('Europe/Moscow', 'ru');
   for (const zone of russianZones) {
