@@ -108,12 +108,12 @@ export async function findActiveMetaScalpPort(preferredPort = 17845): Promise<nu
   return null;
 }
 
-interface LinkedMetaScalpPanel { externalId: string; connectionId: number }
+interface LinkedMetaScalpPanel { externalId: string; connectionId: number; kind: 'orderBook' | 'chart' }
 const META_DOCUMENT_GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 /** A group can contain spot and futures books; never turn either connection into the other. */
 export function linkedMetaScalpPanels(state: unknown, binding: string):
-  { documents: LinkedMetaScalpPanel[]; error?: string } | null {
+  { documents: LinkedMetaScalpPanel[]; orderBookCount: number; error?: string } | null {
   if (!state || typeof state !== 'object') return null;
   const inventory = state as { windows?: unknown; standaloneCharts?: unknown };
   if (!Array.isArray(inventory.windows) || !Array.isArray(inventory.standaloneCharts)) return null;
@@ -131,21 +131,21 @@ export function linkedMetaScalpPanels(state: unknown, binding: string):
   const candidates = documents.filter(d => d && typeof d === 'object'
     && (d as { linkNumber?: number }).linkNumber === bindingNumber
     && ['orderBook','chart'].includes((d as {kind?: string}).kind || '')) as {
-    externalId: string; connectionId: number;
+    externalId: string; connectionId: number; kind: 'orderBook' | 'chart';
   }[];
-  if (candidates.length > 16) return { documents: [], error: 'TOO_MANY_PANELS' };
+  if (candidates.length > 16) return { documents: [], orderBookCount: 0, error: 'TOO_MANY_PANELS' };
   const found: LinkedMetaScalpPanel[] = [];
   const seen = new Set<string>();
   for (const doc of candidates) {
     if (typeof doc.externalId !== 'string' || !META_DOCUMENT_GUID.test(doc.externalId)
       || !Number.isSafeInteger(doc.connectionId) || doc.connectionId <= 0)
-      return { documents: [], error: 'UNBOUND_PANEL' };
+      return { documents: [], orderBookCount: 0, error: 'UNBOUND_PANEL' };
     const externalId = doc.externalId.toLowerCase();
     if (seen.has(externalId)) continue;
     seen.add(externalId);
-    found.push({ externalId, connectionId: doc.connectionId });
+    found.push({ externalId, connectionId: doc.connectionId, kind: doc.kind });
   }
-  return { documents: found };
+  return { documents: found, orderBookCount: found.filter(doc => doc.kind === 'orderBook').length };
 }
 
 /** Only local read-only inventory plus document-specific ticker writes. */
@@ -167,7 +167,10 @@ async function sendMixedMetaScalpGroup(port: number, binding: string, symbol: st
   if (!matched) return null;
   if (matched.error) return { success: false, message: 'MetaScalp: некоректні панелі у групі ' + binding + '.' };
   const docs = matched.documents;
-  if (docs.length < 2 || new Set(docs.map(d => d.connectionId)).size < 2) return null;
+  // A single order book must follow the site-selected market, regardless
+  // of how many charts share its group. Two or more order books in ANY
+  // binding group retain their own Spot/Futures market connections.
+  if (matched.orderBookCount < 2) return null;
   const results = await Promise.all(docs.map(async doc => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1600);

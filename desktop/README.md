@@ -35,9 +35,9 @@ and Tiger local integrations are kept untouched.
 ## MetaScalp linking from a tablet (opt-in)
 
 1. On Windows, start MetaScalp and h00k Desktop. In MetaScalp, assign the
-   order book, trade feed and charts to one **named link group**, for example
-   **002**. Check the MetaScalp version: the `Active window` binding is
-   different from a named link group and is not notified by this API.
+   desired order books, trade feed and charts to a matching link group
+   **001–500** (e.g. **002**). The special "Active window" link mode is
+   not the same as selecting a named group in MetaScalp.
 2. In h00k Desktop click **Separate window**, sign in to your h00k.top
    account (email/password), then enable **Receive ticker selections from
    tablet** in Desktop settings. The remote-control feature is off by default.
@@ -47,13 +47,21 @@ and Tiger local integrations are kept untouched.
 4. Select a coin via an existing site ticker-link action. The tablet uses
    a protected account route, and the Electron main process forwards only
    symbol, exchange, market and binding to the running Windows MetaScalp API.
-5. When binding `002` contains Spot and Futures order books with different
-   connections, Desktop reads `GET /api/ui/state` and switches each panel
-   using `PUT /api/ui/documents/{externalId}/ticker`. Each pane retains
-   its existing spot/futures connection; no futures suffix is sent to Spot.
-   The same behavior is supported for direct website-to-local-PC linking.
-   A legacy MetaScalp without UI inventory uses the original
-   `POST /api/change-ticker` named-group behavior instead.
+5. The routing rule is identical for **all named groups 001–500**, and
+   depends on the number of order-book panels in the selected group:
+   - **One order book** (with or without linked charts): send MetaScalp's
+     original `POST /api/change-ticker` with the **website-selected**
+     exchange and market (`BINANCE:BTCUSDT.p` for futures,
+     `BINANCE:BTCUSDT` for spot).
+   - **Two or more order books**: read `GET /api/ui/state` and switch
+     each linked order book (and any linked charts) with
+     `PUT /api/ui/documents/{externalId}/ticker`, providing only the
+     symbol. The existing connection of every panel — Spot/Futures and
+     its exchange — is preserved. This applies even when two panels
+     report the same connection ID.
+   The same rule also works for a normal h00k.top page opened directly
+   on the Windows computer. MetaScalp versions without the UI inventory
+   endpoint fall back to original named-group behavior.
 
 These changes affect **ticker selection only**, not orders, positions,
 trading or terminal link settings. If the instrument does not actually
