@@ -32,7 +32,7 @@ import type { ArchiveChartCapture } from '../../utils/archiveChartSnapshot';
 import { formatTerminalQuotedPrice } from '../../utils/terminalPresets';
 import { normalizeChartProvider } from '../../utils/chartPreferences';
 import { formationChartMarkers } from '../../utils/hookchartData';
-import { isTerminalWidgetNearViewport } from '../../utils/terminalWidgetVisibility';
+import { subscribeTerminalWidgetVisibility } from '../../utils/terminalVisibilityScheduler';
 
 interface TerminalChartWidgetProps {
   block: TerminalChartBlock;
@@ -142,9 +142,9 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   const shouldLoadWidgets = !isSuspended
     && (isSingleBlock || isOnlyChart || isMaximized || compactFullscreenMode || isNearViewport);
 
-  // Lazy-load only nearby Terminal rows. On iPad Safari IntersectionObserver can
-  // report a stale false value inside nested overflow grids: use actual geometry
-  // as the source of truth, and coalesce checks to one per animation frame.
+  // Every card still suspends its offscreen HookChart independently, but
+  // all Terminal tiles share one scroll/resize observer and one geometry pass
+  // per animation frame (including the iPad Safari nested-scroll fallback).
   useEffect(() => {
     const node = blockRootRef.current;
     if (!node) return;
@@ -152,55 +152,10 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
       setIsNearViewport(true);
       return;
     }
-
-    const scrollRoot = node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
-    let pendingFrame: number | null = null;
-    const updateVisibility = () => {
-      pendingFrame = null;
-      const screen = { top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth };
-      const near = isTerminalWidgetNearViewport(
-        node.getBoundingClientRect(),
-        scrollRoot?.getBoundingClientRect() ?? screen,
-        screen,
-      );
-      setIsNearViewport(current => current === near ? current : near);
-    };
-    const scheduleVisibilityCheck = () => {
-      if (pendingFrame === null) pendingFrame = window.requestAnimationFrame(updateVisibility);
-    };
-
-    const observer = typeof IntersectionObserver === 'undefined' ? null
-      : new IntersectionObserver(scheduleVisibilityCheck, {
-        root: scrollRoot,
-        rootMargin: '160px 0px',
-      });
-    observer?.observe(node);
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null
-      : new ResizeObserver(scheduleVisibilityCheck);
-    resizeObserver?.observe(node);
-    if (scrollRoot) resizeObserver?.observe(scrollRoot);
-
-    scrollRoot?.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
-    window.addEventListener('scroll', scheduleVisibilityCheck, { passive: true });
-    window.addEventListener('resize', scheduleVisibilityCheck);
-    window.addEventListener('orientationchange', scheduleVisibilityCheck);
-    document.addEventListener('visibilitychange', scheduleVisibilityCheck);
-    scheduleVisibilityCheck();
-
-    return () => {
-      observer?.disconnect();
-      resizeObserver?.disconnect();
-      scrollRoot?.removeEventListener('scroll', scheduleVisibilityCheck);
-      window.removeEventListener('scroll', scheduleVisibilityCheck);
-      window.removeEventListener('resize', scheduleVisibilityCheck);
-      window.removeEventListener('orientationchange', scheduleVisibilityCheck);
-      document.removeEventListener('visibilitychange', scheduleVisibilityCheck);
-      if (pendingFrame !== null) window.cancelAnimationFrame(pendingFrame);
-    };
+    return subscribeTerminalWidgetVisibility(node,
+      near => setIsNearViewport(current => current === near ? current : near));
   }, [isSingleBlock, isOnlyChart, isMaximized, compactFullscreenMode, isSuspended]);
 
-  const headerRef = useRef<HTMLDivElement>(null);
-  const toolbarMenusRef = useRef<HTMLDivElement>(null);
   const toolbarScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
