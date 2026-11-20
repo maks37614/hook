@@ -378,13 +378,13 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   const gapRecoveryReadyRef = useRef(false);
   gapRecoveryReadyRef.current = hasParentHistory || initialHistoryLoaded;
   const gapRecoveryRef = useRef({ pending: false, attemptedAt: 0 });
-  const recoverKlineGap = useCallback((from: number, to: number) => {
+  const recoverKlineGap = useCallback((from: number, to: number, reconcileClosedBar = false) => {
     const seconds = ({
       '1m': 60, '5m': 300, '15m': 900,
       '1h': 3600, '4h': 14400, '1d': 86400,
     } as Record<string, number>)[timeframe];
-    if (!seconds || !gapRecoveryReadyRef.current || to - from <= seconds ||
-        document.visibilityState === 'hidden') return;
+    if (!seconds || !gapRecoveryReadyRef.current ||
+        (to - from <= seconds && !reconcileClosedBar)) return;
     // Do not issue a request for every chart or every tick. Only a new,
     // measurable missing-bar gap can trigger one small, shared history page.
     const state = gapRecoveryRef.current;
@@ -669,12 +669,12 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   }, [liveCandles, liveUiIntervalMs]);
 
   const handleLiveTick = useCallback(
-    (candle: Kline, mode: 'ws' | 'rest') => {
+    (candle: Kline, mode: 'ws' | 'rest', reconnectNeedsReconcile = false) => {
       if (chartProvider !== 'hookchart' && !candleSeriesRef.current) return;
       const previousCandle = currentCandleRef.current;
       if (previousCandle && isOlderLiveCandle(candle, previousCandle)) return;
       const opensBar = !!previousCandle && candle.time > previousCandle.time;
-      if (opensBar) recoverKlineGap(previousCandle.time, candle.time);
+      if (opensBar) recoverKlineGap(previousCandle.time, candle.time, reconnectNeedsReconcile);
       if (opensBar && previousCandle.time !== lastNotifiedClosedRef.current) {
         lastNotifiedClosedRef.current = previousCandle.time;
         // A new exchange candle is the conservative, provider-independent
@@ -1075,6 +1075,8 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     if (terminalTradeCandles) return;
     let disposed = false;
     let wsConnected = false;
+    let hadActiveKlineFeed = false;
+    let reconcileOnReconnect = false;
     const streamClock = { lastExchangePriceAt: 0, lastStreamTickReceivedAt: 0 };
     liveStreamClockRef.current = streamClock;
     let lastKlineReceivedAt = 0;
@@ -1088,6 +1090,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
       {
         onStatus: connected => {
           if (disposed) return;
+          if (!connected && wsConnected && hadActiveKlineFeed) reconcileOnReconnect = true;
           wsConnected = connected;
           setIsLiveConnected(connected);
           if (connected) { setLiveMode('ws'); fallbackFailures = 0; }
@@ -1096,6 +1099,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           if (disposed) return;
           const receivedAt = Date.now();
           lastKlineReceivedAt = receivedAt;
+          hadActiveKlineFeed = true;
           const eventAt = Number(candle.eventTime) || receivedAt;
           const current = currentCandleRef.current;
           if (current && isOlderLiveCandle(candle, current)) return;
@@ -1109,7 +1113,13 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
             : candle;
           if (!current || candle.time > current.time) streamClock.lastExchangePriceAt = eventAt;
           else streamClock.lastExchangePriceAt = Math.max(streamClock.lastExchangePriceAt, eventAt);
-          liveTickHandlerRef.current(corrected, 'ws');
+          // An interrupted candle can remain partial even when the next
+          // timestamp is adjacent. Restore its final exchange OHLC once.
+          const reconcileClosedBar = reconcileOnReconnect &&
+            !!current && candle.time > current.time;
+          if (reconcileOnReconnect && current && candle.time >= current.time)
+            reconcileOnReconnect = false;
+          liveTickHandlerRef.current(corrected, 'ws', reconcileClosedBar);
         },
       },
     );
