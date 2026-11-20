@@ -722,14 +722,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     // and sorted every active depth level merely to expand Y to the four closest.
     // Keep the same distance, stable tie order and 3% gate in one bounded pass.
     const cp=candles.at(-1)!.c,limit=Math.max(cp,1e-12)*.03;
-    const nearest:{price:number;distance:number;index:number}[]=[];
+    const nearest:{price:number;distance:number}[]=[];
     for(let i=0;i<densities.length;i++){
       const d=densities[i];if(!d.active)continue;
       const distance=Math.abs(d.p-cp);if(distance>limit)continue;
       let at=nearest.findIndex(v=>v.distance>distance);
       if(at<0)at=nearest.length;
       if(at>=4)continue;
-      nearest.splice(at,0,{price:d.p,distance,index:i});
+      nearest.splice(at,0,{price:d.p,distance});
       if(nearest.length>4)nearest.pop();
     }
     for(const d of nearest){if(d.price<lo)lo=d.price;if(d.price>hi)hi=d.price}
