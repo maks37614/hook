@@ -39,3 +39,19 @@ test('candle quality remains physical-pixel DPR painting with the original width
   assert.match(engine, /q\.fillRect\(wickLeftPx,wickTopPx,wickPx,wickHPx\)/);
   assert.match(engine, /q\.fillRect\(bodyLeftPx,bodyTopPx,bodyPx,bodyHPx\)/);
 });
+
+test('Terminal pan and pinch coalesce pointer-driven viewport commits to one display frame',()=>{
+  assert.match(engine,/const pendingTerminalPointerGesture=useRef/);
+  assert.match(engine,/const terminalPointerGestureFrame=useRef/);
+  assert.match(engine,/pendingTerminalPointerGesture\.current=\{update,kind\}/);
+  assert.match(engine,/if\(terminalPointerGestureFrame\.current!==null\)return/);
+  assert.match(engine,/terminalPointerGestureFrame\.current=window\.requestAnimationFrame\(/);
+  assert.match(engine,/if\(pending\)setGestureVp\(pending\.update,pending\.kind\)/);
+  assert.match(engine,/const gestureUpdate=\(update:React\.SetStateAction<Viewport>\)=>schedulePointerGestureVp\(/);
+  assert.match(engine,/const handlePointerUp=\(e:React\.PointerEvent<HTMLElement>\)=>\{[\s\S]{0,150}flushTerminalPointerGesture\(\)/);
+  assert.match(engine,/const handleWheel=\(e:WheelEvent\)=>\{\s*flushTerminalPointerGesture\(\)/);
+  assert.match(engine,/if\(!terminalMode\)\{setGestureVp\(update,kind\);return\}/,
+    'standalone HookChart, Replay and fullscreen must retain their original gestures');
+  assert.match(engine,/\[fitAllScopeKey\]\);/,
+    'a replaced coin must cancel any pending gesture');
+});
