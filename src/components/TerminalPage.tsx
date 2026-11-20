@@ -150,6 +150,31 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const [presetPage, setPresetPage] = useState(0);
   const presetPageRef = useRef(0);
   const chartListRef = useRef<HTMLDivElement>(null);
+  // Only cards actually intersecting the viewport consume the interactive
+  // candle paint budget. A 50-chart list with 3 visible must run as 3 charts.
+  // Coalesce rapid enter/leave callbacks into one parent update per frame.
+  const visibleChartIdsRef = useRef<Set<string>>(new Set());
+  const [visibleChartCount, setVisibleChartCount] = useState(1);
+  const visibleCountFrameRef = useRef<number | null>(null);
+  const handleTerminalChartVisibility = useCallback((id: string, visible: boolean) => {
+    const set = visibleChartIdsRef.current;
+    if (visible === set.has(id)) return;
+    if (visible) set.add(id);
+    else set.delete(id);
+    if (visibleCountFrameRef.current !== null) return;
+    visibleCountFrameRef.current = window.requestAnimationFrame(() => {
+      visibleCountFrameRef.current = null;
+      setVisibleChartCount(count => {
+        const actual = Math.max(1, visibleChartIdsRef.current.size);
+        return count === actual ? count : actual;
+      });
+    });
+  }, []);
+  useEffect(() => () => {
+    if (visibleCountFrameRef.current !== null)
+      window.cancelAnimationFrame(visibleCountFrameRef.current);
+    visibleCountFrameRef.current = null;
+  }, []);
   // A finger may begin dragging in a narrow gutter without a preparatory tap.
   // Bind one DOM-only listener to the shared scroll viewport, not each live chart.
   useEffect(() => {
@@ -1814,10 +1839,11 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                       )}
                       isMaximized={isMaximized}
                       isSuspended={maximizedBlockId !== null && !isMaximized}
+                      onVisibilityChange={handleTerminalChartVisibility}
                       terminalAutoScale={autoScaleCharts && chartProvider === 'hookchart'}
                       terminalEcoMode={terminalEcoMode}
                       terminalRefreshMs={terminalRefreshMs}
-                      terminalActiveCharts={maximizedBlockId ? 1 : visibleWorkspaceBlocks.length}
+                      terminalActiveCharts={maximizedBlockId ? 1 : visibleChartCount}
                       terminalInitialView={config.initialChartView}
                       terminalFitAllRequest={terminalFitAllRequest}
                       heightStyle={computedHeightStyle}
