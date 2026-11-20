@@ -1794,7 +1794,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
               </div>
             ) : (
               <>
-              <div className={`terminal-workspace-grid grid ${gridColsClass} gap-2 sm:gap-3 transition-all duration-200`} style={terminalHeightVariables}>
+              <div className={`terminal-workspace-grid grid ${gridColsClass} gap-2 sm:gap-3`} style={terminalHeightVariables}>
                 {visibleWorkspaceBlocks.map((block, index) => {
                   const coinData = getCoinForBlock(block);
                   const isMaximized = maximizedBlockId === block.id;
