@@ -63,3 +63,25 @@ test('relay uses the signed-in cookie and forwards one fresh command',async()=>{
   assert.match(calls[0][0],/\/api\/desktop-link\/poll\?after=0$/);
   assert.equal(calls[0][1].headers.Cookie,'__Host-h00k-session=test-token');
 });
+
+test('Desktop accepts a fresh low sequence after VPS channel restart',async()=>{
+  const command={seq:1,symbol:'ETHUSDT',exchange:'binance',
+    marketType:'futures',binding:'002',createdAt:Date.now()};
+  let handled=0;
+  let client;
+  client=new DesktopTickerRelayClient({
+    getCookie:async()=> '__Host-h00k-session=test-token',
+    fetchImpl:async()=>({
+      status:200,headers:{get:()=> 'new-vps-epoch'},
+      json:async()=>({command}),
+    }),
+    onCommand:async()=>{handled++;client.stop();return {ok:true};},
+  });
+  client.seq=1000;
+  client.epoch='old-vps-epoch';
+  client.start();
+  await new Promise(resolve=>setTimeout(resolve,35));
+  assert.equal(handled,1);
+  assert.equal(client.seq,1);
+  assert.equal(client.epoch,'new-vps-epoch');
+});
