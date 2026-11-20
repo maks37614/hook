@@ -1,7 +1,8 @@
 import { isTerminalWidgetNearViewport } from './terminalWidgetVisibility';
 
 type Listener = (near: boolean) => void;
-type TrackedListener = { listener: Listener; last: boolean | null };
+type Bounds = { top: number; bottom: number; left: number; right: number };
+type TrackedListener = { listener: Listener; last: boolean | null; bounds?: Bounds };
 
 interface VisibilityTracker {
   subscribe: (node: HTMLElement, listener: Listener) => () => void;
@@ -14,6 +15,10 @@ const trackers = new WeakMap<HTMLElement, VisibilityTracker>();
 function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTracker {
   const listeners = new Map<HTMLElement, TrackedListener>();
   let frame: number | null = null;
+  let layoutDirty = true;
+  let measuredScrollTop = 0;
+  let lastFullMeasure = 0;
+  const maxCacheAgeMs = 250; // Safari can shift layout without ResizeObserver firing.
   const publish = (entry: TrackedListener, visible: boolean) => {
     // Scrolling can fire at 120 Hz on tablets. Never enqueue 50 identical
     // React setState actions per frame: publish only real entry/exit changes.
@@ -23,6 +28,10 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
   };
   const onChange = () => {
     if (frame === null) frame = window.requestAnimationFrame(check);
+  };
+  const invalidateLayout = () => {
+    layoutDirty = true;
+    onChange();
   };
   const check = () => {
     frame = null;
@@ -35,23 +44,41 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
     const screen = {
       top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth,
     };
-    // Read the scroll container once per frame for ALL Terminal cards.
+    // Reading 50 getBoundingClientRect() values every animation frame on
+    // iPad can force repeated layout. During plain scroll, tile geometry is
+    // translated by scrollTop; no element layout read is necessary. Re-measure
+    // on resize/intersection changes and at least every 250 ms as a safeguard
+    // against Safari's delayed ResizeObserver/layout notifications.
+    const scrollTop = root?.scrollTop ?? 0;
+    const now = performance.now();
+    const measureAll = !root || layoutDirty || now - lastFullMeasure >= maxCacheAgeMs;
     const bounds = root?.getBoundingClientRect() ?? screen;
+    const scrollDelta = measuredScrollTop - scrollTop;
     for (const [node, entry] of listeners) {
-      publish(entry, isTerminalWidgetNearViewport(node.getBoundingClientRect(), bounds, screen));
+      const rect = measureAll || !entry.bounds ? node.getBoundingClientRect() : {
+        top: entry.bounds.top + scrollDelta, bottom: entry.bounds.bottom + scrollDelta,
+        left: entry.bounds.left, right: entry.bounds.right,
+      };
+      if (measureAll || !entry.bounds) entry.bounds = rect;
+      publish(entry, isTerminalWidgetNearViewport(rect, bounds, screen));
+    }
+    if (measureAll) {
+      lastFullMeasure = now;
+      measuredScrollTop = scrollTop;
+      layoutDirty = false;
     }
   };
   const intersection = typeof IntersectionObserver === 'undefined' ? null
-    : new IntersectionObserver(onChange, { root, rootMargin: '0px' });
+    : new IntersectionObserver(invalidateLayout, { root, rootMargin: '0px' });
   const resize = typeof ResizeObserver === 'undefined' ? null
-    : new ResizeObserver(onChange);
+    : new ResizeObserver(invalidateLayout);
   if (root) {
     root.addEventListener('scroll', onChange, { passive: true });
     resize?.observe(root);
   }
-  window.addEventListener('scroll', onChange, { passive: true });
-  window.addEventListener('resize', onChange);
-  window.addEventListener('orientationchange', onChange);
+  window.addEventListener('scroll', invalidateLayout, { passive: true });
+  window.addEventListener('resize', invalidateLayout);
+  window.addEventListener('orientationchange', invalidateLayout);
   const onVisibilityChange = () => {
     if (document.visibilityState !== 'hidden') { onChange(); return; }
     if (frame !== null) window.cancelAnimationFrame(frame);
@@ -63,11 +90,13 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
   return {
     subscribe(node, listener) {
       listeners.set(node, { listener, last: null });
+      invalidateLayout();
       intersection?.observe(node);
       resize?.observe(node);
       onChange();
       return () => {
         listeners.delete(node);
+        layoutDirty = true;
         intersection?.unobserve(node);
         resize?.unobserve(node);
         if (listeners.size) return;
@@ -76,9 +105,9 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
         intersection?.disconnect();
         resize?.disconnect();
         root?.removeEventListener('scroll', onChange);
-        window.removeEventListener('scroll', onChange);
-        window.removeEventListener('resize', onChange);
-        window.removeEventListener('orientationchange', onChange);
+        window.removeEventListener('scroll', invalidateLayout);
+        window.removeEventListener('resize', invalidateLayout);
+        window.removeEventListener('orientationchange', invalidateLayout);
         document.removeEventListener('visibilitychange', onVisibilityChange);
         trackers.delete(key);
       };
