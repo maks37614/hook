@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -97,4 +97,33 @@ test('every automatic Scalper line uses the same CSS width and the cascade proje
   assert.match(layer,/q\.lineWidth = scalperStrokeWidth;/);
   assert.doesNotMatch(layer,/scalperCascadeLineWidth|scalperTrendStrokeWidth|setup\.kind === 'trend' \?/);
   assert.equal(scalperRenderedLineEndX('cascade',horizontal('upper'),100,400),400);
+});
+
+test('Scalper thin-line raster width stays uniform across its full length and DPRs', () => {
+  assert.equal(scalperRasterStrokeWidth(0.4, 1, 1), 1, 'at least one physical pixel on DPR1');
+  assert.equal(scalperRasterStrokeWidth(0.4, 2, 2), 0.5, 'one physical pixel on DPR2');
+  assert.equal(scalperRasterStrokeWidth(0.4, 4, 4), 0.5, 'two physical pixels on DPR4');
+  assert.equal(scalperRasterStrokeWidth(0.2, 4, 4), 0.25, '0.2 CSS px remains visible');
+  assert.equal(scalperRasterStrokeWidth(1, 4, 4), 1, 'larger configured widths stay intact');
+  assert.equal(scalperRasterStrokeWidth(0.4, 2, 4), 0.5, 'uneven bitmap axes use safe minimum scale');
+  assert.ok(Number.isFinite(scalperRasterStrokeWidth(Number.NaN, 0, Infinity)));
+});
+
+test('horizontal Scalper strokes align their center without moving diagonal wick pivots', () => {
+  assert.equal(scalperPixelCenteredHorizontalY(7.2, 0.5, 2), 7.25);
+  assert.equal(scalperPixelCenteredHorizontalY(7.2, 0.5, 4), 7.25);
+  assert.equal(scalperPixelCenteredHorizontalY(7.2, 1, 2), 7);
+  assert.equal(scalperPixelCenteredHorizontalY(Number.NaN, 0.5, 2), Number.NaN);
+  const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
+  const from = engine.indexOf('if (scalperResult?.setups.length) {');
+  const to = engine.indexOf('drawHookTimeMarkers(q,g,timeMarkers,mouse);', from);
+  const layer = engine.slice(from, to);
+  assert.ok(from >= 0 && to > from);
+  assert.match(engine, /scalperRasterStrokeWidth\(normalizeScalperLineWidth\(scalperLineWidth\), scaleX, scaleY\)/);
+  assert.match(layer, /const horizontalLine = line\.from\.p === line\.to\.p/);
+  assert.match(layer, /const y0 = horizontalLine \? scalperPixelCenteredHorizontalY\(rawY0, scalperStrokeWidth, scaleY\) : rawY0/);
+  assert.match(layer, /const y1 = horizontalLine \? y0 : rawY1/);
+  assert.match(layer, /q\.lineWidth = scalperStrokeWidth/);
+  assert.match(layer, /q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
+  assert.match(layer, /q\.lineTo\(renderedEndX, y1\)/);
 });
