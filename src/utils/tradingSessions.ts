@@ -40,7 +40,7 @@ const POPULAR_TIME_ZONES: Record<string, string> = {
   'Asia/Tokyo': 'Токіо', 'Asia/Shanghai': 'Шанхай', 'Asia/Hong_Kong': 'Гонконг',
   'Asia/Singapore': 'Сінгапур', 'Asia/Dubai': 'Дубай', 'Australia/Sydney': 'Сідней',
   'Asia/Kolkata': 'Колката', 'Asia/Kathmandu': 'Катманду',
-  // Keep major Russian cities explicit: iOS/older Intl implementations can
+  // Keep Russia's IANA zone IDs explicit: iOS/older Intl implementations can
   // omit them from supportedValuesOf, and the native picker is not searchable.
   'Europe/Kaliningrad': 'Калінінград', 'Europe/Moscow': 'Москва',
   'Europe/Samara': 'Самара', 'Asia/Yekaterinburg': 'Єкатеринбург',
