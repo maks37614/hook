@@ -188,6 +188,16 @@ class DesktopTickerRelayClient {
         // Freshness is enforced against the VPS clock before delivery.
         // The Windows clock may differ from the VPS clock by >15 seconds.
         if (!Number.isFinite(command.createdAt) || command.createdAt <= 0) continue;
+        // The user may have signed out while the old account's long poll
+        // was pending. Do not execute an old user's command after the switch.
+        const currentCookie = await this.getCookie();
+        if (!this.running || !currentCookie ||
+          createHash('sha256').update(currentCookie).digest('hex') !== this.sessionFingerprint) {
+          this.seq=0;
+          this.epoch=null;
+          this.sessionFingerprint=null;
+          continue;
+        }
         const result=await this.onCommand(command);
         if (result?.reason === 'METASCALP_OFFLINE' || result?.reason === 'METASCALP_UNREACHABLE')
           this.setStatus('metascalp-offline');
