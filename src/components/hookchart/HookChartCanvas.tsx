@@ -171,6 +171,12 @@ const AV_FOOTER_TOOLTIP: Record<string, string> = {
   pl: 'AV 24h — średni obrót w USDT na minutę: obrót z 24 h / 1440. Gdy brak notowań, wykorzystywane jest oszacowanie z pełnej doby załadowanych świec.',
 };
 
+const TRADE_LEVEL_TOGGLE_LABELS: Record<string, { show: string; hide: string; unavailable: string; unavailableTitle: string }> = {
+  uk: { show: 'Показати TP, Вхід і SL', hide: 'Приховати TP, Вхід і SL', unavailable: 'TP/SL: немає розрахованих рівнів', unavailableTitle: 'TP/SL стане доступним, коли будуть розраховані Вхід, Ціль і Стоп' },
+  en: { show: 'Show TP, Entry and SL', hide: 'Hide TP, Entry and SL', unavailable: 'TP/SL: no calculated trade levels', unavailableTitle: 'TP/SL is available when Entry, Target and Stop are calculated' },
+  pl: { show: 'Pokaż TP, wejście i SL', hide: 'Ukryj TP, wejście i SL', unavailable: 'TP/SL: brak wyznaczonych poziomów', unavailableTitle: 'TP/SL będzie dostępne po wyznaczeniu wejścia, celu i stopa' },
+  ru: { show: 'Показать TP, вход и SL', hide: 'Скрыть TP, вход и SL', unavailable: 'TP/SL: уровни не рассчитаны', unavailableTitle: 'TP/SL станет доступно после расчёта входа, цели и стопа' },
+};
 const NECKLINE_TOGGLE_LABELS: Record<string, { show: string; hide: string }> = {
   uk: { show: 'Показати лінію шиї', hide: 'Приховати лінію шиї' },
   en: { show: 'Show neckline', hide: 'Hide neckline' },
@@ -1626,8 +1632,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         {!replay && tradeLevelToggle && <button
           type="button"
           className={'trade-level-toggle-button' + (tradeLevelToggle.visible && tradeLevelToggle.available !== false ? ' active' : '')}
-          aria-label={tradeLevelToggle.available === false ? 'TP/SL: немає розрахованих рівнів для цієї монети' : tradeLevelToggle.visible ? 'Приховати TP, Вхід і SL' : 'Показати TP, Вхід і SL'}
-          title={tradeLevelToggle.available === false ? 'TP/SL стане доступним, коли будуть розраховані Вхід, Ціль і Стоп' : tradeLevelToggle.visible ? 'Приховати всі три мітки: TP, Вхід, SL' : 'Показати всі три мітки: TP, Вхід, SL'}
+          aria-label={tradeLevelToggle.available === false ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].unavailable : tradeLevelToggle.visible ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].hide : TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].show}
+          title={settings.tooltips !== false ? (tradeLevelToggle.available === false ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].unavailableTitle : tradeLevelToggle.visible ? TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].hide : TRADE_LEVEL_TOGGLE_LABELS[chartLanguage].show) : undefined}
           aria-pressed={tradeLevelToggle.visible}
           disabled={tradeLevelToggle.available === false}
           onClick={tradeLevelToggle.onToggle}
