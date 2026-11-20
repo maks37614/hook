@@ -54,7 +54,7 @@ test('Terminal keeps one live visual refresh path despite multiple coin blocks',
   assert.match(page, /isOnlyChart=\{visibleWorkspaceBlocks\.length === 1\}/);
   assert.match(grid, /isSingleBlock=\{false\}/);
   assert.match(grid, /isOnlyChart=\{isOnlyChart\}/);
-  assert.match(widget, /!isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /!isSuspended\s*&& \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| compactFullscreenMode \|\| isNearViewport\)/);
   assert.match(widget, /historyLimit=\{isMaximized \|\| isSingleBlock \|\| isOnlyChart \? 1000 : 180\}/);
   assert.doesNotMatch(page, /new WebSocket\(/);
 });
