@@ -117,6 +117,30 @@ export function blocksForSavedFavorites(
   });
 }
 
+/**
+ * Toggle a market from the Terminal's existing "+" picker in a custom preset
+ * draft. This edits only the draft: it never mounts a HookChart or opens a
+ * market-data subscription. A market identity includes exchange + spot/perp.
+ */
+export function toggleTerminalPresetCoin(
+  selected: readonly TerminalChartBlock[],
+  coin: Pick<TerminalChartBlock, 'symbol' | 'baseAsset' | 'quoteAsset' | 'exchange' | 'marketType'>,
+  timeframe: Timeframe,
+  formationId?: string,
+): TerminalChartBlock[] {
+  const { symbol, quoteAsset } = normalizeTerminalMarketPair(coin.symbol, coin.quoteAsset);
+  const identity = coinMarketKey({ symbol, exchange: coin.exchange, marketType: coin.marketType });
+  if (selected.some(block => coinMarketKey(block) === identity))
+    return selected.filter(block => coinMarketKey(block) !== identity);
+  if (selected.length >= MAX_TERMINAL_CHARTS) return selected as TerminalChartBlock[];
+  return [...selected, {
+    id: `preset-${identity}`, symbol,
+    baseAsset: coin.baseAsset || symbol.slice(0, -quoteAsset.length), quoteAsset,
+    exchange: coin.exchange, marketType: coin.marketType,
+    timeframe, formationId, colSpan: 1,
+  }];
+}
+
 /** Keep existing widget IDs and settings when the market ranking is unchanged. */
 export function blocksForMarketPreset(current: TerminalChartBlock[], coins: readonly TerminalPresetCoin[], timeframe: Timeframe): TerminalChartBlock[] {
   // Reuse blocks in O(n + m) instead of searching every open chart for each
