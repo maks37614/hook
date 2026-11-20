@@ -17,3 +17,11 @@ export function rulerHasRange(a: RulerPricePoint, b: RulerPricePoint): boolean {
     && Number.isFinite(b.t) && Number.isFinite(b.p)
     && (a.t !== b.t || a.p !== b.p);
 }
+
+/** Two-anchor graphics share the same ruler press-drag-release gesture. */
+const RANGE_TOOLS = new Set(['ruler', 'trend', 'ray', 'rect', 'fib', 'profile']);
+/** A one-anchor object is positioned at the finger's RELEASE location. */
+const POINT_TOOLS = new Set(['level', 'text', 'alert']);
+
+export function isRangeDrawingTool(tool: string): boolean { return RANGE_TOOLS.has(tool); }
+export function isPointDrawingTool(tool: string): boolean { return POINT_TOOLS.has(tool); }

@@ -46,7 +46,7 @@ test('chart scope changes clear an unfinished two-click drawing', () => {
 test('rectangles and rays have proper scene and draft-preview branches', () => {
   const src = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
   assert.match(src, /if\(d\.type==='rect'\)\{[\s\S]*?q\.strokeRect\(x1,y1,x2-x1,y2-y1\);[\s\S]*?\}else\{\s*const end=d\.type==='ray'\?rayEndPoint/);
-  assert.match(src, /tool==='ray'\|\|tool==='rect'\)\&\&draft\&\&mouse/);
+  assert.match(src, /if\(isRangeDrawingTool\(tool\)\&\&previewAnchor\&\&mouse/);
   assert.match(src, /if\(tool==='rect'\)q\.strokeRect\(x1,y1,x2-x1,y2-y1\)/);
 });
 
