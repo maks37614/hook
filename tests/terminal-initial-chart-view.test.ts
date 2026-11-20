@@ -81,7 +81,7 @@ test('Apply transmits the chosen viewport to every mounted Terminal chart on eac
     'do not remount charts or subscribe again to WebSocket');
 
   const engine = source('../src/components/hookchart/engine.tsx');
-  assert.match(engine, /visualProfileKey,visualProfile\.visibleBars/);
+  assert.match(engine, /profilePrefix=\[interactionScope\|\|symbol,symbol,tf,visualProfileKey,profile\.visibleBars/);
   assert.match(engine, /if\(visualAppliedRef\.current===signature\)return;/);
   assert.match(engine, /candleFit:priceAuto && \(terminalMode \|\| visualProfileKey\.startsWith\('terminal'\)\)/);
   assert.match(engine, /terminalCandlePriceRange\(lo,hi,plotH,showVolumes\)/);
@@ -161,7 +161,7 @@ test('maximizing one Terminal chart suspends other visible charts without changi
   const page = source('../src/components/TerminalPage.tsx');
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
   assert.match(page, /isSuspended=\{maximizedBlockId !== null && !isMaximized\}/);
-  assert.match(widget, /const shouldLoadWidgets = !isSuspended && \(isSingleBlock \|\| isOnlyChart \|\| isMaximized \|\| isNearViewport\)/);
+  assert.match(widget, /const shouldLoadWidgets = !isSuspended && isNearViewport && isMountReady/);
   assert.doesNotMatch(widget, /new WebSocket\(/, 'HookChart already owns its quote stream');
   assert.match(widget, /onLivePriceUpdate=\{useIntegratedHookChartToolbar \? handleChartPrice : undefined\}/);
   assert.match(widget, /\{shouldLoadWidgets \? \(/);
@@ -169,12 +169,11 @@ test('maximizing one Terminal chart suspends other visible charts without changi
 
 test('Terminal coin changes clear pending prices from a prior instrument', () => {
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
-  assert.match(widget, /previousInstrumentRef\.current === instrumentKey/);
+  assert.match(widget, /previousInstrumentRef\.current !== instrumentKey/);
   assert.match(widget, /activeInstrumentRef\.current !== instrumentKey/);
-  assert.match(widget, /clearTimeout\(headerPriceTimerRef\.current\)/);
-  assert.match(widget, /pendingHeaderPriceRef\.current = null/);
-  assert.match(widget, /setCurrentPrice\(nextPrice\)/);
-  assert.match(widget, /setLivePrice\(nextPrice \?\? 0\)/);
+  assert.match(widget, /livePriceRef\.current = initialPrice/);
+  assert.match(widget, /livePriceRef\.current = price/);
+  assert.doesNotMatch(widget, /headerPriceTimerRef|setCurrentPrice\(|setLivePrice\(/);
 });
 
 test('Terminal removes the separate 24h quote strip but keeps unique chart ids and indexed lookups', () => {
@@ -213,7 +212,7 @@ test('Terminal header actions cannot target the wrong symbol in multi-chart mode
 
 test('closed per-chart coin switchers do not rescan the entire Terminal market', () => {
   const widget = source('../src/components/terminal/TerminalChartWidget.tsx');
-  assert.match(widget, /const filteredCoins = useMemo\(\(\) => \{\s*void coinListVersion;\s*if \(!isCoinPickerOpen\) return \[\];/);
+  assert.match(widget, /const filteredCoins = useMemo\(\(\) => \{[\s\S]*?void coinListVersion;[\s\S]*?if \(!isCoinPickerOpen\) return \[\];/);
   assert.match(widget, /const available = getAllCoins\?\.\(\) \?\? allCoins \?\? \[\]/);
   assert.match(widget, /\}, \[allCoins, getAllCoins, coinSearch, isCoinPickerOpen(?:, coinListVersion)?\]\)/);
 });
@@ -284,7 +283,7 @@ test('legacy workspaces with over 50 charts paginate without discarding saved ch
   assert.match(page, /setWorkspacePage\(Math\.floor\(blockIndex \/ workspacePageSize\)\)/);
   assert.match(page, /const terminalBelowCharts = \(/);
   assert.match(page, /disabled=\{blocks\.length >= MAX_TERMINAL_CHARTS\}/);
-  const gridStart = page.indexOf('ref={chartListRef} className="w-full h-full');
+  const gridStart = page.indexOf('ref={chartListRef} data-terminal-scroll-viewport className="w-full h-full');
   const gridEnd = page.indexOf('{/* Add Chart Modal */}', gridStart);
   assert.ok(gridStart >= 0 && gridEnd > gridStart);
   assert.doesNotMatch(page.slice(gridStart, gridEnd), /\{blocks\.map\(/);
@@ -375,7 +374,7 @@ test('Terminal increments save revisions only for committed React workspaces', (
   assert.match(updates, /if \(lastCommittedWorkspace\.current === workspace\) return/);
   assert.match(updates, /const isPureHydration = hydrationWorkspaceRef\.current === workspace/);
   assert.match(updates, /if \(!isPureHydration\) revision\.current \+= 1/);
-  assert.match(hook, /hydrationWorkspaceRef\.current = hydratedWorkspace/);
+  assert.match(hook, /hydrationWorkspaceRef\.current = cloud/);
   assert.doesNotMatch(hook, /skipHydrationCommit/,
     'hydration must not suppress a concurrent user edit batched into the same commit');
   assert.match(updates, /revision\.current \+= 1/);
@@ -427,5 +426,5 @@ test('identical 30-second market snapshots do not reapply the preset page twice'
   assert.match(handler, /coin\.formationId === selected\[index\]\.formationId/,
     'a changed formation or timeframe must refresh the displayed chart');
   assert.match(handler, /\? current : selected/);
-  assert.match(handler, /applyPresetPage\(selected, presetPageRef\.current\)/);
+  assert.match(handler, /applyPresetPage\(selected, presetPageRef\.current, preset === 'av_1m' \? MAX_TERMINAL_CHARTS : coinPresetLimit\)/);
 });

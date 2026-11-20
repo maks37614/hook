@@ -71,20 +71,26 @@ test('malformed upstream tickers are unavailable; a genuinely empty browser sour
   assert.equal(feed.status('binance', 'spot').status, 'unavailable');
   assert.equal(feed.diagnostics()[0].restSuccesses, 0,
     'an upstream list with zero valid USDT tickers must not refresh quote freshness');
-  const empty = await loadMarketCoins({ exchange: 'binance', marketType: 'spot' }, new AbortController().signal, {
+  // An empty backend array WITHOUT verified live sources is an outage, not
+  // proof that the exchange genuinely lists zero markets.
+  let fallbackCalls = 0;
+  await assert.rejects(loadMarketCoins({ exchange: 'binance', marketType: 'spot' }, new AbortController().signal, {
     request: async () => json({ success: true, data: [], timestamp: 10 }),
-    binance: async () => { throw new Error('should not fall back for a valid empty response'); },
+    binance: async () => { fallbackCalls++; throw new Error('source unavailable'); },
     bybit: async () => { throw new Error('wrong exchange'); },
-  });
-  assert.deepEqual(empty, { coins: [], timestamp: 10, warning: null });
+  }), /Не вдалося отримати дані бірж/);
+  assert.equal(fallbackCalls, 1);
 });
 
 test('partial backend snapshots expose failed sources and original quote time', async () => {
+  const validCoin = { symbol: 'BTCUSDT', exchange: 'binance', marketType: 'futures' } as MarketCoin;
   const snapshot = await loadMarketCoins({ exchange: 'all', marketType: 'all' }, new AbortController().signal, {
-    request: async () => json({ success: true, data: [], timestamp: 1234,
+    request: async () => json({ success: true, data: [validCoin], timestamp: 1234,
       sources: [{ exchange: 'bybit', marketType: 'futures', status: 'unavailable', error: 'HTTP 403' }] }),
-    binance: async () => [], bybit: async () => [],
+    binance: async () => { throw new Error('unexpected fallback'); },
+    bybit: async () => { throw new Error('unexpected fallback'); },
   });
+  assert.deepEqual(snapshot.coins, [validCoin]);
   assert.equal(snapshot.timestamp, 1234);
   assert.match(snapshot.warning!, /Bybit Futures.*HTTP 403/);
 });
@@ -128,15 +134,16 @@ test('screener uses the public quote endpoint and successful sources do not show
 });
 
 test('browser fetch receives no dependency object as its receiver', async () => {
+  const validCoin = { symbol: 'BTCUSDT', exchange: 'binance', marketType: 'spot' } as MarketCoin;
   const snapshot = await loadMarketCoins({ exchange: 'binance', marketType: 'spot' }, new AbortController().signal, {
     request: async function(this: unknown) {
       assert.equal(this, undefined, 'native browser fetch rejects a non-Window receiver');
-      return json({ success: true, data: [], timestamp: 10 });
+      return json({ success: true, data: [validCoin], timestamp: 10 });
     },
     binance: async () => { throw new Error('unexpected fallback'); },
     bybit: async () => { throw new Error('unexpected fallback'); },
   });
-  assert.deepEqual(snapshot, { coins: [], timestamp: 10, warning: null });
+  assert.deepEqual(snapshot, { coins: [validCoin], timestamp: 10, warning: null });
 });
 
 test('all four successful direct sources load concurrently without a fallback warning', async () => {

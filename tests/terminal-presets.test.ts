@@ -63,7 +63,7 @@ test('Terminal Formations preset is wired to existing filtered results without e
   assert.match(panel, /selectFormationPresetCoins\(formationCoins\)/);
   assert.match(panel, /id === 'formations'\s*\? selectFormationPresetCoins/);
   assert.match(panel, /preset\.id !== 'formations' && loading/);
-  assert.match(panel, /onActivePresetChange\(id\);\s*onApplyCoins\(readyCoins\[id\]\)/);
+  assert.match(panel, /onActivePresetChange\(id\);\s*onApplyCoins\(readyCoins\[id\], id\)/);
   assert.match(app, /onRequestFormationScan=\{requestTerminalFormationScan\}/);
   assert.match(app, /formationScanStatus=\{terminalFormationScanStatus\}/);
   assert.match(app, /if \(earlyMode\) return false/);
@@ -106,7 +106,8 @@ test('limits and invalid prices cannot generate extra or fake charts; inputs rem
   data.push(coin('BROKENUSDT', 100, { price: NaN }), coin('ZEROPRICEUSDT', 100, { price: 0 }));
   const original = [...data];
   assert.equal(selectMarketPresetCoins(data, 'top_gainers', all, 4).length, 4);
-  assert.equal(selectMarketPresetCoins(data, 'top_gainers', all, 100).length, 36);
+  assert.equal(selectMarketPresetCoins(data, 'top_gainers', all, 100).length, 50,
+    'the current workspace cap is 50, not the retired 36-chart limit');
   // Terminal pages must be able to browse the same complete category as the screener.
   const allMatches = selectMarketPresetCoins(data, 'top_gainers', all, Number.POSITIVE_INFINITY);
   assert.equal(allMatches.length, 50);
@@ -331,7 +332,7 @@ test('hidden Terminal market-presets menu only ranks the active category while p
   assert.match(page, /menuOpen=\{showCoinPresets\}/);
   assert.match(panel, /const ids = menuOpen \? MARKET_PRESETS\.map\(preset => preset\.id\)/);
   assert.match(panel, /: activePreset && autoUpdate \? \[activePreset\] : \[\]/);
-  assert.match(panel, /activePreset && autoUpdate && readyCoins\[activePreset\]\.length/);
+  assert.match(panel, /activePreset && autoUpdate && !pendingFormationPreset && readyCoins\[activePreset\]\.length/);
   assert.match(panel, /activePreset === 'formations' \|\| \(!error && !snapshot\.warning\)/);
   assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
 });

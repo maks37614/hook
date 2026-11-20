@@ -132,7 +132,19 @@ test('Terminal and fullscreen always render native HookChart, including legacy T
         const html = render(view);
         const iframe = html.match(/src="([^"]*widgetembed[^\"]*)"/);
         assert.equal(iframe, null, `${label} must never embed legacy TradingView`);
-        assert.ok(html.includes('Завантаження hookchart…'), `${label} renders native HookChart`);
+        // Terminal tiles are intentionally viewport-virtualized. SSR runs
+        // no observer/effect, so neither a Canvas nor its loader should mount
+        // until the card is actually visible on the client.
+        if (name === 'fullscreen') {
+          assert.ok(html.includes('Завантаження hookchart…'), `${label} renders native HookChart`);
+        } else if (name === 'terminal') {
+          assert.match(html, /data-terminal-scroll-viewport|terminal-empty-workspace/,
+            `${label} keeps the native Terminal workspace shell`);
+        } else {
+          assert.ok(html.includes(symbol!), `${label} preserves exact symbol while deferred`);
+          assert.ok(html.includes('Віджет призупинено поза видимою областю.'),
+            `${label} defers HookChart until browser visibility is known`);
+        }
         assert.ok(!html.includes('Завантаження графіку'), 'iframe loader cannot cover native HookChart');
       }
       const deferredGrid = render(widget(false, false));
