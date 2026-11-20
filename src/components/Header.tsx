@@ -124,25 +124,15 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-[1720px] mx-auto px-2.5 sm:px-4 lg:px-6 py-1.5 sm:py-2">
         <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:gap-3 xl:relative xl:justify-between xl:gap-2">
           <div className="flex w-full min-w-0 flex-col items-center gap-2 sm:gap-3 xl:w-auto xl:shrink-0 xl:flex-row xl:gap-2">
-            {/* Keep the logo centered in the mobile grid; the help icon is on its left,
-                while language and fullscreen controls are on its right. */}
-            <div data-header-brand-row className="grid min-h-9 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1.5 sm:min-h-10 sm:gap-x-2 xl:absolute xl:left-1/2 xl:top-1/2 xl:z-10 xl:flex xl:w-auto xl:-translate-x-1/2 xl:-translate-y-1/2">
-              <button
-                  type="button"
-                  id="screener-help-btn"
-                  onClick={() => setScreenerGuideOpen(true)}
-                  aria-label={pageGuideCopy.open}
-                  title={pageGuideCopy.title}
-                  aria-haspopup="dialog"
-                  aria-expanded={screenerGuideOpen}
-                  className="inline-flex h-8 w-8 justify-self-end shrink-0 items-center justify-center border-0 bg-transparent p-1 text-cyan-300 shadow-none transition-colors hover:bg-transparent hover:text-white focus-visible:bg-transparent focus-visible:text-white focus-visible:outline-none"
-                >
-                  <CircleHelp className="h-4 w-4" aria-hidden="true" />
-                </button>
+            {/* Only the logo occupies the center grid track, so language, help
+                and fullscreen can never move the h00k mark away from 50%.
+                Desktop overlay ignores pointer events except on real controls. */}
+            <div data-header-brand-row className="grid min-h-9 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1.5 sm:min-h-10 sm:gap-x-2 xl:pointer-events-none xl:absolute xl:inset-x-0 xl:top-1/2 xl:z-10 xl:-translate-y-1/2">
+              <span aria-hidden="true" className="min-w-0" />
               <button
                 type="button"
                 onClick={() => onPageChange('screener')}
-                className="flex shrink-0 items-center justify-center cursor-pointer select-none bg-transparent border-0 p-0 focus:outline-none"
+                className="flex shrink-0 justify-self-center items-center justify-center cursor-pointer select-none bg-transparent border-0 p-0 focus:outline-none xl:pointer-events-auto"
                 title={tr("Головна сторінка: Скрінер")}
                 aria-label={tr("Головна сторінка: Скрінер")}
               >
@@ -155,9 +145,20 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </button>
 
-              {/* Language sits immediately to the right of the logo; fullscreen follows.
-                  Keep the native selector accessible while removing its default chrome. */}
-              <div className="flex min-w-0 shrink-0 items-center justify-start gap-1 sm:gap-1.5">
+              {/* All utilities are to the RIGHT of the centered mark. */}
+              <div className="flex min-w-0 shrink-0 items-center justify-start gap-0.5 sm:gap-1 xl:pointer-events-auto">
+              <button
+                  type="button"
+                  id="screener-help-btn"
+                  onClick={() => setScreenerGuideOpen(true)}
+                  aria-label={pageGuideCopy.open}
+                  title={pageGuideCopy.title}
+                  aria-haspopup="dialog"
+                  aria-expanded={screenerGuideOpen}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center border-0 bg-transparent p-1 text-cyan-300 shadow-none transition-colors hover:bg-transparent hover:text-white focus-visible:bg-transparent focus-visible:text-white focus-visible:outline-none"
+                >
+                  <CircleHelp className="h-4 w-4" aria-hidden="true" />
+                </button>
                 <select
                   value={language}
                   onChange={(e) => changeSiteLanguage(e.target.value as SupportedLanguage)}
@@ -181,17 +182,16 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Maximize2 className="h-4 w-4" />
                 </button>
-
               </div>
             </div>
 
             {/* Navigation Category Tabs */}
-            <nav aria-label={tr("Основна навігація")} className="grid w-full min-w-0 grid-cols-2 items-center gap-0.5 p-0.5 sm:flex sm:w-auto sm:flex-wrap sm:p-1 xl:shrink-0 xl:flex-nowrap rounded-xl bg-slate-900 border border-slate-800 text-xs shadow-inner">
+            <nav aria-label={tr("Основна навігація")} className="grid w-full min-w-0 grid-cols-2 items-center gap-0.5 p-0.5 sm:flex sm:w-auto sm:flex-wrap sm:p-1 xl:shrink-0 xl:flex-nowrap xl:gap-0 xl:p-0.5 rounded-xl bg-slate-900 border border-slate-800 text-xs shadow-inner">
               <button
                 id="nav-category-screener-btn"
                 aria-current={activePage === 'screener' ? 'page' : undefined}
                 onClick={() => onPageChange('screener')}
-                className={`flex min-w-0 items-center justify-center order-1 sm:order-none gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex min-w-0 items-center justify-center order-1 sm:order-none gap-1 sm:gap-1.5 xl:gap-1 px-2 sm:px-3 xl:px-1.5 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   activePage === 'screener'
                     ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-sm shadow-indigo-900/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -205,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="nav-category-patterns-btn"
                 aria-current={activePage === 'patterns' ? 'page' : undefined}
                 onClick={() => onPageChange('patterns')}
-                className={`flex min-w-0 items-center justify-center order-3 sm:order-none gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex min-w-0 items-center justify-center order-3 sm:order-none gap-1 sm:gap-1.5 xl:gap-1 px-2 sm:px-3 xl:px-1.5 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   activePage === 'patterns'
                     ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-sm shadow-cyan-900/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -233,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="nav-category-replay-btn"
                 aria-current={activePage === 'replay' ? 'page' : undefined}
                 onClick={() => onPageChange('replay')}
-                className={`flex min-w-0 items-center justify-center order-4 sm:order-none gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex min-w-0 items-center justify-center order-4 sm:order-none gap-1 sm:gap-1.5 xl:gap-1 px-2 sm:px-3 xl:px-1.5 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   activePage === 'replay'
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-sm shadow-amber-900/40 font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -258,7 +258,7 @@ export const Header: React.FC<HeaderProps> = ({
                   aria-current={activePage === 'pc' ? 'page' : undefined}
                   title="PC"
                   onClick={() => onPageChange('pc')}
-                  className={`absolute -top-1.5 z-10 rounded-md border border-emerald-400/70 bg-emerald-950/95 px-1 py-0.5 text-[8px] font-extrabold leading-none tracking-wide text-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.55)] transition-all hover:border-emerald-300 hover:bg-emerald-800/80 hover:text-white hover:shadow-[0_0_16px_rgba(52,211,153,0.85)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300 ${user ? 'right-0 sm:right-1' : 'right-4 sm:right-5'} ${activePage === 'pc' ? 'border-emerald-300 bg-emerald-600/70 text-white shadow-[0_0_18px_rgba(52,211,153,0.9)]' : ''}`}
+                  className={`absolute -top-1.5 z-10 rounded-md border border-emerald-400/70 bg-emerald-950/95 px-1 py-0.5 text-[8px] font-extrabold leading-none tracking-wide text-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.55)] transition-all hover:border-emerald-300 hover:bg-emerald-800/80 hover:text-white hover:shadow-[0_0_16px_rgba(52,211,153,0.85)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300 ${user ? 'right-0 sm:right-1' : 'right-4 sm:right-5'} xl:right-auto xl:left-1 ${activePage === 'pc' ? 'border-emerald-300 bg-emerald-600/70 text-white shadow-[0_0_18px_rgba(52,211,153,0.9)]' : ''}`}
                 >
                   PC
                 </button>
@@ -266,7 +266,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="nav-category-terminal-btn"
                 aria-current={activePage === 'terminal' ? 'page' : undefined}
                 onClick={() => onPageChange('terminal')}
-                className={`flex min-w-0 items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex min-w-0 items-center justify-center gap-1 sm:gap-1.5 xl:gap-1 px-2 sm:px-3 xl:px-1.5 py-1 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   activePage === 'terminal'
                     ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-sm shadow-emerald-900/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
