@@ -29,7 +29,7 @@ import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
 import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLineStyle } from './scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX } from './scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -1325,7 +1325,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // All Scalper-only circular markers (filled contacts and outlined breakout rings)
   // are presentation gated by one preference, never by separate saved layers.
   // Every automatic Scalper line uses one preference; touch dots and text remain unchanged.
-  const scalperStrokeWidth = normalizeScalperLineWidth(scalperLineWidth);
+  // Keep the configured CSS width; only the raster stroke resolves to physical pixels.\n  const scalperStrokeWidth = scalperRasterStrokeWidth(normalizeScalperLineWidth(scalperLineWidth), scaleX, scaleY);
   if (scalperResult?.setups.length) {
     q.save();
     for (const setup of scalperResult.setups) {
@@ -1335,7 +1335,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.globalAlpha = setup.status === 'forming' ? .67 : .92;
       for (const line of setup.lines) {
         const x0 = g.x(line.from.t), x1 = g.x(line.to.t);
-        const y0 = g.y(line.from.p), y1 = g.y(line.to.p);
+        const rawY0 = g.y(line.from.p), rawY1 = g.y(line.to.p);\n        // Horizontal pixel-centering only; diagonals retain exact wick pivots.\n        const horizontalLine = line.from.p === line.to.p;\n        const y0 = horizontalLine ? scalperPixelCenteredHorizontalY(rawY0, scalperStrokeWidth, scaleY) : rawY0;\n        const y1 = horizontalLine ? y0 : rawY1;
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
         q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
