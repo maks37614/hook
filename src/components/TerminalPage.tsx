@@ -134,8 +134,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     ru: { signIn: 'Войдите в профиль, чтобы сохранять монеты.', unavailable: 'Снимок графика ещё не готов. Дождитесь свечей.', price: 'Цена монеты пока недоступна. Дождитесь котировки.', thirty: 'Сохранение графиков 30s пока недоступно. Выберите 1m или выше.', saved: 'Монета добавлена в Сохранённые формации.' },
   } as const)[language], [language]);
   const { blocks, config, customPresets, setBlocks: updateBlocks, setConfig, setCustomPresets,
-    syncError, syncConflict, backupFailed, retrySync, downloadLocalBackup, importWorkspaceBackup,
-    restoreCloudWorkspace, requestImmediateWorkspaceSync } = useTerminalWorkspace();
+    syncError, retrySync, downloadLocalBackup, importWorkspaceBackup,
+    requestImmediateWorkspaceSync } = useTerminalWorkspace();
   const [activeMarketPreset, setActiveMarketPreset] = useState<TerminalMarketPreset | null>(null);
   const [presetMatches, setPresetMatches] = useState<TerminalPresetCoin[]>([]);
   const [presetPage, setPresetPage] = useState(0);
@@ -1382,12 +1382,11 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="relative flex h-7 w-6 shrink-0 items-center justify-center p-0 sm:h-auto sm:w-auto sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border-0 lg:h-8 lg:w-8 lg:rounded-lg lg:border lg:border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title={t(syncConflict ? 'terminal.drawer.conflictTooltip' : 'terminal.drawer.settingsTooltip')}
+              title={t('terminal.drawer.settingsTooltip')}
               aria-label={t('terminal.drawer.settingsTooltip')}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
-               {syncConflict && <span aria-label={t('terminal.drawer.conflictIndicator')}
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400" />}
+
             </button>
 
             {/* Browser Fullscreen Button */}
@@ -1569,7 +1568,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
                requestImmediateWorkspaceSync();
                setCustomPresets(current => current.filter(preset => preset.id !== id));
              }}
-            syncError={syncError} syncConflict={syncConflict} onRetrySync={retrySync}
+            syncError={syncError} onRetrySync={retrySync}
             onDownloadLocalBackup={downloadLocalBackup} onImportWorkspaceBackup={handleImportWorkspaceBackup}
             signedIn={Boolean(user)}
           />
@@ -1854,9 +1853,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
 
       {/* Workspace Settings Drawer */}
       <TerminalSettingsDrawer
-        syncConflict={syncConflict} backupFailed={backupFailed}
-        onDownloadLocalBackup={downloadLocalBackup}
-        onRestoreCloudWorkspace={restoreCloudWorkspace}
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onDone={handleDoneWorkspaceSettings}
