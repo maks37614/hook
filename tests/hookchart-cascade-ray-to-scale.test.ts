@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { scalperRenderedLineEndX } from '../src/components/hookchart/scalperLineProjection';
+import { scalperCascadeLineWidth, scalperRenderedLineEndX } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -62,7 +62,7 @@ test('Scalper draw uses the plot boundary, without changing stroke, labels or ca
   assert.match(layer,/if \(cascadeRay && y1 >= 0 && y1 <= g\.plotH\)/);
   assert.match(layer,/q\.moveTo\(Math\.max\(0, g\.plotW - 2\), y1\)/);
   assert.match(layer,/q\.lineTo\(g\.plotW, y1\)/);
-  assert.match(layer,/q\.lineWidth = line\.role === 'cascade-step' \? 0\.7/);
+  assert.match(layer,/q\.lineWidth = setup\.kind === 'cascade' \? scalperCascadeLineWidth\(line, setup\.status\)/);
   assert.match(layer,/q\.setLineDash\(scalperLineDash\(scalperLineStyle, setup\.status\)\)/);
   assert.match(layer,/q\.strokeStyle = color/);
   assert.match(layer,/if \(anchor && showScalperLabels\)/);
@@ -80,4 +80,14 @@ test('cascade outer boundary has a real scale price badge but tiers do not flood
   assert.match(overlay,/setup\.lines\.find\(line => line\.role === 'upper' \|\| line\.role === 'lower'\)/);
   assert.match(overlay,/g\.x\(boundary\.from\.t\) > g\.plotW/);
   assert.match(overlay,/priceTag\(boundary\.from\.p, '', color/);
+});
+
+test('Cascade widths are 0.2px tiers, 0.5px main and 0.8px confirmed main',()=>{
+  for(const status of ['forming','possible','confirmed','failed'] as const){
+    assert.equal(scalperCascadeLineWidth(horizontal('cascade-step'),status),0.2);
+    assert.equal(scalperCascadeLineWidth(horizontal('upper'),status),status==='confirmed'?0.8:0.5);
+    assert.equal(scalperCascadeLineWidth(horizontal('lower'),status),status==='confirmed'?0.8:0.5);
+  }
+  // The horizontal-line end projection is still the price-scale edge.
+  assert.equal(scalperRenderedLineEndX('cascade',horizontal('upper'),100,400),400);
 });
