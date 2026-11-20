@@ -59,12 +59,14 @@ test('liquidation HUD defaults to collapsed and keeps independent per-account ch
   }
 });
 
-test('all HookChart instances use a shared preference event and a single display guard', () => {
+test('ordinary HookCharts retain shared Liq preferences, while Terminal charts opt out', () => {
   const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
   const wrapper = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
   assert.equal(LIQUIDATION_HUD_PREFERENCE_EVENT, 'h00k:liquidation-hud-visibility');
   assert.match(wrapper, /liquidationHudOwner=\{user\?\.uid\}/);
-  assert.match(engine, /\[liqHudOpen,setLiqHudOpen\]=useState<boolean>\(\(\)=>readLiquidationHudExpanded\(liqHudKey\)\)/);
+  assert.match(engine, /\[liqHudOpen,setLiqHudOpen\]=useState<boolean>\(\(\)=>terminalMode\?false:readLiquidationHudExpanded\(liqHudKey\)\)/);
+  assert.match(engine, /if\(terminalMode\)\{[\s\S]*?setLiqHudOpen\(false\);[\s\S]*?return;[\s\S]*?\}/);
+  assert.match(engine, /\},\[liqHudKey,terminalMode\]\)/);
   assert.match(engine, /window\.addEventListener\(LIQUIDATION_HUD_PREFERENCE_EVENT,onShared\)/);
   assert.match(engine, /window\.addEventListener\('storage',onStorage\)/);
   assert.match(engine, /saveLiquidationHudExpanded\(liqHudKey,next\)/);
@@ -92,4 +94,18 @@ test('Terminal HookChart restores the Liq/cascade chevron and respects the exist
   assert.match(engine, /aria-expanded=\{liqHudOpen\}/);
   assert.match(engine, /onClick=\{toggleLiqHud\}/);
   assert.match(engine, /\{liqHudOpen&&<div className="liqRiskContent"/);
+});
+
+test('Liq expansion on a Terminal tile changes only its own chart state', () => {
+  const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
+  const widget = readFileSync(new URL('../src/components/terminal/TerminalChartWidget.tsx', import.meta.url), 'utf8');
+  assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
+  // In Terminal mode no shared event, localStorage or remote profile writes.
+  // Each independent Chart instance owns its own useState hook.
+  assert.match(engine, /const toggleLiqHud=\(\)=>\{\s*if\(terminalMode\)\{\s*setLiqHudOpen\(open=>!open\);\s*return;/);
+  assert.match(engine, /return;\s*\}\s*setLiqHudOpen\(readLiquidationHudExpanded\(liqHudKey\)\)/);
+  const toggle = engine.slice(engine.indexOf('const toggleLiqHud=()=>{'), engine.indexOf('const touchHold=', engine.indexOf('const toggleLiqHud=()=>{')));
+  assert.ok(toggle.indexOf('return;') < toggle.indexOf('saveLiquidationHudExpanded(liqHudKey,next)'), 'no broadcast in Terminal');
+  assert.match(engine, /className="liqRiskToggle"/);
+  assert.match(engine, /aria-expanded=\{liqHudOpen\}/);
 });
