@@ -12,10 +12,17 @@ test('loads visible Terminal tiles, even if IntersectionObserver is stale', () =
   assert.equal(isTerminalWidgetNearViewport(tile(955, 1200), scroller, screen), true);
 });
 
-test('preloads a nearby row but suspends distant rows', () => {
-  assert.equal(isTerminalWidgetNearViewport(tile(1000, 1300), scroller, screen), true);
+test('strictly suspends every chart outside the visible screen and scroll container', () => {
+  assert.equal(isTerminalWidgetNearViewport(tile(960, 1250), scroller, screen), false,
+    'next row must not start loading before it enters the viewport');
+  assert.equal(isTerminalWidgetNearViewport(tile(79, 80), scroller, screen), false,
+    'no charts above the clipped scroll region');
+  assert.equal(isTerminalWidgetNearViewport(tile(959, 1200), scroller, screen), true,
+    'even one visible pixel is sufficient');
   assert.equal(isTerminalWidgetNearViewport(tile(1300, 1500), scroller, screen), false);
   assert.equal(isTerminalWidgetNearViewport(tile(-400, -150), scroller, screen), false);
+  assert.equal(isTerminalWidgetNearViewport(tile(1000, 1300), scroller, screen, 160), true,
+    'legacy explicit margin remains opt-in but Terminal never uses it');
 });
 
 test('respects the intersection of the scroll container and screen', () => {
