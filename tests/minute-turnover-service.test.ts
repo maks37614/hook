@@ -42,3 +42,20 @@ test('one-minute service ranks 200K+ true candle volumes, shares identical reque
   assert.equal((await service.coin('binance','futures','C1USDT')).volume1mUsd,320_000);
   assert.equal(calls.get('C1USDT'),1);
 });
+
+test('public per-symbol footer reads are bounded and cannot exhaust shared IP budget',async()=>{
+  const now=minute+65_000, target=completedMinuteStart(now);
+  let calls=0;
+  const svc=new MinuteTurnoverService(async()=>{
+    calls++;
+    return [{time:target/1000,quoteVolume:300_000,open:1,high:1,low:1,close:1,volume:1}];
+  },async()=>[],()=>now);
+  for(let i=0;i<48;i++){
+    const value=await svc.publicCoin('binance','spot','P'+i+'USDT');
+    assert.equal(value.volume1mUsd,300_000);
+  }
+  assert.equal((await svc.publicCoin('binance','spot','P48USDT')).volume1mUsd,null);
+  assert.equal(calls,48);
+  assert.equal((await svc.publicCoin('binance','spot','P0USDT')).volume1mUsd,300_000);
+  assert.equal(calls,48);
+});
