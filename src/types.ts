@@ -588,7 +588,9 @@ export interface HookChartPreferences {
   horizontalDrawingLineWidth?: number;
   /** Width in CSS pixels of manually drawn trend lines (not auto trend detection). */
   trendDrawingLineWidth?: number;
-  /** CSS-pixel stroke width for the automatically detected Scalper Mode trend-line pattern. */
+  /** CSS-pixel stroke width shared by all automatically detected Scalper Mode lines. */
+  scalperLineWidth?: number;
+  /** @deprecated Legacy trend-only preference, normalized into scalperLineWidth then removed. */
   scalperTrendLineWidth?: number;
   showMarketPrintSums?: boolean;
   /** Draw connector arrows for executed market-trade amounts without hiding the amounts. */

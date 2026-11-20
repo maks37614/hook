@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { scalperCascadeLineWidth, scalperRenderedLineEndX } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -62,7 +62,7 @@ test('Scalper draw uses the plot boundary, without changing stroke, labels or ca
   assert.match(layer,/if \(cascadeRay && y1 >= 0 && y1 <= g\.plotH\)/);
   assert.match(layer,/q\.moveTo\(Math\.max\(0, g\.plotW - 2\), y1\)/);
   assert.match(layer,/q\.lineTo\(g\.plotW, y1\)/);
-  assert.match(layer,/q\.lineWidth = setup\.kind === 'cascade' \? scalperCascadeLineWidth\(line, setup\.status\)/);
+  assert.match(layer,/q\.lineWidth = scalperStrokeWidth;/);
   assert.match(layer,/q\.setLineDash\(scalperLineDash\(scalperLineStyle, setup\.status\)\)/);
   assert.match(layer,/q\.strokeStyle = color/);
   assert.match(layer,/if \(anchor && showScalperLabels\)/);
@@ -82,12 +82,19 @@ test('cascade outer boundary has a real scale price badge but tiers do not flood
   assert.match(overlay,/priceTag\(boundary\.from\.p, '', color/);
 });
 
-test('Cascade widths are 0.2px tiers, 0.5px main and 0.8px confirmed main',()=>{
-  for(const status of ['forming','possible','confirmed','failed'] as const){
-    assert.equal(scalperCascadeLineWidth(horizontal('cascade-step'),status),0.2);
-    assert.equal(scalperCascadeLineWidth(horizontal('upper'),status),status==='confirmed'?0.8:0.5);
-    assert.equal(scalperCascadeLineWidth(horizontal('lower'),status),status==='confirmed'?0.8:0.5);
-  }
-  // The horizontal-line end projection is still the price-scale edge.
+test('every automatic Scalper line uses the same CSS width and the cascade projection remains intact',()=>{
+  assert.equal(normalizeScalperLineWidth(undefined),0.4);
+  assert.equal(normalizeScalperLineWidth(Number.NaN),0.4);
+  assert.equal(normalizeScalperLineWidth(0.1),0.2);
+  assert.equal(normalizeScalperLineWidth(0.7),0.7);
+  assert.equal(normalizeScalperLineWidth(8),5);
+  const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
+  const start=engine.indexOf('if (scalperResult?.setups.length) {');
+  const end=engine.indexOf('drawHookTimeMarkers(q,g,timeMarkers,mouse);',start);
+  const layer=engine.slice(start,end);
+  assert.match(layer,/for \(const setup of scalperResult\.setups\)/);
+  assert.match(layer,/for \(const line of setup\.lines\)/);
+  assert.match(layer,/q\.lineWidth = scalperStrokeWidth;/);
+  assert.doesNotMatch(layer,/scalperCascadeLineWidth|scalperTrendStrokeWidth|setup\.kind === 'trend' \?/);
   assert.equal(scalperRenderedLineEndX('cascade',horizontal('upper'),100,400),400);
 });
