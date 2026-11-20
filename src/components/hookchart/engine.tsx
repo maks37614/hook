@@ -14,7 +14,7 @@ import { createVolumeProfileHistogramCache } from './volumeProfileHistogram';
 import { chartDiagnosticsEnabled, recordChartPaint } from './chartDiagnostics';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, paintChartCrosshair, paintChartRuler } from './chartCursor';
 import { DEFAULT_MAX_CANVAS_DPR, effectiveCanvasDpr } from './canvasDpr';
-import { measurementStats, measurementHit, paintMeasurement } from './measurementTool';
+import { measurementStats, measurementHit, paintMeasurement, measurementActionPosition } from './measurementTool';
 import { createChartTouchHold, isChartControlTarget } from './touchHold';
 import { CrosshairTimeLabel } from './CrosshairTimeLabel';
 import type { ChartCrosshairStore, CrosshairPosition } from './crosshairState';
@@ -1507,7 +1507,6 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        if(typeof drawingActions!=='undefined')selectDrawingAt(found,z.x,z.y,z.g);
        else setSelectedDrawingId(found.id);
        setEditingDrawingId(null);
-       if(hit==='delete'){drag.current={kind:'measurementDeleteClick'};scheduleDraw();return}
        drag.current={kind:'measurementDrag',drawingId:found.id,pointIndex:hit==='start'?0:hit==='end'?1:null,x:z.x,y:z.y,pts:found.pts.slice(0,2).map(p=>({...p})),moved:false};
        cancelTouchHold();scheduleDraw();return;
      }
@@ -1625,7 +1624,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      const action=hit?measurementHit(z.g,hit.pts[0],hit.pts[1],z.x,z.y):null;
      if(hoveredMeasurement.current!==(hit?.id||null)){hoveredMeasurement.current=hit?.id||null;scheduleDraw()}
      if(hit&&typeof drawingActions!=='undefined'&&hit.id!==selectedDrawingId)selectDrawingAt(hit,z.x,z.y,z.g);
-     if(box.current?.style)box.current.style.cursor=action==='delete'?'pointer':action==='start'||action==='end'?'crosshair':action==='body'?'move':'';
+     if(box.current?.style)box.current.style.cursor=action==='start'||action==='end'?'crosshair':action==='body'?'move':'';
    }
    if(!d&&tool==='cursor'&&e.pointerType==='mouse'&&zone(z.x,z.y,z.g)==='plot'){
      const hit=drawings.some(item=>item.type!=='ruler')?hitDrawing(z.x,z.y,z.g):null;
@@ -1633,7 +1632,6 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      if(!hit&&alerts.length){const marker=hitAlertAt(z.x,z.y,z.g);if(marker&&marker.id!==alertActions?.id)selectAlertAt(marker.id,z.x,z.y,z.g);}
    }
    if(!d)return;
-   if(d.kind==='measurementDeleteClick')return;
    if(d.kind==='measurementDrag'){
      const dx=z.x-d.x,dy=z.y-d.y;
      if(Math.hypot(dx,dy)<3&&!d.moved)return;
@@ -1884,9 +1882,6 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(tool==='cursor'||tool==='ruler'){
      const measurement=[...drawings].reverse().find(d=>d.type==='ruler'&&d.id.startsWith(symbol+':')&&d.pts[1]&&measurementHit(g,d.pts[0],d.pts[1],x,y));
      if(measurement){
-       if(measurementHit(g,measurement.pts[0],measurement.pts[1],x,y)==='delete'&&hoveredMeasurement.current===measurement.id){
-         setDrawings(list=>list.filter(d=>d.id!==measurement.id));setSelectedDrawingId(null);setEditingDrawingId(null);hoveredMeasurement.current=null;scheduleDraw();return;
-       }
        selectDrawingAt(measurement,x,y,g);setEditingDrawingId(null);return;
      }
    }
@@ -2059,6 +2054,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  archiveScreenshotRef.current=takeArchiveScreenshot;
  useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:fitAllHistory,zoomToLatest:reset,focusLatest:()=>{fitAllScopeRef.current=null;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false}))},zoom:zoomButton}),[candles,vp]);
  const actionDrawing=drawingActions?.id===selectedDrawingId?drawings.find(d=>d.id===selectedDrawingId&&d.id.startsWith(symbol+':')):null;
+ // Ruler actions belong to its measurement label, not to the point last tapped.
+ // Compute only for the selected ruler and reuse the same geometry as its canvas.
+ const rulerActionPosition=actionDrawing?.type==='ruler'&&actionDrawing.pts[1]&&drawingActions
+   ? (()=>{
+       const g=geometry();
+       return g?measurementActionPosition(g,actionDrawing.pts[0],actionDrawing.pts[1]):null;
+     })() : null;
  const barCountdown=!hideBarCountdown?<ChartBarCountdown tf={tf} intervalMs={intervalMs} lastBarStart={candles.at(-1)?.t}/>:null;
  const scaleControls=(<div role="toolbar" aria-label={translateHookChartPhrase(language,"Керування масштабом графіка")} className={'chartScaleDock '+(zoomPanelOpen?'expanded':'collapsed')}>
    {countdownContainer===undefined&&barCountdown}
@@ -2114,9 +2116,9 @@ LONG: $${formatUsd(cascadeRisk.longUsd)} · SHORT: $${formatUsd(cascadeRisk.shor
   </div>}
   {controlsContainer?createPortal(scaleControls,controlsContainer):controlsContainer===undefined?scaleControls:null}
   {countdownContainer&&createPortal(barCountdown,countdownContainer)}
-  {actionDrawing&&drawingActions&&tool==='cursor'&&
-    <div className="chartDrawingActions" role="toolbar" aria-label={translateHookChartPhrase(language,'Дії з інструментом графіка')}
-      style={{left:drawingActions.x,top:drawingActions.y}} onPointerDown={e=>e.stopPropagation()}>
+  {actionDrawing&&drawingActions&&(tool==='cursor'||(tool==='ruler'&&actionDrawing.type==='ruler'))&&
+    <div className={'chartDrawingActions'+(rulerActionPosition?' measurement-actions':'')} role="toolbar" aria-label={translateHookChartPhrase(language,'Дії з інструментом графіка')}
+      style={{left:rulerActionPosition?.x??drawingActions.x,top:rulerActionPosition?.y??drawingActions.y}} onPointerDown={e=>e.stopPropagation()}>
       <button type="button" title={translateHookChartPhrase(language,'Редагувати межі інструмента')} aria-label={translateHookChartPhrase(language,'Редагувати інструмент')}
         aria-pressed={editingDrawingId===actionDrawing.id} className={editingDrawingId===actionDrawing.id?'active':''}
         onClick={e=>{e.stopPropagation();setEditingDrawingId(id=>id===actionDrawing.id?null:actionDrawing.id)}}>

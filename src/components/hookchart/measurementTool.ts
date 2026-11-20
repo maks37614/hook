@@ -3,7 +3,7 @@ import { formatCryptoPrice } from '../../utils/formatters';
 
 export type MeasurementPoint = { t: number; p: number };
 export type MeasurementView = { x: (t: number) => number; y: (p: number) => number; plotW: number; plotH: number };
-export type MeasurementHit = 'start' | 'end' | 'body' | 'delete' | null;
+export type MeasurementHit = 'start' | 'end' | 'body' | null;
 
 const compact = (value: number) => {
   const n = Math.abs(value);
@@ -63,14 +63,22 @@ export function measurementLabelLayout(g: MeasurementView, a: MeasurementPoint, 
   const x = Math.max(5, Math.min(g.plotW - width - 5, (x1 + x2) / 2 - width / 2));
   const above = Math.min(y1, y2) - height - 12;
   const y = above >= 6 ? above : Math.min(Math.max(6, Math.max(y1, y2) + 12), Math.max(6, g.plotH - height - 6));
-  return { x, y, width, height, deleteX: x + width - 13, deleteY: y + 13 };
+  return { x, y, width, height };
+}
+
+/** Place the single accessible edit/delete dock INSIDE the tooltip, away
+ * from its percentage text. It follows the actual tooltip when the chart pans,
+ * the user resizes the ruler, or the visible viewport changes. */
+export function measurementActionPosition(g: MeasurementView, a: MeasurementPoint, b: MeasurementPoint) {
+  const label = measurementLabelLayout(g, a, b);
+  // Dock buttons are 26px wide plus a 2px gap, leaving 4px inset.
+  return { x: label.x + label.width - 58, y: label.y + 2 };
 }
 
 export function measurementHit(g: MeasurementView, a: MeasurementPoint, b: MeasurementPoint, x: number, y: number): MeasurementHit {
   const x1 = g.x(a.t), x2 = g.x(b.t), y1 = g.y(a.p), y2 = g.y(b.p);
   if (Math.max(x1, x2) < 0 || Math.min(x1, x2) > g.plotW || Math.max(y1, y2) < 0 || Math.min(y1, y2) > g.plotH) return null;
   const label = measurementLabelLayout(g, a, b);
-  if (Math.hypot(x - label.deleteX, y - label.deleteY) <= 12) return 'delete';
   if (x >= label.x && x <= label.x + label.width && y >= label.y && y <= label.y + label.height) return 'body';
   if (Math.hypot(x - x1, y - y1) <= 13) return 'start';
   if (Math.hypot(x - x2, y - y2) <= 13) return 'end';
@@ -123,22 +131,11 @@ export function paintMeasurement(
   q.textBaseline = 'middle';
   const textX = label.x + 10;
   q.fillStyle = color; q.font = '700 15px system-ui';
-  q.fillText((stats.pct > 0 ? '+' : '') + stats.pct.toFixed(2) + '%', textX, label.y + 16, label.width - 38);
+  q.fillText((stats.pct > 0 ? '+' : '') + stats.pct.toFixed(2) + '%', textX, label.y + 16, Math.max(10, label.width - 76));
   q.font = '600 11px system-ui';
   q.fillText((stats.delta > 0 ? '+' : '') + formatCryptoPrice(stats.delta), textX, label.y + 34, label.width - 20);
   q.fillStyle = '#e1e8f2'; q.font = '500 10px system-ui';
   q.fillText(stats.bars + ' ' + l.bars + ' · ' + duration(stats.ms, lang), textX, label.y + 51, label.width - 18);
   q.fillText(l.volume + ' ' + compact(stats.volume) + ' (~$' + compact(stats.quoteVolume) + ')', textX, label.y + 67, label.width - 18);
-  if (hovered) {
-    // Compact line-only trash icon, matching the transparent drawing toolbar.
-    // Keep the existing generous hit area for mouse and touch input.
-    q.strokeStyle = '#ff9ca6'; q.lineWidth = 1.2; q.lineCap = 'round';
-    q.beginPath();
-    q.moveTo(label.deleteX - 4, label.deleteY - 4); q.lineTo(label.deleteX + 4, label.deleteY - 4);
-    q.moveTo(label.deleteX - 2, label.deleteY - 6); q.lineTo(label.deleteX + 2, label.deleteY - 6);
-    q.moveTo(label.deleteX - 3, label.deleteY - 2); q.lineTo(label.deleteX - 2, label.deleteY + 5);
-    q.lineTo(label.deleteX + 2, label.deleteY + 5); q.lineTo(label.deleteX + 3, label.deleteY - 2);
-    q.stroke();
-  }
   q.restore();
 }

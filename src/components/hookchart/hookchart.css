@@ -316,6 +316,14 @@
   color:#cbd6e7!important;cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
+/* The ruler has its own four-line card. Its only two actions sit together
+ * in the upper-right inset; no second canvas-painted trash is necessary. */
+.hookchart-root .chartWrap .chartDrawingActions.measurement-actions{
+  gap:2px;
+}
+.hookchart-root .chartWrap .chartDrawingActions.measurement-actions button{
+  width:26px!important;min-width:26px!important;height:26px!important;min-height:26px!important;
+}
 .hookchart-root .chartWrap .chartDrawingActions button svg{
   width:13px!important;height:13px!important;flex:none;stroke-width:1.9;
 }
