@@ -198,6 +198,30 @@ test('surviving cascade rays start at historical wick pivots and reach the scale
   assert.match(layer, /if \(setup\.kind === 'cascade' && !activeCascadeLines\.has\(line\)\) continue/);
 });
 
+test('an identical-price later pivot cannot resurrect a swept outer or inner cascade tier',()=>{
+  const base=1_700_000_000_000;
+  const rows:ScalperCandle[]=Array.from({length:75},(_,i)=>{
+    const peakIndex=[30,39,48,57,66].indexOf(i);
+    return { t:base+i*60_000,o:10,c:10,
+      h:peakIndex<0?10.03:[10.09,10.11,10.13,10.15,10.15][peakIndex],
+      l:9.97 };
+  });
+  const setup=createScalperAnalyzer().evaluate(rows,'binance:futures:BTCUSDT:1m',false,true)
+    .setups.find(x=>x.kind==='cascade');
+  assert.ok(setup,'a repeated level must not count as a new distinct tier');
+  const outer=setup.lines.find(x=>x.role==='upper');
+  assert.ok(outer);
+  assert.equal(outer.from.t,rows[57].t,
+    'line must originate from the first actual wick at 10.15, not the later retest at 66');
+  assert.equal(cascadeLineIsActive(outer,setup.touches,rows,'upper'),false,
+    'the later same-price retest invalidates the visible outer level');
+  const repeatedStep=setup.lines.find(x=>x.role==='cascade-step'&&x.from.p===10.15);
+  assert.ok(repeatedStep);
+  assert.equal(repeatedStep.from.t,rows[57].t,
+    'the inner tier cannot shift its start to a repeated wick');
+  assert.equal(cascadeLineIsActive(repeatedStep,setup.touches,rows,'upper'),false);
+});
+
 test('scalper diagonal expires after a later wick crosses a downward resistance',()=>{
   const base=1_700_000_000_000;
   const minutes=(i:number)=>base+i*60_000;
