@@ -29,6 +29,8 @@ interface ExchangeCandlestickChartProps {
   terminalToolbarVisibility?: TerminalToolbarVisibility;
   hookchartToolbarActions?: React.ReactNode;
   hookchartToolbarOverlays?: React.ReactNode;
+  /** Terminal chart-specific TP / Entry / SL visibility, saved with its workspace tile. */
+  tradeLevelToggle?: { visible: boolean; onToggle: () => void };
   formation?: DetectedFormation | null;
   /** Explicitly selected Terminal formation markers, for this chart only. */
   customMarkers?: ChartMarkerInfo[];
@@ -41,7 +43,7 @@ interface ExchangeCandlestickChartProps {
 
 export const ExchangeCandlestickChart: React.FC<ExchangeCandlestickChartProps> = ({
   symbol, exchange, marketType, timeframe, historyLimit = 1000, onTimeframeChange, onLivePriceUpdate,
-  terminalMode, terminalThirtySecondMode, forceHookChart, terminalAutoScale, terminalEcoMode, terminalRefreshMs, terminalActiveCharts, terminalInitialView, terminalFitAllRequest, visualContext, terminalToolbarVisibility, hookchartToolbarActions, hookchartToolbarOverlays, formation, customMarkers, previewMarkers, onAddToArchive, isSavingArchive,
+  terminalMode, terminalThirtySecondMode, forceHookChart, terminalAutoScale, terminalEcoMode, terminalRefreshMs, terminalActiveCharts, terminalInitialView, terminalFitAllRequest, visualContext, terminalToolbarVisibility, hookchartToolbarActions, hookchartToolbarOverlays, tradeLevelToggle, formation, customMarkers, previewMarkers, onAddToArchive, isSavingArchive,
 }) => (
   <div className="h-full w-full min-h-0" role="group" aria-label={`Графік ${symbol}`}>
     <TradingViewChart
@@ -62,6 +64,7 @@ export const ExchangeCandlestickChart: React.FC<ExchangeCandlestickChartProps> =
       isSavingArchive={isSavingArchive}
       hookchartToolbarActions={hookchartToolbarActions}
       hookchartToolbarOverlays={hookchartToolbarOverlays}
+      tradeLevelToggle={tradeLevelToggle}
       formation={formation}
       customMarkers={customMarkers}
       previewMarkers={previewMarkers}
