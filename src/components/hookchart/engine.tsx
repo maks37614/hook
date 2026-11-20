@@ -1155,7 +1155,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.fillText(txt,lx+pad,top+labelH/2);q.restore();
     }
   });
-   if(showDensityLines||showDensityLabels)densities.filter(d=>d.p>=g.lo&&d.p<=g.hi).forEach(d=>{
+   if(showDensityLines||showDensityLabels)for(const d of densities){
+     // Same inclusive price gate and original order, without a temporary
+     // visible-depth array on every full DPR Canvas paint.
+     if(!(d.p>=g.lo&&d.p<=g.hi))continue;
      const yy=g.y(d.p), origin=g.x(d.first);
      const xx=origin>g.plotW?Math.max(0,g.plotW-g.step):Math.max(0,origin);
      const age=Math.max(0,Math.floor((now-d.first)/1000));
@@ -1182,7 +1185,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        q.fillStyle=labelColor;q.globalAlpha=d.active?(strong ? .75 : 1):.55;
        q.fillText(txt,lx,Math.max(12,yy-5));q.globalAlpha=1;
      }
-   });
+   }
   if(showMarketPrintSums && marketPrints.length){
     // One per-candle summary, not the three largest individual bursts.
     // Keep BUY and SELL separate inside the same label and avoid text collisions
