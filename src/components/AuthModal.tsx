@@ -16,6 +16,33 @@ interface AuthModalProps {
   promptReason?: AuthPromptReason;
 }
 type Mode = 'signin' | 'signup' | 'forgot' | 'reset';
+const CAPTCHA_CONFIG_TIMEOUT_MS = 8_000;
+const captchaConfigMessages = {
+  uk: {
+    loading: 'Завантажуємо перевірку CAPTCHA…',
+    unavailable: 'Не вдалося підключитися до CAPTCHA. Перевірте з’єднання та спробуйте ще раз.',
+    unconfigured: 'CAPTCHA не налаштована. Зверніться до адміністратора.',
+    retry: 'Повторити',
+  },
+  en: {
+    loading: 'Loading CAPTCHA verification…',
+    unavailable: 'Could not connect to CAPTCHA. Check your connection and try again.',
+    unconfigured: 'CAPTCHA is not configured. Contact the administrator.',
+    retry: 'Retry',
+  },
+  pl: {
+    loading: 'Ładowanie weryfikacji CAPTCHA…',
+    unavailable: 'Nie można połączyć się z CAPTCHA. Sprawdź połączenie i spróbuj ponownie.',
+    unconfigured: 'CAPTCHA nie jest skonfigurowana. Skontaktuj się z administratorem.',
+    retry: 'Ponów',
+  },
+  ru: {
+    loading: 'Загрузка проверки CAPTCHA…',
+    unavailable: 'Не удалось подключиться к CAPTCHA. Проверьте соединение и повторите попытку.',
+    unconfigured: 'CAPTCHA не настроена. Обратитесь к администратору.',
+    retry: 'Повторить',
+  },
+};
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen, onClose, initialMode = 'signin', onSuccess, isRestrictedMode = false, promptReason = null,
@@ -36,8 +63,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaSiteKey, setCaptchaSiteKey] = useState<string | null>(null);
-  const [captchaStatus, setCaptchaStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [captchaStatus, setCaptchaStatus] = useState<'loading' | 'ready' | 'unconfigured' | 'unavailable'>('loading');
   const [captchaEpoch, setCaptchaEpoch] = useState(0);
+  const [captchaConfigRetry, setCaptchaConfigRetry] = useState(0);
   // Opening a modal resets its fields once; changing an auth notice or reset
   // token must not accidentally clear its completed reset result.
   const authResetRef = useRef({ resetToken, clearAuthError });
@@ -62,9 +90,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CAPTCHA_CONFIG_TIMEOUT_MS);
     setCaptchaStatus('loading');
     setCaptchaSiteKey(null);
-    void fetch('/api/auth/config', { credentials: 'same-origin', cache: 'no-store' })
+    void fetch('/api/auth/config', {
+      credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
+    })
       .then(async response => {
         if (!response.ok) throw new Error('CAPTCHA config unavailable');
         return response.json();
@@ -74,11 +106,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const key = config?.captcha?.configured && typeof config.captcha.siteKey === 'string'
           ? config.captcha.siteKey : null;
         setCaptchaSiteKey(key);
-        setCaptchaStatus(key ? 'ready' : 'unavailable');
+        setCaptchaStatus(key ? 'ready' : 'unconfigured');
       })
-      .catch(() => { if (active) setCaptchaStatus('unavailable'); });
-    return () => { active = false; };
-  }, [isOpen]);
+      .catch(() => { if (active) setCaptchaStatus('unavailable'); })
+      .finally(() => window.clearTimeout(timeout));
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [isOpen, captchaConfigRetry]);
 
   if (!isOpen) return null;
   const changeMode = (next: Mode) => {
@@ -156,6 +193,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const localizedTitle = translatePhrase(language, title);
   const localizedExplanation = translatePhrase(language, explanation);
+  const captchaMessage = captchaConfigMessages[language] || captchaConfigMessages.uk;
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-slate-950/90 p-3 backdrop-blur-md sm:p-5"
@@ -280,10 +318,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 {captchaStatus === 'ready' && captchaSiteKey
                   ? <AuthCaptcha key={`${mode}-${captchaEpoch}`} siteKey={captchaSiteKey} onTokenChange={setCaptchaToken} />
-                  : <p role="status" className="text-xs leading-relaxed text-amber-200">
-                      {captchaStatus === 'loading' ? 'Завантажуємо перевірку CAPTCHA…' :
-                        'CAPTCHA ще не налаштована або недоступна. Зверніться до адміністратора.'}
-                    </p>}
+                  : <div role="status" className="flex items-center justify-between gap-2 text-xs leading-relaxed text-amber-200">
+                      <span>{captchaMessage[captchaStatus === 'ready' ? 'loading' : captchaStatus]}</span>
+                      {captchaStatus === 'unavailable' && (
+                        <button type="button" className="shrink-0 underline hover:text-white"
+                          onClick={() => {
+                            setCaptchaToken(null);
+                            setCaptchaConfigRetry(value => value + 1);
+                          }}>{captchaMessage.retry}</button>
+                      )}
+                    </div>}
               </div>
             )}
             <button type="submit" disabled={busy || (mode !== 'reset' && !captchaToken)}
