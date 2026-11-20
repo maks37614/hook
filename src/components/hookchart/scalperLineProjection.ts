@@ -25,3 +25,30 @@ export function normalizeScalperLineWidth(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.max(0.2, Math.min(5, value)) : 0.4;
 }
+
+
+/**
+ * A CSS width below one *physical* pixel has inconsistent coverage as a thin
+ * diagonal crosses sub-pixel positions. Rasterize automatic scalper strokes to
+ * whole device pixels, with a one-pixel floor. Settings continue storing CSS px.
+ * No other chart or candle strokes pass through this helper.
+ */
+export function scalperRasterStrokeWidth(cssWidth: number, scaleX: number, scaleY: number): number {
+  const sx = Number.isFinite(scaleX) && scaleX > 0 ? scaleX : 1;
+  const sy = Number.isFinite(scaleY) && scaleY > 0 ? scaleY : 1;
+  const scale = Math.min(sx, sy);
+  return Math.max(1, Math.round(normalizeScalperLineWidth(cssWidth) * scale)) / scale;
+}
+
+/**
+ * Only horizontal strokes can be pixel-centered without changing their slope
+ * or wick touch geometry. An odd device-pixel width is centered at n + 0.5;
+ * an even device-pixel width is centered at n. Diagonals use raw coordinates.
+ */
+export function scalperPixelCenteredHorizontalY(y: number, strokeWidth: number, scaleY: number): number {
+  if (!Number.isFinite(y)) return y;
+  const scale = Number.isFinite(scaleY) && scaleY > 0 ? scaleY : 1;
+  const physicalWidth = Math.max(1, Math.round(strokeWidth * scale));
+  const halfPixel = physicalWidth % 2 ? 0.5 : 0;
+  return (Math.round(y * scale - halfPixel) + halfPixel) / scale;
+}
