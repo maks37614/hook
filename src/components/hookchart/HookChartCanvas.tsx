@@ -786,8 +786,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // changes; an inexpensive 90-bar signature also detects exchange backfills.
   // No extra API, worker, interval or saved drawing is created.
   const scalperResult = useMemo(() => runtimeSettings.scalperMode === true && !archiveMode && !replay && !externalData && !ecoActive
-    ? scalperAnalyzer.evaluate(candles, [exchange, marketType, symbol, timeframe].join(':'), runtimeSettings.scalperRegressionMode === true)
-    : null, [runtimeSettings.scalperMode, runtimeSettings.scalperRegressionMode, archiveMode, replay, externalData, ecoActive, scalperAnalyzer, candles, exchange, marketType, symbol, timeframe]);
+    ? scalperAnalyzer.evaluate(candles, [exchange, marketType, symbol, timeframe].join(':'), runtimeSettings.scalperRegressionMode === true, runtimeSettings.scalperCascadeLevels === true)
+    : null, [runtimeSettings.scalperMode, runtimeSettings.scalperRegressionMode, runtimeSettings.scalperCascadeLevels, archiveMode, replay, externalData, ecoActive, scalperAnalyzer, candles, exchange, marketType, symbol, timeframe]);
   const chartToolbarEnabled = replay || archiveMode || settings.chartToolbar !== false;
   // Terminal extras must open visibly below the crowded chart controls.
   // Other HookChart pages keep using the saved toolbar preference.

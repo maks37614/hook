@@ -174,6 +174,7 @@ export const ORIGINAL_HOOKCHART_DEFAULTS: HookChartPreferences = {
   indicators: [],
   strategyId: '',
   scalperMode: false,
+  scalperCascadeLevels: false,
   scalperRegressionMode: false,
   showScalperLabels: true,
   scalperLineStyle: 'auto',
@@ -209,6 +210,7 @@ export function normalizeOriginalHookChartPreferences(source?: HookChartPreferen
   // Explicit true only. Existing accounts cannot opt in accidentally.
   next.showModeledLiquidationZones = source?.showModeledLiquidationZones === true;
   next.scalperMode = source?.scalperMode === true;
+  next.scalperCascadeLevels = source?.scalperCascadeLevels === true;
   next.scalperRegressionMode = source?.scalperRegressionMode === true;
   next.showScalperLabels = source?.showScalperLabels !== false;
   next.scalperLineStyle = ['auto', 'solid', 'dash', 'dot'].includes(source?.scalperLineStyle || '') ? source!.scalperLineStyle : 'auto';
@@ -962,6 +964,12 @@ export function OriginalHookChartSettings({
               desc="Автоматично показує на живому графіку підтверджені дотиками діапазони, трикутники, клини, похилі лінії та подвійні вершини/дна. Можливий пробій не є підтвердженим до закриття свічки. Аналіз виконується лише в браузері без нових біржових запитів."
               value={prefs.scalperMode === true}
               onChange={value => set('scalperMode', value)}
+            />
+            <SwitchRow
+              label="Авто позначення каскадних рівнів"
+              desc="Окремо позначає каскади з 3–5 послідовних підтверджених High або Low тіней і відповідну межу пробою. Незакрита свічка показує лише можливий пробій. Працює в Режимі Скальпера на вже завантажених свічках без додаткових запитів."
+              value={prefs.scalperCascadeLevels === true}
+              onChange={value => set('scalperCascadeLevels', value)}
             />
             <SwitchRow
               label="Усереднена регресійна лінія"

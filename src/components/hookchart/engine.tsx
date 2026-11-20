@@ -1262,7 +1262,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
         q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
-        q.lineWidth = setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
+        q.lineWidth = line.role === 'cascade-step' ? 0.7
+          : setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
         q.strokeStyle = color;
         q.moveTo(x0, y0); q.lineTo(x1, y1); q.stroke();
       }

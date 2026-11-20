@@ -707,6 +707,8 @@ export interface HookChartPreferences {
   strategyId?: string;
   /** Opt-in, client-only scalp patterns on the live chart. Never creates alerts/orders. */
   scalperMode?: boolean;
+  /** Separately opt in to 3–5 wick-tested cascading High/Low levels; client-only. */
+  scalperCascadeLevels?: boolean;
   /** Independent opt-out for scalp pattern/status text; lines and wick dots stay visible. */
   showScalperLabels?: boolean;
   /** Optional legacy least-squares fit instead of exact wick-tip anchored scalp lines. */

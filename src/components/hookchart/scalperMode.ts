@@ -5,7 +5,7 @@
  * The final, potentially unfinished candle is used only for a preview.
  */
 export type ScalperCandle = { t: number; o: number; h: number; l: number; c: number };
-export type ScalperKind = 'range' | 'triangle' | 'wedge' | 'trend' | 'double-top' | 'double-bottom';
+export type ScalperKind = 'range' | 'triangle' | 'wedge' | 'trend' | 'double-top' | 'double-bottom' | 'cascade';
 export type ScalperStatus = 'forming' | 'possible' | 'confirmed' | 'failed';
 export type ScalperLineStyle = 'auto' | 'solid' | 'dash' | 'dot';
 // Shared immutable-by-convention patterns: no new arrays for each rendered line.
@@ -21,7 +21,7 @@ export function scalperLineDash(style: ScalperLineStyle, status: ScalperStatus):
 }
 export type ScalperSide = 'up' | 'down';
 export type ScalperPoint = { t: number; p: number };
-export type ScalperLine = { from: ScalperPoint; to: ScalperPoint; role: 'upper' | 'lower' | 'neckline' };
+export type ScalperLine = { from: ScalperPoint; to: ScalperPoint; role: 'upper' | 'lower' | 'neckline' | 'cascade-step' };
 export type ScalperSetup = {
   id: string;
   kind: ScalperKind;
@@ -43,6 +43,7 @@ type Structure = {
   only?: ScalperSide;
   touches: ScalperPoint[];
   atr: number;
+  cascadeSteps?: Pivot[];
 };
 const EMPTY: ScalperScene = { setups: [], closedAt: 0 };
 const MAX_BARS = 90;
@@ -399,6 +400,62 @@ function structureCandidates(rows: readonly ScalperCandle[], averagedRegression 
   // Avoid multiple competing geometries in a dense Terminal grid.
   return active.sort((a, b) => b.score - a.score).slice(0, 2);
 }
+
+/**
+ * Repeated, distinct wick-tested Highs or Lows form a compact 3–5-level
+ * cascade. Use confirmed swing pivots only: the last two completed bars are
+ * intentionally not eligible to establish new pivots. This avoids marking
+ * rapid intrabar flickers as independent levels.
+ *
+ * The flat outer boundary is the actionable breakout limit; the short shelves
+ * preserve the individual wick prices visually without painting huge rays
+ * across an already-crowded chart. All work remains in the <=90-candle cache.
+ */
+function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
+  const volatility = atr(rows);
+  if (!Number.isFinite(volatility) || volatility <= 0) return [];
+  const { highs, lows } = pivots(rows);
+  const last = rows.length - 1;
+  const tolerance = Math.max(volatility * .65, rows[last].c * .00015);
+  const found: Structure[] = [];
+  for (const side of ['upper', 'lower'] as const) {
+    const recent = (side === 'upper' ? highs : lows).filter(p => last - p.i <= 46);
+    if (recent.length < 3 || last - recent[recent.length - 1].i > 20) continue;
+    let selected: Pivot[] | null = null;
+    for (let n = Math.min(5, recent.length); n >= 3; n--) {
+      const group = recent.slice(-n);
+      const values = group.map(p => p.p);
+      const high = Math.max(...values), low = Math.min(...values);
+      if (high - low > tolerance || group[n - 1].i - group[0].i < 9) continue;
+      if (group.slice(1).some((p, i) => p.i - group[i].i > 20)) continue;
+      const boundary = side === 'upper' ? high : low;
+      const buffer = Math.max(volatility * .24, boundary * .00004);
+      // Never resurrect a level already broken by an older closed candle.
+      const violated = rows.slice(group[0].i).some(bar =>
+        side === 'upper' ? bar.c > boundary + buffer : bar.c < boundary - buffer);
+      if (violated || Math.abs(rows[last].c - boundary) > volatility * 4) continue;
+      selected = group;
+      break;
+    }
+    if (!selected) continue;
+    const boundary = side === 'upper'
+      ? Math.max(...selected.map(p => p.p))
+      : Math.min(...selected.map(p => p.p));
+    const endPivot: Pivot = { i: last, t: rows[last].t, p: rows[last].c };
+    const line = flat(boundary, selected[0], endPivot);
+    found.push({
+      id: 'cascade:' + side + ':' + selected[0].t,
+      kind: 'cascade', score: Math.min(95, 48 + selected.length * 8
+        + Math.max(0, 16 - (last - selected[selected.length - 1].i))),
+      ...(side === 'upper' ? { upper: line, only: 'up' as const }
+        : { lower: line, only: 'down' as const }),
+      touches: uniqueTouches(selected), cascadeSteps: selected, atr: volatility,
+    });
+  }
+  // Only one independent cascade in a dense multi-chart Terminal layout.
+  return found.sort((a, b) => b.score - a.score).slice(0, 1);
+}
+
 function project(fit: Fit, rows: readonly ScalperCandle[], lastIndex: number, role: ScalperLine['role']): ScalperLine {
   return { from: { t: fit.first.t, p: at(fit, fit.first.i) },
     to: { t: rows[lastIndex].t, p: at(fit, lastIndex) }, role };
@@ -417,6 +474,10 @@ function presentation(candidate: Structure, rows: readonly ScalperCandle[]): Sca
   const lines: ScalperLine[] = [];
   if (candidate.upper) lines.push(project(candidate.upper, rows, liveIndex, candidate.kind === 'double-bottom' ? 'neckline' : 'upper'));
   if (candidate.lower) lines.push(project(candidate.lower, rows, liveIndex, candidate.kind === 'double-top' ? 'neckline' : 'lower'));
+  if (candidate.cascadeSteps) candidate.cascadeSteps.forEach((step, i) => {
+    const nextTime = candidate.cascadeSteps![i + 1]?.t ?? rows[liveIndex].t;
+    lines.push({ from: point(step), to: { t: nextTime, p: step.p }, role: 'cascade-step' });
+  });
   const buffer = Math.max(candidate.atr * .14, live.c * .00008);
   type Hit = { state: ScalperStatus; side: ScalperSide; bar: ScalperCandle };
   const classify = (bar: ScalperCandle, index: number, confirmed: boolean): Hit | null => {
@@ -464,7 +525,7 @@ export function createScalperAnalyzer() {
   const cloneBar = (bar: ScalperCandle): ScalperCandle =>
     ({ t: bar.t, o: bar.o, h: bar.h, l: bar.l, c: bar.c });
   return {
-    evaluate(candles: readonly ScalperCandle[], scope: string, averagedRegression = false): ScalperScene {
+    evaluate(candles: readonly ScalperCandle[], scope: string, averagedRegression = false, cascadeLevels = false): ScalperScene {
       if (candles.length < MIN_BARS + 2) return EMPTY;
       // The last candle can still be forming: never use it to confirm signals.
       // Reject invalid newest bars instead of showing misleading live geometry.
@@ -487,7 +548,7 @@ export function createScalperAnalyzer() {
       if (end - start < MIN_BARS) return EMPTY;
       // The selected fit is part of the cache key; changing it must rebuild
       // geometry immediately, even when every candle is unchanged.
-      const key = [scope, averagedRegression, start, end, candles[start]?.t, candles[end - 1]?.t].join('|');
+      const key = [scope, averagedRegression, cascadeLevels, start, end, candles[start]?.t, candles[end - 1]?.t].join('|');
       // Compare OHLC VALUES, not object references or the first/last bar.
       // WS repair can revise an interior closed candle after initial loading.
       let changed = signature !== key || historicalSnapshot.length !== end - start;
@@ -504,6 +565,7 @@ export function createScalperAnalyzer() {
         historicalSnapshot = candles.slice(start, end).map(b =>
           ({ t: b.t, o: b.o, h: b.h, l: b.l, c: b.c }));
         cached = structureCandidates(historicalSnapshot, averagedRegression);
+        if (cascadeLevels) cached = [...cached, ...cascadeCandidates(historicalSnapshot)];
         // A changed historical price, market or fit mode must invalidate the
         // live presentation even if the last two OHLC bars are unchanged.
         scene = null;
@@ -536,10 +598,10 @@ export function createScalperAnalyzer() {
 }
 
 const labels = {
-  uk: { range: 'Діапазон', triangle: 'Трикутник', wedge: 'Клин', trend: 'Похила', 'double-top': 'Подвійна вершина', 'double-bottom': 'Подвійне дно', forming: 'формується', possible: 'можливий пробій', confirmed: 'пробій підтверджено', failed: 'хибний пробій' },
-  en: { range: 'Range', triangle: 'Triangle', wedge: 'Wedge', trend: 'Trendline', 'double-top': 'Double top', 'double-bottom': 'Double bottom', forming: 'forming', possible: 'possible breakout', confirmed: 'breakout confirmed', failed: 'false breakout' },
-  pl: { range: 'Konsolidacja', triangle: 'Trójkąt', wedge: 'Klin', trend: 'Linia trendu', 'double-top': 'Podwójny szczyt', 'double-bottom': 'Podwójne dno', forming: 'tworzy się', possible: 'możliwe wybicie', confirmed: 'wybicie potwierdzone', failed: 'fałszywe wybicie' },
-  ru: { range: 'Диапазон', triangle: 'Треугольник', wedge: 'Клин', trend: 'Наклонная', 'double-top': 'Двойная вершина', 'double-bottom': 'Двойное дно', forming: 'формируется', possible: 'возможный пробой', confirmed: 'пробой подтверждён', failed: 'ложный пробой' },
+  uk: { cascade: 'Каскадний рівень', range: 'Діапазон', triangle: 'Трикутник', wedge: 'Клин', trend: 'Похила', 'double-top': 'Подвійна вершина', 'double-bottom': 'Подвійне дно', forming: 'формується', possible: 'можливий пробій', confirmed: 'пробій підтверджено', failed: 'хибний пробій' },
+  en: { cascade: 'Cascade level', range: 'Range', triangle: 'Triangle', wedge: 'Wedge', trend: 'Trendline', 'double-top': 'Double top', 'double-bottom': 'Double bottom', forming: 'forming', possible: 'possible breakout', confirmed: 'breakout confirmed', failed: 'false breakout' },
+  pl: { cascade: 'Poziom kaskadowy', range: 'Konsolidacja', triangle: 'Trójkąt', wedge: 'Klin', trend: 'Linia trendu', 'double-top': 'Podwójny szczyt', 'double-bottom': 'Podwójne dno', forming: 'tworzy się', possible: 'możliwe wybicie', confirmed: 'wybicie potwierdzone', failed: 'fałszywe wybicie' },
+  ru: { cascade: 'Каскадный уровень', range: 'Диапазон', triangle: 'Треугольник', wedge: 'Клин', trend: 'Наклонная', 'double-top': 'Двойная вершина', 'double-bottom': 'Двойное дно', forming: 'формируется', possible: 'возможный пробой', confirmed: 'пробой подтверждён', failed: 'ложный пробой' },
 } as const;
 export function scalperLabel(key: ScalperKind | ScalperStatus, language: string): string {
   const locale: keyof typeof labels = language === 'en' || language === 'pl' || language === 'ru' ? language : 'uk';
