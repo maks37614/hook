@@ -4,7 +4,6 @@ import { translatePhrase } from '../../locales';
 import {
   X,
   Sliders,
-  CircleHelp,
   Maximize2,
   Grid,
   Columns,
@@ -24,10 +23,6 @@ import { getVisualProfile, VISUAL_GAP_MAX, VISUAL_ZOOM_MIN, VISUAL_ZOOM_MAX } fr
 import { applyTerminalInitialViewNow, discardTerminalInitialViewPreview, TERMINAL_FIT_HISTORY_PROFILE } from './terminalInitialViewApply';
 
 interface TerminalSettingsDrawerProps {
-  syncConflict?: boolean;
-  backupFailed?: boolean;
-  onDownloadLocalBackup?: () => void;
-  onRestoreCloudWorkspace?: () => void;
   isOpen: boolean;
   onClose: () => void;
   /** Explicit Done flushes all changed workspace settings to this account. */
@@ -50,10 +45,6 @@ interface TerminalSettingsDrawerProps {
 }
 
 export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
-  syncConflict = false,
-  backupFailed = false,
-  onDownloadLocalBackup,
-  onRestoreCloudWorkspace,
   isOpen,
   onClose,
   onDone,
@@ -71,33 +62,12 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
   totalBlocks,
 }) => {
   const { language, t } = useLanguage();
-  const [conflictHelpOpen, setConflictHelpOpen] = React.useState(false);
   const [initialApplied, setInitialApplied] = React.useState(false);
   const [defaultApplied, setDefaultApplied] = React.useState(false);
   const [hasUncommittedPreview, setHasUncommittedPreview] = React.useState(false);
   const [initialDirty, setInitialDirty] = React.useState(false);
   const [initialResetToDefault, setInitialResetToDefault] = React.useState(false);
   const [initialFitAll, setInitialFitAll] = React.useState(config.initialChartFitAll === true);
-  const conflictHelpRef = React.useRef<HTMLElement | null>(null);
-  const hoverCapable = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: hover)').matches;
-  React.useEffect(() => {
-    if (!isOpen || !syncConflict) setConflictHelpOpen(false);
-  }, [isOpen, syncConflict]);
-  React.useEffect(() => {
-    if (!conflictHelpOpen) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!conflictHelpRef.current?.contains(event.target as Node)) setConflictHelpOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setConflictHelpOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [conflictHelpOpen]);
   // Keep slider edits local until Done. Moving a slider must never trigger a
   // reinitialization or store a half-finished profile for dozens of charts.
   const [initial, setInitial] = React.useState(() =>
@@ -205,64 +175,6 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
 
         {/* Settings Sections */}
         <div className="p-5 space-y-6 flex-1 text-xs">
-          {syncConflict && (
-            <section ref={conflictHelpRef} role="alert" aria-label={t('terminal.drawer.conflictAria')}
-              onMouseLeave={() => {
-                if (hoverCapable()) setConflictHelpOpen(false);
-              }}
-              className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-950/35 p-3 text-amber-100">
-              <div className="flex items-start gap-2">
-                <p className="min-w-0 flex-1">
-                  {t(backupFailed ? 'terminal.drawer.conflictBackupFailed' : 'terminal.drawer.conflictDetails')}
-                </p>
-                <button type="button"
-                  aria-label={t('terminal.drawer.conflictHelpButton')}
-                  title={t('terminal.drawer.conflictHelpButton')}
-                  aria-expanded={conflictHelpOpen}
-                  aria-controls="terminal-workspace-conflict-help"
-                  onMouseEnter={() => {
-                    if (hoverCapable()) setConflictHelpOpen(true);
-                  }}
-                  onClick={() => {
-                    setConflictHelpOpen(open => hoverCapable() ? true : !open);
-                  }}
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-amber-100 transition-colors hover:border-cyan-400 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-                  <CircleHelp className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-              {conflictHelpOpen && (
-                <div id="terminal-workspace-conflict-help" role="region"
-                  aria-label={t('terminal.drawer.conflictHelpTitle')}
-                  className="space-y-3 rounded-lg border border-amber-500/25 bg-slate-950/95 p-3 text-[11px] leading-relaxed text-slate-200 shadow-lg">
-                  <h4 className="text-xs font-bold text-amber-200">
-                    {t('terminal.drawer.conflictHelpTitle')}
-                  </h4>
-                  <p>{t('terminal.drawer.conflictHelpReason')}</p>
-                  <h5 className="font-bold text-cyan-300">
-                    {t('terminal.drawer.conflictHelpStepsTitle')}
-                  </h5>
-                  <ol className="list-decimal space-y-2 pl-4">
-                    <li>{t('terminal.drawer.conflictHelpBackup')}</li>
-                    <li>{t('terminal.drawer.conflictHelpCloud')}</li>
-                    <li>{t('terminal.drawer.conflictHelpLocal')}</li>
-                  </ol>
-                  <p className="border-t border-slate-700 pt-2 text-amber-200">
-                    {t('terminal.drawer.conflictHelpSafety')}
-                  </p>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={onDownloadLocalBackup}
-                  className="rounded-md border border-amber-500/50 px-2 py-1 hover:bg-amber-900/60">
-                  {t('terminal.drawer.downloadBackup')}
-                </button>
-                <button type="button" onClick={onRestoreCloudWorkspace}
-                  className="rounded-md border border-slate-600 px-2 py-1 hover:bg-slate-800">
-                  {t('terminal.drawer.restoreCloud')}
-                </button>
-              </div>
-            </section>
-          )}
           <section className="space-y-3" aria-label={t('terminal.drawer.presetCoins')}>
             <h4 className="font-bold text-slate-300">{t('terminal.drawer.presetCoins')}</h4>
             <label className="flex items-center justify-between gap-3 text-slate-400">{t('terminal.drawer.exchange')}
