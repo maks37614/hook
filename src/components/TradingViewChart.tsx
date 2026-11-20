@@ -397,6 +397,9 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     const limit = Math.min(120, Math.max(24, missing + 8));
     void fetchSharedHistoricalKlines({
       exchange, marketType, symbol, timeframe: timeframe as Timeframe, limit,
+      // A gap-specific history cursor bypasses a possibly stale "latest"
+      // snapshot while still allowing short browser/server request coalescing.
+      endTime: to * 1000,
     }).then(rows => {
       // The newest live candle remains authoritative; only insert missing
       // verified bars strictly between the two observed timestamps.
