@@ -9,6 +9,10 @@ const app=require('../package.json');
 const setup=require('../installer/package.json');
 const locales=['en-US','pl','ru','uk'];
 
+test('Animated setup version always matches the installed h00k Desktop version',()=>{
+  assert.equal(setup.version,app.version,'never ship a 0.1.12 launcher containing a newer Desktop');
+});
+
 test('Desktop packaging preserves a small, explicit application file list',()=>{
   const files=app.build.files;
   assert.ok(Array.isArray(files)&&files.length>0);
