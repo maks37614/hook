@@ -29,6 +29,7 @@ import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
 import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLineStyle } from './scalperMode';
+import { scalperRenderedLineEndX } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -1317,7 +1318,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         q.lineWidth = line.role === 'cascade-step' ? 0.7
           : setup.kind === 'trend' ? scalperTrendStrokeWidth : (setup.status === 'confirmed' ? 1.5 : 1);
         q.strokeStyle = color;
-        q.moveTo(x0, y0); q.lineTo(x1, y1); q.stroke();
+        // Project only horizontal cascade tiers/boundaries to the same
+        // right plot edge used by ordinary price levels. Do not alter the
+        // detector's original pivot geometry or any other Scalper formation.
+        q.moveTo(x0, y0);
+        q.lineTo(scalperRenderedLineEndX(setup.kind, line, x1, g.plotW), y1);
+        q.stroke();
       }
       q.setLineDash([]);
       if (showScalperTouchPoints) for (const touch of setup.touches) {
