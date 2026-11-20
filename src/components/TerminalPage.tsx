@@ -179,7 +179,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const marketSnapshotLoadedRef = useRef(false);
   const [marketError, setMarketError] = useState<string | null>(null);
   const presetAutoUpdate = config.presetAutoUpdate !== false;
-  // AV 1m TOP 10 is computed from the same exchange ticker universe as the
+  // AV 1m uses the whole exchange ticker universe, not a top-10 subset.
   // ordinary Terminal coin picker (24h quote turnover / 1440). Unlike the
   // per-chart instantaneous volume display, it needs no candle polling.
   const marketCoins = marketSnapshot.coins;
@@ -191,7 +191,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   // legacy workspaces above 50 charts retain the 50-chart safety page cap.
   const isAutomaticMarketSelection = Boolean(activeMarketPreset && presetMatches.length > 0);
   const workspacePageSize = resolveTerminalWorkspacePageSize(
-    avOneMinuteActive ? 10 : config.coinPresetLimit, blocks.length, isAutomaticMarketSelection,
+    avOneMinuteActive ? MAX_TERMINAL_CHARTS : config.coinPresetLimit, blocks.length, isAutomaticMarketSelection,
   );
   const [workspacePage, setWorkspacePage] = useState(0);
   const workspacePageCount = Math.max(1, Math.ceil(blocks.length / workspacePageSize));
@@ -365,8 +365,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     } as const;
   }, [config.coinPresetExchange, config.coinPresetMarketType, preferences.defaultExchange, preferences.defaultMarketType]);
   const coinPresetLimit = resolveTerminalPresetPageSize(config.coinPresetLimit);
-  // AV 1m is a fixed top-10 view, regardless of the page size used by other presets.
-  const effectivePresetPageSize = avOneMinuteActive ? 10 : coinPresetLimit;
+  // AV 1m must expose every qualified symbol via page navigation. Limit only
+  // simultaneously mounted charts to the existing safe 50-card workspace cap.
+  const effectivePresetPageSize = avOneMinuteActive ? MAX_TERMINAL_CHARTS : coinPresetLimit;
   const visiblePresetPage = useMemo(() => getTerminalPresetPage(presetMatches, presetPage, effectivePresetPageSize),
     [presetMatches, presetPage, effectivePresetPageSize]);
   const coins = useMemo(() => {
@@ -867,11 +868,11 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     presetPageRef.current = nextPage;
     // Manual and personal presets keep all their charts visible up to 50.
     // Automatic presets and older oversized imports retain pagination.
-    setWorkspacePage(current => pageAfterLimitChange(current, workspacePageSize, nextLimit));
+    setWorkspacePage(current => avOneMinuteActive ? 0 : pageAfterLimitChange(current, workspacePageSize, nextLimit));
     setMaximizedBlockId(null);
     if (activeMarketPreset && presetMatches.length) {
       // Auto market presets already page live matches; update their slice now.
-      applyPresetPage(presetMatches, nextPage, avOneMinuteActive ? 10 : nextLimit);
+      applyPresetPage(presetMatches, nextPage, avOneMinuteActive ? MAX_TERMINAL_CHARTS : nextLimit);
     }
     chartListRef.current?.scrollTo({ top: 0 });
     setConfig(current => ({ ...current, ...updated, coinPresetLimit: nextLimit }));
@@ -914,7 +915,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       ? current : selected);
     // The click can arrive before React commits activeMarketPreset. Use the
     // selected ID, not the previous render's preset, for the first page.
-    applyPresetPage(selected, presetPageRef.current, preset === 'av_1m' ? 10 : coinPresetLimit);
+    applyPresetPage(selected, presetPageRef.current, preset === 'av_1m' ? MAX_TERMINAL_CHARTS : coinPresetLimit);
   }, [applyPresetPage, coinPresetLimit]);
 
   const handleActiveMarketPresetChange = useCallback((preset: TerminalMarketPreset | null) => {
