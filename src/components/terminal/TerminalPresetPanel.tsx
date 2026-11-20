@@ -21,9 +21,6 @@ interface Props {
   onRequestFormationScan?: () => boolean;
   /** Retry the existing shared public quote refresh when a preset was clicked before quotes arrived. */
   onRequestMarketRefresh?: () => void;
-  onRequestMinuteRefresh?: () => void;
-  minuteReady?: boolean;
-  minuteError?: string | null;
   formationScanStatus?: 'idle' | 'loading' | 'ready' | 'busy' | 'failed';
   selection: MarketSelection;
   timeframe: Timeframe;
@@ -50,7 +47,7 @@ interface Props {
 const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, av_1m: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
-export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, pickerFormationCoins, formationCoins, onRequestFormationScan, onRequestMarketRefresh, onRequestMinuteRefresh, minuteReady = false, minuteError = null, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
+export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, pickerFormationCoins, formationCoins, onRequestFormationScan, onRequestMarketRefresh, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
   onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
@@ -120,18 +117,11 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
       onActivePresetChange(id);
       return;
     }
-    if (id === 'av_1m' && !readyCoins[id].length) {
-      if (minuteReady && !minuteError) {
-        setMessage({ text: 'Немає перевірених монет з AV 1m від 200K USDT у доступній вибірці.' });
+    if (id !== 'formations' && !readyCoins[id].length) {
+      if (id === 'av_1m' && snapshot.coins.length && !loading && !error && !snapshot.warning) {
+        setMessage({ text: translatePhrase(language, 'Немає монет із середнім AV 1m від 200 000 USDT для вибраної біржі та ринку.') });
         return;
       }
-      setPendingMarketPreset(id);
-      pendingQuoteSnapshot.current = snapshot;
-      setMessage({ text: 'Шукаємо обсяг за останню завершену хвилину…' });
-      onRequestMinuteRefresh?.();
-      return;
-    }
-    if (id !== 'formations' && !readyCoins[id].length) {
       // A transient empty snapshot is not evidence of an empty exchange. Keep
       // existing charts intact and apply this exact preset when quotes return.
       pendingQuoteSnapshot.current = snapshot;
@@ -165,18 +155,13 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
     }
     // Wait for a *new* quote snapshot or an explicit error before deciding
     // that a selected exchange really has no usable ticker rows.
-    if (pendingMarketPreset === 'av_1m') {
-      if (minuteReady) {
-        setPendingMarketPreset(null);
-        setMessage({ text: minuteError || 'Немає перевірених монет з AV 1m від 200K USDT у доступній вибірці.' });
-      }
-      return;
-    }
     if (error || snapshot !== pendingQuoteSnapshot.current) {
       setPendingMarketPreset(null);
-      setMessage(error ? { text: error } : { text: translatePhrase(language, 'Для вибраної біржі та ринку зараз немає доступних котирувань. Перевірте фільтри або повторіть.') });
+      setMessage(error ? { text: error } : pendingMarketPreset === 'av_1m' && snapshot.coins.length && !snapshot.warning
+        ? { text: translatePhrase(language, 'Немає монет із середнім AV 1m від 200 000 USDT для вибраної біржі та ринку.') }
+        : { text: translatePhrase(language, 'Для вибраної біржі та ринку зараз немає доступних котирувань. Перевірте фільтри або повторіть.') });
     }
-  }, [pendingMarketPreset, readyCoins, error, snapshot, language, minuteReady, minuteError, onActivePresetChange, onPresetChosen]);
+  }, [pendingMarketPreset, readyCoins, error, snapshot, language, onActivePresetChange, onPresetChosen]);
 
   // Favorite keys include an exact exchange/market/symbol identity.
   // Index once per quote refresh instead of scanning the full exchange universe
