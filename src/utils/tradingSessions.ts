@@ -49,6 +49,12 @@ const POPULAR_TIME_ZONES: Record<string, string> = {
   'Asia/Yakutsk': 'Якутськ', 'Asia/Vladivostok': 'Владивосток',
   'Asia/Magadan': 'Магадан', 'Asia/Kamchatka': 'Камчатка',
   'Asia/Anadyr': 'Анадир', 'Asia/Sakhalin': 'Сахалін',
+  'Europe/Kirov': 'Кіров', 'Europe/Volgograd': 'Волгоград',
+  'Europe/Astrakhan': 'Астрахань', 'Europe/Saratov': 'Саратов',
+  'Europe/Ulyanovsk': 'Ульяновськ', 'Asia/Barnaul': 'Барнаул',
+  'Asia/Tomsk': 'Томськ', 'Asia/Novokuznetsk': 'Новокузнецьк',
+  'Asia/Chita': 'Чита', 'Asia/Khandyga': 'Хандига',
+  'Asia/Ust-Nera': 'Усть-Нера', 'Asia/Srednekolymsk': 'Середньоколимськ',
 };
 
 const TIME_ZONE_CITY_TRANSLATIONS: Record<string, { en: string; ru: string; pl: string }> = {
@@ -82,6 +88,18 @@ const TIME_ZONE_CITY_TRANSLATIONS: Record<string, { en: string; ru: string; pl: 
   'Камчатка': { en: 'Kamchatka', ru: 'Камчатка', pl: 'Kamczatka' },
   'Анадир': { en: 'Anadyr', ru: 'Анадырь', pl: 'Anadyr' },
   'Сахалін': { en: 'Sakhalin', ru: 'Сахалин', pl: 'Sachalin' },
+  'Кіров': { en: 'Kirov', ru: 'Киров', pl: 'Kirow' },
+  'Волгоград': { en: 'Volgograd', ru: 'Волгоград', pl: 'Wołgograd' },
+  'Астрахань': { en: 'Astrakhan', ru: 'Астрахань', pl: 'Astrachań' },
+  'Саратов': { en: 'Saratov', ru: 'Саратов', pl: 'Saratów' },
+  'Ульяновськ': { en: 'Ulyanovsk', ru: 'Ульяновск', pl: 'Uljanowsk' },
+  'Барнаул': { en: 'Barnaul', ru: 'Барнаул', pl: 'Barnauł' },
+  'Томськ': { en: 'Tomsk', ru: 'Томск', pl: 'Tomsk' },
+  'Новокузнецьк': { en: 'Novokuznetsk', ru: 'Новокузнецк', pl: 'Nowokuźnieck' },
+  'Чита': { en: 'Chita', ru: 'Чита', pl: 'Czyta' },
+  'Хандига': { en: 'Khandyga', ru: 'Хандыга', pl: 'Chandyga' },
+  'Усть-Нера': { en: 'Ust-Nera', ru: 'Усть-Нера', pl: 'Ust-Niera' },
+  'Середньоколимськ': { en: 'Srednekolymsk', ru: 'Среднеколымск', pl: 'Sredniekołymsk' },
 };
 
 export function getTimeZoneChoices(selected?: string, language: 'uk' | 'en' | 'ru' | 'pl' = 'uk'): Array<{ value: string; label: string }> {
