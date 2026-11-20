@@ -493,6 +493,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     };
     const dismissOutside = (event: Event) => {
       const target = event.target as Node | null;
+      // The custom-preset draft reuses the existing + coin picker in a portal.
+      // It is visually outside the menu, but must not dismiss the draft.
+      if (target instanceof Element && target.closest('[data-terminal-preset-picker]')) return;
       if (target && !presetsMenuRef.current?.contains(target) && !presetsButtonRef.current?.contains(target)) {
         setShowCoinPresets(false);
         if (event.type === 'pointerdown') presetsButtonRef.current?.focus();
@@ -1567,6 +1570,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         <div className="min-h-0 overflow-y-auto">
           <TerminalPresetPanel
             blocks={blocks} watchlist={localWatchlist} presets={customPresets}
+            pickerCoins={coins} pickerFormationCoins={formationCoins}
             formationCoins={formationPresetCoins}
             onRequestFormationScan={onRequestFormationScan}
             formationScanStatus={formationScanStatus}
