@@ -41,25 +41,33 @@ test('AV preset ranks all valid spot/futures coins by average USDT volume per mi
   assert.equal(coins[0].symbol, 'SOLUSDT');
 });
 
-test('AV 1m does not reject a tradable market solely for missing 24h change', () => {
-  const candidate = quote('NEWUSDT', 1_440_000, { change24h: Number.NaN, volume1mUsd: 220_000 });
+test('AV 1m derives the mean from 24h quote turnover and does not require last-minute candles or 24h price change', () => {
+  const candidate = quote('NEWUSDT', 451_106_979.95045, { change24h: Number.NaN, volume1mUsd: 0 });
   const all = { exchange: 'all', marketType: 'all' } as const;
-  assert.deepEqual(selectMarketPresetCoins([candidate], 'av_1m', all, 10).map(c => c.symbol), ['NEWUSDT']);
+  const qualified = selectMarketPresetCoins([candidate], 'av_1m', all, 10);
+  assert.deepEqual(qualified.map(c => c.symbol), ['NEWUSDT']);
+  assert.ok(Math.abs(qualified[0].volumeUsd / 1440 - 313_268.736) < 0.01);
   assert.deepEqual(selectMarketPresetCoins([candidate], 'top_gainers', all, 10), []);
+  assert.deepEqual(selectMarketPresetCoins([quote('LOWUSDT', 287_999_999, {volume1mUsd: 999_999})], 'av_1m', all, 10), []);
+  assert.deepEqual(selectMarketPresetCoins([quote('EDGEUSDT', 288_000_000)], 'av_1m', all, 10).map(c => c.symbol), ['EDGEUSDT']);
 });
 
-test('empty market feed triggers a shared quote retry, not a false no-coins conclusion', () => {
+test('AV 1m relies on the full existing market quote snapshot and a shared quote retry', () => {
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   const panel = readFileSync(new URL('../src/components/terminal/TerminalPresetPanel.tsx', import.meta.url), 'utf8');
   const loader = readFileSync(new URL('../src/utils/marketCoinLoader.ts', import.meta.url), 'utf8');
   assert.match(loader, /Array\.isArray\(result\.data\) && result\.data\.length > 0/);
+  assert.match(page, /loadMarketCoins\(\{ exchange: 'all', marketType: 'all' \}, controller\.signal\)/);
   assert.match(panel, /const \[pendingMarketPreset, setPendingMarketPreset\]/);
   assert.match(panel, /pendingQuoteSnapshot\.current = snapshot/);
   assert.match(panel, /onRequestMarketRefresh\?\.\(\)/);
   assert.match(panel, /applyRef\.current\(matched, pendingMarketPreset\)/);
+  assert.match(panel, /середнім AV 1m від 200 000 USDT/);
   assert.match(page, /onRequestMarketRefresh=\{\(\) => requestMarketRefreshRef\.current\?\.\(true\)\}/);
   assert.match(page, /exchange === 'binance' \|\| exchange === 'bybit' \? exchange : 'all'/);
   assert.match(page, /marketType === 'spot' \|\| marketType === 'futures' \? marketType : 'all'/);
+  // No extra minute-candle scan just to rank the average volume.
+  assert.doesNotMatch(page, /api\/market\/av1m\/top|minuteRequested|setMinuteRows|onRequestMinuteRefresh/);
 });
 
 test('AV shares existing quote refresh/preset pagination and does not trigger separate market-wide scans', () => {
@@ -67,7 +75,7 @@ test('AV shares existing quote refresh/preset pagination and does not trigger se
   const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   assert.match(panel, /MARKET_PRESETS\.map\(preset => preset\.id\)/);
   assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
-  assert.match(terminal, /applyPresetPage\(selected, presetPageRef\.current\)/);
+  assert.match(terminal, /applyPresetPage\(selected, presetPageRef\.current, preset === 'av_1m' \? 10 : coinPresetLimit\)/);
 });
 
 test('HookChart AV footer uses only cached 24h quotes or a full day of existing candles', () => {
@@ -89,10 +97,10 @@ test('HookChart AV footer uses only cached 24h quotes or a full day of existing 
   assert.match(server, /volume24hUsd = marketTickerFeed\.getCached24hVolumeUsd/);
 });
 
-test('AV 1m ranks exactly the top ten markets by cached average minute turnover', () => {
+test('AV 1m ranks top ten qualifying markets by full-universe 24h/1440 average', () => {
   const all = { exchange: 'all', marketType: 'all' } as const;
   const coins = Array.from({ length: 16 }, (_, index) =>
-    quote(`C${index}USDT`, (index + 1) * 1_440_000, { volume1mUsd: (index + 2) * 25_000 }));
+    quote(`C${index}USDT`, (index + 1) * 144_000_000, { volume1mUsd: index === 15 ? 0 : 500_000 }));
   coins.push(quote('BROKENUSDT', Number.NaN), quote('MISSINGUSDT', 0), quote('NEGUSDT', -1));
   const original = [...coins];
   assert.ok(MARKET_PRESETS.some(preset => preset.id === 'av_1m' && preset.label === 'AV 1m TOP 10'));
@@ -101,33 +109,37 @@ test('AV 1m ranks exactly the top ten markets by cached average minute turnover'
   assert.deepEqual(ranked.map(coin => coin.symbol),
     ['C15USDT','C14USDT','C13USDT','C12USDT','C11USDT',
       'C10USDT','C9USDT','C8USDT','C7USDT','C6USDT']);
-  assert.equal(ranked[0].volume1mUsd, 425_000);
-  assert.equal(ranked[9].volume1mUsd, 200_000);
+  assert.equal(ranked[0].volumeUsd / 1440, 1_600_000);
+  assert.equal(ranked[9].volumeUsd / 1440, 700_000);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', all, 4), ranked.slice(0, 4));
   // Legacy internal AV sorting still operates without exposing an AV button.
   assert.equal(selectMarketPresetCoins(coins, 'av', all, Number.POSITIVE_INFINITY).length, 17);
   assert.deepEqual(coins, original);
 });
 
-test('AV 1m honors exact exchange and Spot/Futures filters, deduplicates and uses stable ordering', () => {
+test('AV 1m honors Binance/Bybit and Spot/Futures selection and deduplicates', () => {
   const coins = [
-    quote('BTCUSDT', 14_400_000, { volume1mUsd: 210_000 }),
-    quote('BTCUSDT', 999_000_000, { volume1mUsd: 990_000 }), // duplicate market must not replace its first authoritative quote
-    quote('BTCUSDT', 43_200_000, { marketType: 'spot', volume1mUsd: 220_000 }),
-    quote('ETHUSDT', 72_000_000, { exchange: 'bybit', volume1mUsd: 340_000 }),
-    quote('SOLUSDT', 72_000_000, { exchange: 'bybit', marketType: 'spot', volume1mUsd: 300_000 }),
+    quote('BTCUSDT', 432_000_000),
+    quote('BTCUSDT', 9_990_000_000), // duplicated market must not replace its first authoritative quote
+    quote('BTCUSDT', 576_000_000, { marketType: 'spot' }),
+    quote('ETHUSDT', 720_000_000, { exchange: 'bybit' }),
+    quote('SOLUSDT', 648_000_000, { exchange: 'bybit', marketType: 'spot' }),
+    quote('AKEUSDT', 451_106_979.95045),
     quote('XRPUSDT', 0, { exchange: 'bybit', marketType: 'spot' }),
   ];
   const all = { exchange: 'all', marketType: 'all' } as const;
   const ranked = selectMarketPresetCoins(coins, 'av_1m', all, Number.POSITIVE_INFINITY);
   assert.deepEqual(ranked.map(x => [x.symbol, x.exchange, x.marketType]), [
     ['ETHUSDT', 'bybit', 'futures'], ['SOLUSDT', 'bybit', 'spot'],
-    ['BTCUSDT', 'binance', 'spot'], ['BTCUSDT', 'binance', 'futures'],
+    ['BTCUSDT', 'binance', 'spot'], ['AKEUSDT', 'binance', 'futures'],
+    ['BTCUSDT', 'binance', 'futures'],
   ]);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'binance', marketType: 'spot' }, 10)
     .map(x => x.symbol), ['BTCUSDT']);
   assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'bybit', marketType: 'futures' }, 10)
     .map(x => x.symbol), ['ETHUSDT']);
+  assert.deepEqual(selectMarketPresetCoins(coins, 'av_1m', { exchange: 'binance', marketType: 'futures' }, 10)
+    .map(x => x.symbol), ['AKEUSDT', 'BTCUSDT']);
 });
 
 test('AV 1m shows all ten terminal charts even when ordinary presets page at four', () => {
