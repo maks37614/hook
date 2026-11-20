@@ -618,11 +618,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const drag=useRef<any>(null),geom=useRef<any>(null),pointers=useRef(new Map<number,{x:number,y:number}>()),lastTap=useRef(0),mouseRef=useRef<{x:number,y:number}|null>(null),drawRef=useRef<()=>void>(()=>{}),interactionDrawRef=useRef<()=>void>(()=>{});
  const frames=useRef<ReturnType<typeof createChartFrameScheduler>|null>(null);
  const chartOnScreen=useRef(true);
+ // Captured chart gestures keep their original canvas position until the page
+ // scrolls or the chart resizes, avoiding a layout read on every pointermove.
+ const activePointerRect=useRef<DOMRect|null>(null);
  if(!frames.current)frames.current=createChartFrameScheduler({scene:()=>{const start=chartDiagnosticsEnabled()?performance.now():0;drawRef.current();if(start)recordChartPaint(performance.now()-start)},interaction:()=>interactionDrawRef.current()});
  const resetInteraction=()=>{
    const owner=box.current,ids=[...pointers.current.keys()];
    cancelTouchHold();magnifierPointer.current=null;magnifierPriceDrag.current=null;magnifierZoom.current=TOUCH_MAGNIFIER_DEFAULT_ZOOM;touchCursorVisible.current=false;suppressTouchClick.current=false;
-   mouseRef.current=null;transient.current=null;hoveredMeasurement.current=null;drag.current=null;geom.current=null;lastTap.current=0;pointers.current.clear();
+   mouseRef.current=null;transient.current=null;hoveredMeasurement.current=null;drag.current=null;geom.current=null;lastTap.current=0;pointers.current.clear();activePointerRect.current=null;
    if(box.current?.style)box.current.style.cursor='';
    // Clear ownership before releasing capture: a lost-capture event must not
    // revive an interaction belonging to a previous coin, timeframe or tool.
@@ -866,9 +869,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  useEffect(()=>{
    const c=ref.current;
    if(!c)return;
-   const ro=new ResizeObserver(()=>scheduleDraw());
+   const invalidatePointerRect=()=>{activePointerRect.current=null};
+   const ro=new ResizeObserver(()=>{invalidatePointerRect();scheduleDraw()});
    const onVisible=()=>{if(document.visibilityState==='visible'&&chartOnScreen.current)frames.current?.flush()};
-   const onResize=()=>scheduleDraw();
+   const onResize=()=>{invalidatePointerRect();scheduleDraw()};
    let intersection:IntersectionObserver|null=null;
    if(typeof IntersectionObserver!=='undefined'){
      intersection=new IntersectionObserver(entries=>{
@@ -883,12 +887,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    ro.observe(c);
    document.addEventListener('visibilitychange',onVisible);
    window.addEventListener('resize',onResize,{passive:true});
+   window.addEventListener('scroll',invalidatePointerRect,true);
    window.visualViewport?.addEventListener('resize',onResize,{passive:true});
    scheduleDraw();
    return()=>{
      intersection?.disconnect();ro.disconnect();
      document.removeEventListener('visibilitychange',onVisible);
      window.removeEventListener('resize',onResize);
+     window.removeEventListener('scroll',invalidatePointerRect,true);
      window.visualViewport?.removeEventListener('resize',onResize);
      frames.current?.cancel();
    };
@@ -1484,10 +1490,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  },[]);
  const point=(e:React.PointerEvent<HTMLElement>)=>{
    if(!candles.length)return null;
-   const r=ref.current?.getBoundingClientRect();if(!r)return null;
+   // Hover must follow layout changes immediately; captured drags use their
+   // pointer-down rectangle, invalidated by scroll/resize above.
+   const r=(pointers.current.has(e.pointerId)?activePointerRect.current:null)
+     ||ref.current?.getBoundingClientRect();if(!r)return null;
    const cached=geom.current,g=cached&&cached.r.width===r.width&&cached.r.height===r.height?cached:geometry();
    if(!g)return null;
-   return{g,x:e.clientX-r.left,y:e.clientY-r.top};
+   return{g,x:e.clientX-r.left,y:e.clientY-r.top,rect:r};
  };
  const handlePointerDown=(e:React.PointerEvent<HTMLElement>)=>{
    if(isChartControlTarget(e.target))return;
@@ -1497,6 +1506,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    terminalNavigation.current=true;
    if(terminalMode||e.pointerType==='touch'||e.pointerType==='pen')e.preventDefault();
    e.currentTarget.setPointerCapture(e.pointerId);
+   activePointerRect.current=z.rect;
    // A second finger on the right price scale adjusts ONLY the active lens.
    // Keep the first finger's crosshair and the main chart viewport untouched.
    if(e.pointerType==='touch'&&magnifierPointer.current!==null
@@ -1784,6 +1794,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    pointers.current.delete(e.pointerId);
    if(e.currentTarget.hasPointerCapture?.(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);
    if(!pointers.current.size){
+     activePointerRect.current=null;
      drag.current=null;
      if(e.pointerType==='touch'||e.pointerType==='pen'){
        touchCursorVisible.current=false;
