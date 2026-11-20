@@ -45,3 +45,23 @@ test('respects memory cap after a genuine reconnect repair', () => {
   const result = mergeMissingExchangeKlines(displayed, recovered, 1000, 1180, 3);
   assert.deepEqual(result.map(c => c.time), [1060, 1120, 1180]);
 });
+
+test('reconnect corrects a frozen pre-outage candle even with adjacent bar timestamps', () => {
+  const stale = bar(1000, 0.27, 2);
+  const live = bar(1060, 0.275, 1);
+  const finalized = bar(1000, 0.268, 8);
+  const displayed = [stale, live];
+  const recovered = [finalized, bar(1060, 0.272, 0.5)];
+  const result = mergeMissingExchangeKlines(displayed, recovered, 1000, 1060);
+  assert.equal(result.length, 2, 'no artificial candles between adjacent bars');
+  assert.strictEqual(result[0], finalized, 'closed candle uses final exchange data');
+  assert.strictEqual(result[1], live, 'new live candle cannot be overwritten');
+});
+
+test('lower-volume stale history must not roll back an already newer closed candle', () => {
+  const verified = bar(1000, 0.27, 20);
+  const live = bar(1060, 0.275, 1);
+  const displayed = [verified, live];
+  const result = mergeMissingExchangeKlines(displayed, [bar(1000, 0.26, 2)], 1000, 1060);
+  assert.strictEqual(result, displayed);
+});
