@@ -116,11 +116,12 @@ export function ScreenerGuide({ language, navigationOnly = false, onClose }: {
       window.visualViewport?.removeEventListener('resize', schedule);
       window.visualViewport?.removeEventListener('scroll', schedule);
     };
-  }, [step?.key, step?.selector]);
+  }, [step]);
 
+  const hasHighlight = Boolean(highlight);
   useEffect(() => {
-    if (highlight) cardRef.current?.focus({ preventScroll: true });
-  }, [!!highlight]);
+    if (hasHighlight) cardRef.current?.focus({ preventScroll: true });
+  }, [hasHighlight]);
 
   if (!step || !highlight || typeof document === 'undefined') return null;
   const info = copy.steps[step.key];

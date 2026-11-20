@@ -188,13 +188,15 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
     : visibleDensities;
   const collapsedDensities = shownDensities.slice(0, showAllDensityLevels ? 50 : 4);
 
+  const detailedCoinId = detailedCoin?.id ?? null;
+  const editingCoinId = editingCoin?.id ?? null;
   useEffect(() => {
-    if (detailedCoin && !coins.some(coin => coin.id === detailedCoin.id)) setDetailedCoin(null);
-    if (editingCoin && !coins.some(coin => coin.id === editingCoin.id)) {
+    if (detailedCoinId && !coins.some(coin => coin.id === detailedCoinId)) setDetailedCoin(null);
+    if (editingCoinId && !coins.some(coin => coin.id === editingCoinId)) {
       setEditingCoin(null);
       setIsAddModalOpen(false);
     }
-  }, [coins, detailedCoin?.id, editingCoin?.id]);
+  }, [coins, detailedCoinId, editingCoinId]);
 
   // iOS Safari's on-screen keyboard changes the *visual* viewport without
   // necessarily shrinking CSS vh. Keep the add/edit modal inside the visible
@@ -257,7 +259,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
   // Shared exchange quotes are already cached server-side; this only returns
   // eight matching symbols rather than shipping the full trading universe.
   useEffect(() => {
-    if (!isAddModalOpen || editingCoin || !symbolSearchOpen || !searchText) return;
+    if (!isAddModalOpen || editingCoinId || !symbolSearchOpen || !searchText) return;
     const controller = new AbortController();
     setSymbolSearch({ key: symbolSearchKey, data: [], loading: true, unavailable: false });
     const timeout = window.setTimeout(async () => {
@@ -282,7 +284,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
       }
     }, 300);
     return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [isAddModalOpen, editingCoin?.id, symbolSearchOpen, searchText, selectedExchange, selectedMarketType, symbolSearchKey]);
+  }, [isAddModalOpen, editingCoinId, symbolSearchOpen, searchText, selectedExchange, selectedMarketType, symbolSearchKey]);
 
   // Close suggestions when the user switches to other controls. Keep taps
   // inside the list intact (a blur on the input alone would swallow iOS taps).
@@ -528,7 +530,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
   };
 
   useEffect(() => {
-    if (!detailedCoin) return;
+    if (!detailedCoinId) return;
     let cancelled = false;
     let inFlight = false;
     setLoadingWorkerData(true);
@@ -537,7 +539,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
       if (inFlight) return;
       inFlight = true;
       try {
-        const snapshot = await getWorkerSnapshot(detailedCoin.id);
+        const snapshot = await getWorkerSnapshot(detailedCoinId);
         if (!cancelled) {
           setWorkerData(snapshot);
           setWorkerFetchedAt(snapshot?.clientRequestedAt || Date.now());
@@ -551,7 +553,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
     void refreshWorker();
     const timer = setInterval(refreshWorker, 2000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [detailedCoin?.id, getWorkerSnapshot]);
+  }, [detailedCoinId, getWorkerSnapshot]);
 
   const handleRunCausalBacktest = async (coin: SurveillanceCoin) => {
     setLoadingBacktest(true);

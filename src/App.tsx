@@ -430,14 +430,18 @@ export default function App() {
   }, [earlyMode, activePage, chartPageActive, earlyFilters.exchange, earlyFilters.marketType, earlyFilters.timeframe,
     earlyFilters.minVolumeUsd, earlyRefreshNonce]);
 
+  // A real status/finish transition is required to arm the 5-minute refresh;
+  // replacing scan results during a sweep must not restart this timeout.
+  const completedEarlyScanStatus = fullEarlyScan?.status;
+  const completedEarlyScanAt = fullEarlyScan?.finishedAt;
   // Refresh a completed scan at a lower cadence; never restart or reset a
   // still-running exhaustive sweep, which can span many exchange API batches.
   useEffect(() => {
-    if (!shouldRunEarlyScan(activePage, earlyMode, chartPageActive) || !fullEarlyScan
-      || !['completed', 'partial', 'failed'].includes(fullEarlyScan.status)) return;
+    if (!shouldRunEarlyScan(activePage, earlyMode, chartPageActive) || !completedEarlyScanStatus
+      || !['completed', 'partial', 'failed'].includes(completedEarlyScanStatus)) return;
     const timer = setTimeout(refreshFullEarlyScan, 5 * 60_000);
     return () => clearTimeout(timer);
-  }, [chartPageActive, activePage, earlyMode, fullEarlyScan?.status, fullEarlyScan?.finishedAt, refreshFullEarlyScan]);
+  }, [chartPageActive, activePage, earlyMode, completedEarlyScanStatus, completedEarlyScanAt, refreshFullEarlyScan]);
 
   const handleOpenAuthModal = useCallback((mode: 'signin' | 'signup' = 'signin', reason: AuthPromptReason = null) => {
     setAuthInitialMode(mode);
@@ -460,7 +464,7 @@ export default function App() {
         setActivePage((prev) => (prev === 'pc' ? prev : 'pc'));
         return;
       }
-      if (!user) {
+      if (!user?.uid) {
         setActivePage((prev) => (prev === 'screener' ? prev : 'screener'));
         if (hash && hash !== '#screener' && hash !== '') {
           handleOpenAuthModal('signin', 'general');
@@ -508,8 +512,9 @@ export default function App() {
   const watchlistCount = useMemo(() => resolveWatchlistEntries(watchlist, coins).length, [watchlist, coins]);
 
   // Synchronize watchlist with current logged-in user profile & user-scoped storage (strictly isolated, guests see 0)
+  const watchlistOwnerUid = user?.uid;
   useEffect(() => {
-    if (!user) {
+    if (!watchlistOwnerUid) {
       setWatchlist((prev) => (prev.length === 0 ? prev : []));
       return;
     }
@@ -521,7 +526,7 @@ export default function App() {
           return prev;
         }
         try {
-          localStorage.setItem(`crypto_screener_watchlist_${user.uid}`, JSON.stringify(next));
+          localStorage.setItem(`crypto_screener_watchlist_${watchlistOwnerUid}`, JSON.stringify(next));
         } catch {}
         return next;
       });
@@ -529,7 +534,7 @@ export default function App() {
     }
 
     try {
-      const userKey = `crypto_screener_watchlist_${user.uid}`;
+      const userKey = `crypto_screener_watchlist_${watchlistOwnerUid}`;
       const saved = localStorage.getItem(userKey);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -547,10 +552,10 @@ export default function App() {
     } catch {}
 
     setWatchlist((prev) => (prev.length === 0 ? prev : []));
-  }, [user?.uid, profile?.watchlist]);
+  }, [watchlistOwnerUid, profile?.watchlist]);
 
   useEffect(() => {
-    if (!user) {
+    if (!watchlistOwnerUid) {
       setWatchlistFolders((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       return;
     }
@@ -567,7 +572,7 @@ export default function App() {
     }
 
     try {
-      const saved = localStorage.getItem(`crypto_screener_watchlist_folders_${user.uid}`);
+      const saved = localStorage.getItem(`crypto_screener_watchlist_folders_${watchlistOwnerUid}`);
       const parsed = saved ? JSON.parse(saved) : {};
       setWatchlistFolders((prev) => {
         if (JSON.stringify(prev) === JSON.stringify(parsed)) {
@@ -578,7 +583,7 @@ export default function App() {
     } catch {
       setWatchlistFolders((prev) => (Object.keys(prev).length === 0 ? prev : {}));
     }
-  }, [user?.uid, profile?.watchlistFolders]);
+  }, [watchlistOwnerUid, profile?.watchlistFolders]);
 
   const [selectedPair, setSelectedPair] = useState<{
     coin: ScannedCoin;
@@ -605,8 +610,10 @@ export default function App() {
     : terminalLinkSettings.provider === 'metascalp' ? metaScalpSettings.binding : '—';
   const lastTerminalCommand = useRef<{ key: string; at: number }>({ key: '', at: 0 });
 
+  const metaScalpProfileRef = useRef(profile);
+  metaScalpProfileRef.current = profile;
   useEffect(() => {
-    const next = getUserMetaScalpSettings(user?.uid, profile);
+    const next = getUserMetaScalpSettings(user?.uid, metaScalpProfileRef.current);
     setMetaScalpSettingsState((prev) => {
       if (
         prev.userId === user?.uid &&
@@ -699,9 +706,12 @@ export default function App() {
     [notificationSettings]
   );
 
-  // Hide an already-visible price toast as soon as notifications are disabled.
+  // Hide an already-visible price toast as soon as notifications are disabled,
+  // without changing the effect's intentionally scalar settings dependencies.
+  const latestNotificationSettingsRef = useRef(notificationSettings);
+  latestNotificationSettingsRef.current = notificationSettings;
   useEffect(() => {
-    if (!notificationEnabled(notificationSettings, 'price')) {
+    if (!notificationEnabled(latestNotificationSettingsRef.current, 'price')) {
       setAlertToast(null);
     }
   }, [notificationSettings.optedIn, notificationSettings.enabled, notificationSettings.price]);
@@ -1023,14 +1033,23 @@ export default function App() {
   const chartRouteKey = chartRoute ? chartPageHash(chartRoute) : null;
   // Archive hydration must never reopen an ordinary chart or interrupt its live feed.
   const routeArchives = chartRoute?.kind === 'archive' && !chartRoute.archiveId ? archivedFormations : null;
+  // Route lookups run only on a real URL/owner change, not on every quote
+  // update. The current snapshots are read when that lookup actually begins.
+  const chartRouteRef = useRef(chartRoute);
+  chartRouteRef.current = chartRoute;
+  const chartRouteUserRef = useRef(user);
+  chartRouteUserRef.current = user;
+  const chartRouteCoinsRef = useRef(coins);
+  chartRouteCoinsRef.current = coins;
   // Restore from the exact account-scoped selection first. When a user opens
   // a copied chart URL in a new browser, resolve just the instrument quotes;
   // do NOT run the entire formation screener to display the chart.
   useEffect(() => {
-    if (!chartRoute || !user || authLoading) return;
-    const route = chartRoute;
+    const route = chartRouteRef.current;
+    const routeUser = chartRouteUserRef.current;
+    if (!route || !routeUser || authLoading) return;
     let stored: ChartPageSnapshot | null = null;
-    try { stored = readChartPageSnapshot(window.sessionStorage, user.uid, route); } catch {}
+    try { stored = readChartPageSnapshot(window.sessionStorage, routeUser.uid, route); } catch {}
     if (route.kind === 'archive' && !stored) {
       const archived = routeArchives?.find(item => item.formation.id === route.formationId &&
         item.symbol.toUpperCase() === route.symbol && item.exchange === route.exchange &&
@@ -1051,12 +1070,12 @@ export default function App() {
             if (!response.ok) throw new Error('Archive detail unavailable');
             const payload = await response.json();
             const full = payload.item as ArchivedFormation | undefined;
-            if (!full || full.id !== recordId || full.userId !== user.uid ||
+            if (!full || full.id !== recordId || full.userId !== routeUser.uid ||
                 full.symbol.toUpperCase() !== route.symbol || full.exchange !== route.exchange ||
                 full.marketType !== route.marketType ||
                 (route.formationId && full.formation.id !== route.formationId)) throw new Error('Invalid archive');
             if (controller.signal.aborted) return;
-            const currentCoin = coins.find(item => item.symbol === route.symbol &&
+            const currentCoin = chartRouteCoinsRef.current.find(item => item.symbol === route.symbol &&
               item.exchange === route.exchange && item.marketType === route.marketType);
             const fallback: ScannedCoin = currentCoin ?? {
               symbol: full.symbol, baseAsset: full.baseAsset, quoteAsset: full.quoteAsset,
@@ -1326,6 +1345,10 @@ export default function App() {
     setIsLoading(false);
   }, [chartPageActive]);
 
+  // Read live filter values without restarting the 60-second timer merely
+  // because a parent recreated the filters object with equivalent values.
+  const scanFiltersRef = useRef(filters);
+  scanFiltersRef.current = filters;
   // Only the visible Screener/regular Formations page runs a standard scan.
   // Terminal, Replay, 24/7 Surveillance and the full W/M mode never start
   // redundant formation scans just because each Desktop pane loads the SPA.
@@ -1335,7 +1358,7 @@ export default function App() {
     const refresh = (initial = false) => {
       if (document.hidden || (!initial && Date.now() - lastRequestedAt < 50_000)) return;
       lastRequestedAt = Date.now();
-      void fetchScreenerData(filters.timeframe, filters.exchange, filters.marketType);
+      void fetchScreenerData(scanFiltersRef.current.timeframe, scanFiltersRef.current.exchange, scanFiltersRef.current.marketType);
     };
     refresh(true);
     const interval = setInterval(() => refresh(), 60_000);
@@ -1420,7 +1443,7 @@ export default function App() {
   const projectedEarlyCoins = useMemo(() => projectUserCoins(fullEarlyScan?.data ?? [], constructorSettings), [fullEarlyScan?.data, constructorSettings]);
   const activeEarlyCandidate = useMemo(() => selectedEarly
     ? resolveEarlyTpSl(selectedEarly.candidate, constructorSettings, selectedEarly.coin.symbol) : null,
-    [selectedEarly?.candidate, selectedEarly?.coin.symbol, constructorSettings]);
+    [selectedEarly, constructorSettings]);
   // Details follow the current user profile, including immediate AUTO restoration.
   // Archived historical snapshots are intentionally immutable.
   const activeSelectedPair = useMemo(() => {

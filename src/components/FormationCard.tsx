@@ -93,7 +93,7 @@ export const FormationCard: React.FC<FormationCardProps> = ({
     if (!isChartExpanded && Number.isFinite(coin.currentPrice) && coin.currentPrice > 0) {
       setLivePrice(coin.currentPrice);
     }
-  }, [coin.currentPrice, coin.exchange, coin.marketType, coin.symbol]);
+  }, [coin.currentPrice, coin.exchange, coin.marketType, coin.symbol, isChartExpanded]);
   const [isConfluenceExpanded, setIsConfluenceExpanded] = useState<boolean>(false);
 
   const selectFormation = (pattern: DetectedFormation) => {

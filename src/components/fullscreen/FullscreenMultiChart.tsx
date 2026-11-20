@@ -62,12 +62,15 @@ export function FullscreenMultiChart({
   const handledFavoriteId = useRef<number | null>(null);
   const handledMarketRequestId = useRef<number | null>(null);
   const primaryKey = fullscreenMarketKey(primaryMarket);
+  // Market identity, not each new quote object, governs the additional slots.
+  const primaryMarketRef = useRef(primaryMarket);
+  primaryMarketRef.current = primaryMarket;
   const count = blocks.length + 1;
 
   // The favorite drawer is controlled by the page header, but its slot choices
   // must always mirror the real chart order, including drag-and-drop changes.
   useEffect(() => {
-    onSlotsChange?.(fullscreenChartSlots(primaryMarket, blocks, chartOrder));
+    onSlotsChange?.(fullscreenChartSlots(primaryMarketRef.current, blocks, chartOrder));
   }, [onSlotsChange, primaryKey, blocks, chartOrder]);
 
   // Avoid a second connection to the primary market when the main chart changes.
@@ -77,11 +80,11 @@ export function FullscreenMultiChart({
   }, [primaryKey]);
 
   const add = useCallback((selected: FullscreenSelection, tf: Timeframe, formationId?: string) => {
-    setBlocks(previous => appendFullscreenChart(previous, primaryMarket, selected, tf, formationId));
+    setBlocks(previous => appendFullscreenChart(previous, primaryMarketRef.current, selected, tf, formationId));
     setDockExpanded(true);
     setPickerOpen(false);
     setFeedback(null);
-  }, [primaryKey]);
+  }, []);
 
   // A favorite replaces only its selected chart without starting a duplicate
   // exchange subscription; adding a new chart remains exclusive to the + picker.
@@ -97,7 +100,7 @@ export function FullscreenMultiChart({
         setFeedback(label.duplicate);
         return;
       }
-      setBlocks(previous => replaceFullscreenChart(previous, primaryMarket, targetId, coin));
+      setBlocks(previous => replaceFullscreenChart(previous, primaryMarketRef.current, targetId, coin));
       setFeedback(null);
       return;
     }
@@ -111,7 +114,7 @@ export function FullscreenMultiChart({
       setDockExpanded(true);
       return;
     }
-    setBlocks(previous => appendFullscreenChart(previous, primaryMarket, coin, primaryTimeframe as Timeframe));
+    setBlocks(previous => appendFullscreenChart(previous, primaryMarketRef.current, coin, primaryTimeframe as Timeframe));
     setDockExpanded(true);
     setFeedback(null);
   }, [favoriteToAdd, primaryKey, blocks, count, primaryTimeframe, label.duplicate, label.limit]);
@@ -126,14 +129,14 @@ export function FullscreenMultiChart({
     if (!current) return;
     const nextMarket = { ...current, exchange, marketType };
     const collision = fullscreenMarketCollision(
-      fullscreenChartSlots(primaryMarket, blocks, chartOrder), targetId, nextMarket,
+      fullscreenChartSlots(primaryMarketRef.current, blocks, chartOrder), targetId, nextMarket,
     );
     if (collision) {
       onActiveSlotChange?.(collision.id);
       setFeedback(label.duplicate);
       return;
     }
-    setBlocks(previous => updateFullscreenChart(previous, primaryMarket, targetId,
+    setBlocks(previous => updateFullscreenChart(previous, primaryMarketRef.current, targetId,
       { exchange, marketType, formationId: undefined }));
     setFeedback(null);
   }, [marketChangeRequest, primaryKey, blocks, chartOrder, onActiveSlotChange, label.duplicate]);
@@ -144,8 +147,8 @@ export function FullscreenMultiChart({
     setFeedback(null);
   }, [activeSlotId, onActiveSlotChange]);
   const update = useCallback((id: string, patch: Partial<TerminalChartBlock>) => {
-    setBlocks(previous => updateFullscreenChart(previous, primaryMarket, id, patch));
-  }, [primaryKey]);
+    setBlocks(previous => updateFullscreenChart(previous, primaryMarketRef.current, id, patch));
+  }, []);
 
   // Reset the active selection when a secondary chart disappears.
   useEffect(() => {

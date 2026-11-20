@@ -258,6 +258,7 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   const previousInstrumentRef = useRef(instrumentKey);
   const activeInstrumentRef = useRef(instrumentKey);
   activeInstrumentRef.current = instrumentKey;
+  const quotedPrice = coin?.currentPrice;
   useEffect(() => {
     if (previousInstrumentRef.current === instrumentKey) return;
     previousInstrumentRef.current = instrumentKey;
@@ -265,10 +266,10 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     if (headerPriceTimerRef.current !== null) clearTimeout(headerPriceTimerRef.current);
     headerPriceTimerRef.current = null;
     pendingHeaderPriceRef.current = null;
-    const nextPrice = Number.isFinite(coin?.currentPrice) && (coin?.currentPrice ?? 0) > 0 ? coin!.currentPrice : null;
+    const nextPrice = Number.isFinite(quotedPrice) && (quotedPrice ?? 0) > 0 ? quotedPrice! : null;
     setCurrentPrice(nextPrice);
     setLivePrice(nextPrice ?? 0);
-  }, [instrumentKey, coin?.currentPrice]);
+  }, [instrumentKey, quotedPrice]);
   const handleChartPrice = useCallback((price: number) => {
     // Late data from an unmounted/replaced chart must not update the next coin.
     if (activeInstrumentRef.current !== instrumentKey) return;
@@ -366,6 +367,9 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
   }, [isCoinPickerOpen, subscribeAllCoins]);
 
   const filteredCoins = useMemo(() => {
+    // Shared catalogue revisions must invalidate the opened picker even when
+    // getAllCoins is a stable function identity.
+    void coinListVersion;
     if (!isCoinPickerOpen) return [];
     const available = getAllCoins?.() ?? allCoins ?? [];
     if (!coinSearch.trim()) return available.slice(0, 30);

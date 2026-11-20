@@ -244,8 +244,9 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
       if (document.visibilityState === 'visible') void refresh(true);
     };
     document.addEventListener('visibilitychange', onVisible);
+    const generationRef = oiRequestGeneration;
     return () => {
-      ++oiRequestGeneration.current;
+      ++generationRef.current;
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);

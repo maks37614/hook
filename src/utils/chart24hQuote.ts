@@ -37,8 +37,10 @@ export function chart24hPercent(
 export function useChartLive24hQuote(scope: MarketKey, enabled = true): Chart24hSample | null {
   const key = screenerLiveScopeKey(scope);
   const [latest, setLatest] = useState<Chart24hSample | null>(null);
+  // Scalar scope dependencies do not restart the socket on unrelated quote renders.
+  const { exchange, marketType, symbol } = scope;
   useEffect(() => {
-    if (!enabled || !isValidExchangeSymbol(normalizeExchangeSymbol(scope.symbol))) return;
+    if (!enabled || !isValidExchangeSymbol(normalizeExchangeSymbol(symbol))) return;
     let expiration: ReturnType<typeof setTimeout> | null = null;
     const socket = createScreenerQuoteSocket((rows, at) => {
       const quote = rows.find(row => screenerLiveScopeKey(row) === key);
@@ -48,13 +50,12 @@ export function useChartLive24hQuote(scope: MarketKey, enabled = true): Chart24h
       expiration = setTimeout(() => setLatest(previous =>
         previous?.key === key && previous.receivedAt === at ? null : previous), LIVE_QUOTE_MAX_AGE);
     });
-    socket.updateScopes([{ exchange: scope.exchange, marketType: scope.marketType,
-      symbol: normalizeExchangeSymbol(scope.symbol) }]);
+    socket.updateScopes([{ exchange, marketType, symbol: normalizeExchangeSymbol(symbol) }]);
     socket.start();
     return () => {
       socket.stop();
       if (expiration !== null) clearTimeout(expiration);
     };
-  }, [key, enabled]);
+  }, [key, enabled, exchange, marketType, symbol]);
   return enabled && latest?.key === key ? latest : null;
 }

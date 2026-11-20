@@ -173,8 +173,10 @@ function MarketRecurrenceToolInner({ rootRef, candles, exchange, marketType, sym
     if (!active) return;
     return retainWorker();
   }, [active]);
+  // Preserve the no-history → history-ready transition without recomputing on each tick.
+  const hasLoadedCandle = latestCandleTime > 0;
   useEffect(() => {
-    if (!active || !latestCandleTime) return;
+    if (!active || !hasLoadedCandle) return;
     let cancelled = false;
     const controller = new AbortController();
     setStatus({ key, loading: true });
@@ -197,7 +199,7 @@ function MarketRecurrenceToolInner({ rootRef, candles, exchange, marketType, sym
       }
     })();
     return () => { cancelled = true; controller.abort(); };
-  }, [active, key, exchange, marketType, symbol, timeframe, latestCandleTime > 0]);
+  }, [active, key, exchange, marketType, symbol, timeframe, hasLoadedCandle]);
   const result = active && status?.key === key ? status : null;
   const report = result && !result.loading && !result.error ? result.report ?? null : null;
   const stale = !!report && isRecurrenceReportStale(report, staleClockNow);

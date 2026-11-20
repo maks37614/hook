@@ -240,7 +240,7 @@ export function HookChartGuide({ rootRef, language, onClose, onNavigate, liquida
 
   useEffect(() => {
     if (step) onNavigate(step.tab ?? null);
-  }, [step?.key, step?.tab, onNavigate]);
+  }, [step, onNavigate]);
 
   useEffect(() => {
     const keyDown = (event: KeyboardEvent) => {
@@ -334,9 +334,10 @@ export function HookChartGuide({ rootRef, language, onClose, onNavigate, liquida
       window.visualViewport?.removeEventListener('resize', schedule);
       window.visualViewport?.removeEventListener('scroll', schedule);
     };
-  }, [step?.key, step?.selector, step?.tab, rootRef, liquidationMapSupported]);
+  }, [step, rootRef, liquidationMapSupported]);
 
-  useEffect(() => { if (highlight) panelRef.current?.focus({ preventScroll: true }); }, [index, !!highlight]);
+  const hasHighlight = Boolean(highlight);
+  useEffect(() => { if (hasHighlight) panelRef.current?.focus({ preventScroll: true }); }, [index, hasHighlight]);
   if (!step || !highlight || typeof document === 'undefined') return null;
   const data = step.key in copy.steps
     ? copy.steps[step.key as StepKey] : ADVANCED[activeLanguage][step.key as AdvancedStepKey];

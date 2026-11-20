@@ -291,8 +291,12 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   const [showTargetLevel, setShowTargetLevel] = useState<boolean>(initialTradeLevels.target);
   const [showStopLevel, setShowStopLevel] = useState<boolean>(initialTradeLevels.stop);
 
+  // Account label toggles are driven by their scalar values, not other profile
+  // fields. Read the latest complete object only on a relevant change.
+  const savedTradeLevelRef = useRef(profile?.chartLabelSettings);
+  savedTradeLevelRef.current = profile?.chartLabelSettings;
   useEffect(() => {
-    const restored = readChartTradeLevels(user?.uid, profile?.chartLabelSettings);
+    const restored = readChartTradeLevels(user?.uid, savedTradeLevelRef.current);
     setShowEntryLevel(restored.entry);
     setShowTargetLevel(restored.target);
     setShowStopLevel(restored.stop);
@@ -336,7 +340,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     window.dispatchEvent(new CustomEvent(CHART_TRADE_LEVELS_EVENT, {
       detail: { accountKey: user?.uid || 'guest', levels },
     }));
-    if (user) {
+    if (user?.uid) {
       void updateProfileData({ chartLabelSettings: levels })
         .catch(error => console.error('Не вдалося зберегти TP/SL у профілі', error));
     }
@@ -570,10 +574,11 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
       window.removeEventListener('storage', onStorage);
     };
   }, [necklineKey, necklineScope]);
-  const savedNecklineChoice = useMemo(
-    () => readChartNecklineOverride(necklineKey, necklineScope),
-    [necklineKey, necklineScope, necklineRevision],
-  );
+  const savedNecklineChoice = useMemo(() => {
+    // This revision signals a localStorage change with identical market keys.
+    void necklineRevision;
+    return readChartNecklineOverride(necklineKey, necklineScope);
+  }, [necklineKey, necklineScope, necklineRevision]);
   const necklineOverride = localNecklineOverride?.key === necklineKey
     && localNecklineOverride.scope === necklineScope
     ? localNecklineOverride.visible : savedNecklineChoice;
@@ -781,7 +786,12 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   );
 
   // Initialize the selected renderer; both share the same exchange feeds.
+  // This initializer runs only on a provider switch; new candles must update
+  // the existing series, not destroy and recreate the entire chart.
+  const chartSetupInputsRef = useRef({ klines, formation });
+  chartSetupInputsRef.current = { klines, formation };
   useEffect(() => {
+    const { klines, formation } = chartSetupInputsRef.current;
     if (chartProvider === 'hookchart' || !chartContainerRef.current) return;
 
     const chart = createChart(chartContainerRef.current, {
@@ -916,6 +926,8 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   }, [chartProvider]);
 
   // Update data and price lines when klines change
+  const chartDrawHelpersRef = useRef({ centerChartOnScreen, tr });
+  chartDrawHelpersRef.current = { centerChartOnScreen, tr };
   useEffect(() => {
     if (!candleSeriesRef.current || !chartRef.current || !effectiveKlines.length) return;
 
@@ -946,9 +958,9 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
       hasInitiallyCenteredRef.current = true;
     } else if (totalBars > 0 && !hasInitiallyCenteredRef.current) {
       hasInitiallyCenteredRef.current = true;
-      centerChartOnScreen();
+      chartDrawHelpersRef.current.centerChartOnScreen();
       requestAnimationFrame(() => {
-        centerChartOnScreen();
+        chartDrawHelpersRef.current.centerChartOnScreen();
       });
     }
 
@@ -992,7 +1004,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: tr('Вхід'),
+          title: chartDrawHelpersRef.current.tr('Вхід'),
         });
         priceLinesRef.current.push(line);
       }
@@ -1005,7 +1017,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           lineWidth: 2,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: tr('Ціль'),
+          title: chartDrawHelpersRef.current.tr('Ціль'),
         });
         priceLinesRef.current.push(line);
       }
@@ -1018,7 +1030,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           lineWidth: 2,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
-          title: tr('Стоп'),
+          title: chartDrawHelpersRef.current.tr('Стоп'),
         });
         priceLinesRef.current.push(line);
       }

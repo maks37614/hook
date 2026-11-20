@@ -59,7 +59,7 @@ test('saved chart settings rehydrate from user account and drive native chart, t
   assert.match(canvas, /visualProfileKey=\{replay \? undefined : terminalInitialViewTarget/);
   assert.match(canvas, /rightPaddingBars=\{rightPaddingBars\}/);
   assert.match(editor, /onProfileChange=\{delta => set\('visualProfiles', patchVisualProfile\(/);
-  assert.match(engine, /visualProfile\.visibleBars,visualProfile\.verticalZoom,visualProfile\.autoPriceScale,visualProfile\.rightGapBars/);
+  assert.match(engine, /profile\.visibleBars,profile\.verticalZoom,profile\.autoPriceScale,profile\.rightGapBars/);
   assert.match(account, /writerRef\.current\(\{ hookChartPreferences: delta \}\)/);
   assert.match(account, /normalizeOriginalHookChartPreferences\(profile\.hookChartPreferences\)/);
 });
@@ -69,7 +69,7 @@ test('Replay remains independent and global Terminal auto mode has explicit prio
   const canvas = source('../src/components/hookchart/HookChartCanvas.tsx');
   assert.match(canvas, /const activeVisualProfile = replay \? undefined/);
   assert.match(canvas, /terminalInitialViewTarget && selectedTerminalInitialView/);
-  assert.match(engine, /const priceAuto=terminalAutoScale\|\|visualProfile\.autoPriceScale/);
-  assert.match(engine, /yZoom:terminalAutoScale\?1:visualProfile\.verticalZoom/);
+  assert.match(engine, /const priceAuto=terminalAutoScale\|\|profile\.autoPriceScale/);
+  assert.match(engine, /yZoom:terminalAutoScale\?1:profile\.verticalZoom/);
   assert.match(engine, /terminalCandlePriceRange\(lo,hi,plotH,showVolumes\)/);
 });

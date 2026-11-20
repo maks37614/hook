@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AuthCaptcha } from './AuthCaptcha';
 import { X, LogIn, UserPlus, Mail, Lock, UserRound, Eye, EyeOff, AlertCircle, CheckCircle2, ShieldCheck, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -38,15 +38,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [captchaSiteKey, setCaptchaSiteKey] = useState<string | null>(null);
   const [captchaStatus, setCaptchaStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [captchaEpoch, setCaptchaEpoch] = useState(0);
+  // Opening a modal resets its fields once; changing an auth notice or reset
+  // token must not accidentally clear its completed reset result.
+  const authResetRef = useRef({ resetToken, clearAuthError });
+  authResetRef.current = { resetToken, clearAuthError };
   useEffect(() => {
     if (isOpen) {
-      setMode(resetToken ? 'reset' : initialMode);
+      setMode(authResetRef.current.resetToken ? 'reset' : initialMode);
       setPassword('');
       setPasswordConfirmation('');
       setLocalError(null);
       setCaptchaToken(null);
       setCaptchaEpoch(value => value + 1);
-      clearAuthError();
+      authResetRef.current.clearAuthError();
     }
   }, [isOpen, initialMode]);
   // A successful reset clears resetToken. Do not clear authNotice again when it

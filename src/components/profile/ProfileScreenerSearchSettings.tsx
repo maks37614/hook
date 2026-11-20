@@ -37,8 +37,11 @@ export function ProfileScreenerSearchSettings() {
   const { t, language } = useLanguage();
   const numberLocale = { uk: 'uk-UA', en: 'en-US', ru: 'ru-RU', pl: 'pl-PL' }[language];
   const fallback = preferredFallback(profile);
-  const stored = useMemo(() => normalizeScreenerSearchSettings(profile?.searchSettings, fallback),
-    [profile?.searchSettings, fallback.exchange, fallback.marketType]);
+  const fallbackExchange = fallback.exchange;
+  const fallbackMarketType = fallback.marketType;
+  const stored = useMemo(() => normalizeScreenerSearchSettings(profile?.searchSettings, {
+    exchange: fallbackExchange, marketType: fallbackMarketType,
+  }), [profile?.searchSettings, fallbackExchange, fallbackMarketType]);
   const [draft, setDraft] = useState<ScreenerSearchConfig>(() =>
     normalizeScreenerSearchConfig(stored.defaultConfig, fallback));
   const [presetName, setPresetName] = useState('');

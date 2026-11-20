@@ -179,13 +179,16 @@ export function useReplayProfileState(context: Context, isPlaying: boolean) {
     context.symbol, context.exchange, context.marketType, context.timeframe,
   ]);
 
+  // The 90-second persistence interval depends on presence, not live PnL.
+  // Recreating it on each candle would increase DB writes.
+  const hasPosition = Boolean(position);
   // Avoid per-candle PostgreSQL writes during fast Replay. Persist an active
   // position/pending orders at most once per 90 seconds; always flush on pause.
   useEffect(() => {
-    if (!isPlaying || !owner || loadedFor !== owner || (!position && !pendingOrders.length)) return;
+    if (!isPlaying || !owner || loadedFor !== owner || (!hasPosition && !pendingOrders.length)) return;
     const tick = window.setInterval(saveLatest, 90_000);
     return () => window.clearInterval(tick);
-  }, [isPlaying, owner, loadedFor, saveLatest, !!position, pendingOrders.length]);
+  }, [isPlaying, owner, loadedFor, saveLatest, hasPosition, pendingOrders.length]);
 
   const wasPlaying = useRef(false);
   useEffect(() => {

@@ -152,7 +152,7 @@ export const CoinScreenerPage: React.FC<CoinScreenerPageProps> = ({
   const isGuest = !user;
   const previousUiSession = screenerUiSession.get(user?.uid || 'guest');
   const searchSettings = useMemo(() => normalizeScreenerSearchSettings(
-    user && profile?.uid === user.uid ? profile.searchSettings : undefined,
+    user?.uid && profile?.uid === user.uid ? profile.searchSettings : undefined,
     { exchange: preferences.defaultExchange, marketType: preferences.defaultMarketType },
   ), [user?.uid, profile?.uid, profile?.searchSettings, preferences.defaultExchange, preferences.defaultMarketType]);
   const initialSearch = useMemo(() => effectiveScreenerSearchConfig(searchSettings,
@@ -490,6 +490,10 @@ export const CoinScreenerPage: React.FC<CoinScreenerPageProps> = ({
   const liveScopes = useMemo(() => screenerVisibleScopes(filteredCoins, displayLimit),
     [filteredCoins, displayLimit]);
   const liveScopeKey = liveScopes.map(screenerLiveScopeKey).join('|');
+  // The scope-key is the real subscription identity; repeated quote renders
+  // with equal keys must not resubscribe or restart the 2s throttle.
+  const liveScopesRef = useRef(liveScopes);
+  liveScopesRef.current = liveScopes;
   const lastLiveSubscribeAt = useRef(0);
   useEffect(() => {
     // At most one subscription update per two seconds. Unlike an infinite
@@ -498,7 +502,7 @@ export const CoinScreenerPage: React.FC<CoinScreenerPageProps> = ({
     const wait = Math.max(0, 2_000 - elapsed);
     const timer = setTimeout(() => {
       lastLiveSubscribeAt.current = Date.now();
-      quoteSocketRef.current?.updateScopes(liveScopes);
+      quoteSocketRef.current?.updateScopes(liveScopesRef.current);
     }, wait);
     return () => clearTimeout(timer);
   }, [liveScopeKey]);

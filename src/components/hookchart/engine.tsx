@@ -287,7 +287,8 @@ export function IndicatorDock({ids,candles,oi,viewport,rightPadding=0,rightPaddi
    idsKey:string; startI:number; endI:number;
    results:Map<IndicatorId,ReturnType<typeof indicatorData>>;
  }|null>(null);
- useEffect(()=>{const el=ref.current;if(!el)return;const update=()=>setWidth(Math.max(HOOKCHART_PRICE_SCALE_WIDTH+40,el.getBoundingClientRect().width||1000));update();const ro=new ResizeObserver(update);ro.observe(el);return()=>ro.disconnect()},[ids.length>0,candles.length>0]);
+ const hasIndicators=ids.length>0,hasIndicatorCandles=candles.length>0;
+ useEffect(()=>{const el=ref.current;if(!el)return;const update=()=>setWidth(Math.max(HOOKCHART_PRICE_SCALE_WIDTH+40,el.getBoundingClientRect().width||1000));update();const ro=new ResizeObserver(update);ro.observe(el);return()=>ro.disconnect()},[hasIndicators,hasIndicatorCandles]);
  if(!ids.length||!candles.length)return null;
  const AX=HOOKCHART_PRICE_SCALE_WIDTH,plotW=hookChartPlotWidth(width),{step,virtualEnd,virtualStart}=hookChartHorizontalRange(candles.length,plotW,viewport,rightPaddingBars,rightPadding),startI=Math.max(0,Math.floor(virtualStart)-2),endI=Math.min(candles.length,Math.ceil(virtualEnd)+2),startT=candles[startI]?.t??-Infinity,endT=candles[Math.max(startI,endI-1)]?.t??Infinity;
  // Hovering OI updates only its crosshair/labels. Do not recompute every
@@ -437,13 +438,14 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  // Request older exchange candles only when a user approaches the left edge.
  // Do not prefetch every Terminal card: up to 50 charts may be mounted.
  const olderHistoryAttempt = useRef<{ key:string; at:number; pending:boolean } | null>(null);
+ const oldestCandleTime=candles[0]?.t,loadedCandleCount=candles.length;
  useEffect(()=>{
-   if(!onNeedHistory||!candles.length||vp.fitAll)return;
+   if(!onNeedHistory||oldestCandleTime===undefined||!loadedCandleCount||vp.fitAll)return;
    const width=ref.current?.getBoundingClientRect().width||0;
    if(width<=0)return;
    const visibleBars=hookChartPlotWidth(width)/Math.max(.12,vp.barWidth);
-   if(candles.length-vp.rightOffset-visibleBars>25)return;
-   const oldestTime=candles[0].t;
+   if(loadedCandleCount-vp.rightOffset-visibleBars>25)return;
+   const oldestTime=oldestCandleTime;
    const key=`${interactionScope||symbol}:${tf}:${oldestTime}`;
    const previous=olderHistoryAttempt.current;
    if(previous?.key===key&&(previous.pending||Date.now()-previous.at<15_000))return;
@@ -451,10 +453,20 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    void onNeedHistory(oldestTime-1).catch(()=>false).finally(()=>{
      if(olderHistoryAttempt.current?.key===key)olderHistoryAttempt.current.pending=false;
    });
- },[candles[0]?.t,candles.length,symbol,tf,interactionScope,vp.rightOffset,vp.barWidth,vp.fitAll,onNeedHistory]);
+ },[oldestCandleTime,loadedCandleCount,symbol,tf,interactionScope,vp.rightOffset,vp.barWidth,vp.fitAll,onNeedHistory]);
  const terminalNavigation=useRef(false),terminalFocusKey=useRef<string|null>(null);
  const autoFollowCandleRef=useRef<string|null>(null);
  const lastCandleTime=candles.at(-1)?.t;
+ // Render-time refs keep the latest geometry without refitting per live tick.
+ const hasVisualProfile=Boolean(visualProfile),hasHistoryCandles=candles.length>0;
+ const visualProfileRef=useRef(visualProfile);
+ visualProfileRef.current=visualProfile;
+ const latestViewportInputs=useRef({candles,focusFormation});
+ latestViewportInputs.current={candles,focusFormation};
+ const profileVisibleBars=visualProfile?.visibleBars;
+ const profileZoom=visualProfile?.verticalZoom;
+ const profileAutoPrice=visualProfile?.autoPriceScale;
+ const profileRightGap=visualProfile?.rightGapBars;
  const wasTerminalAutoScaleEnabled=useRef(terminalAutoScale);
  useEffect(()=>{
    // Switching auto-fit ON is an explicit request to restore automatic prices.
@@ -481,13 +493,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      return previous.rightOffset===0&&previous.autoY&&previous.manualCenter===null&&previous.manualRange===null&&!previous.fitAll&&(previous.yZoom??1)===1
        ?previous:{...previous,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,fitAll:false,yZoom:1};
    });
- },[terminalAutoScale,symbol,tf,interactionScope,lastCandleTime]);
- useEffect(()=>{if(!visualProfile){visualAppliedRef.current=null;if(terminalMode&&!terminalAutoScale) terminalNavigation.current=false}},[!!visualProfile,terminalMode,terminalAutoScale]);
+ },[terminalAutoScale,symbol,tf,interactionScope,lastCandleTime,fitAllScopeKey]);
+ useEffect(()=>{if(!hasVisualProfile){visualAppliedRef.current=null;if(terminalMode&&!terminalAutoScale) terminalNavigation.current=false}},[hasVisualProfile,terminalMode,terminalAutoScale]);
  // Profile editing may finish while the canvas is hidden or has zero width
  // (tabs, fullscreen transitions, Terminal cards). Reapply when measurable.
  // ResizeObserver runs on geometry changes only; no extra market requests.
  useLayoutEffect(()=>{
-   if(!visualProfile||!visualProfileKey||typeof ResizeObserver==='undefined')return;
+   if(!hasVisualProfile||!visualProfileKey||typeof ResizeObserver==='undefined')return;
    const canvas=ref.current;
    if(!canvas)return;
    const update=()=>{
@@ -498,28 +510,36 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    const observer=new ResizeObserver(update);
    observer.observe(canvas);
    return()=>observer.disconnect();
- },[!!visualProfile,visualProfileKey]);
+ },[hasVisualProfile,visualProfileKey]);
  const rangeRestored=useRef(false);
+ const focusFormationId=focusFormation?.id;
  useLayoutEffect(()=>{
-   if(!terminalMode||visualProfile||!candles.length||initialLogicalRange)return;
-   const key=focusFormation?.id||'latest';
+   if(!terminalMode||hasVisualProfile||!hasHistoryCandles||initialLogicalRange)return;
+   const key=focusFormationId||'latest';
    if(terminalFocusKey.current!==key){terminalFocusKey.current=key;terminalNavigation.current=false}
    const canvas=ref.current;if(!canvas)return;
-   const fit=()=>{const width=canvas.getBoundingClientRect().width;if(width>0&&!terminalNavigation.current)setVp(terminalHookViewport(candles,hookChartPlotWidth(width),focusFormation,rightPaddingBars))};
+   const fit=()=>{
+     const width=canvas.getBoundingClientRect().width;
+     if(width>0&&!terminalNavigation.current) {
+       const {candles: latestCandles,focusFormation: latestFocus}=latestViewportInputs.current;
+       setVp(terminalHookViewport(latestCandles,hookChartPlotWidth(width),latestFocus,rightPaddingBars));
+     }
+   };
    fit();const observer=new ResizeObserver(fit);observer.observe(canvas);
    return()=>observer.disconnect();
- },[terminalMode,!!visualProfile,candles.length,focusFormation?.id,initialLogicalRange,rightPaddingBars]);
+ },[terminalMode,hasVisualProfile,hasHistoryCandles,focusFormationId,initialLogicalRange,rightPaddingBars]);
  // Apply only on profile changes, first data load, or the initial history arrival.
  // Replay passes no visualProfile, so its original viewport logic is untouched.
  const terminalHistoryPhase=terminalViewportHistoryPhase(tf,candles.length,
    terminalMode||!!visualProfileKey?.startsWith('terminal'),terminalHistoryReady);
  useLayoutEffect(()=>{
-   if(!visualProfile||!visualProfileKey||!candles.length)return;
+   const profile=visualProfileRef.current,latestCandles=latestViewportInputs.current.candles;
+   if(!profile||!visualProfileKey||!latestCandles.length)return;
    const width=ref.current?.getBoundingClientRect().width||0;
    if(width<=0)return;
    // Include the coin and timeframe: switching markets must restore the
    // selected profile even when its numeric settings have not changed.
-   const profilePrefix=[interactionScope||symbol,symbol,tf,visualProfileKey,visualProfile.visibleBars,visualProfile.verticalZoom,visualProfile.autoPriceScale,visualProfile.rightGapBars,terminalAutoScale].join(':');
+   const profilePrefix=[interactionScope||symbol,symbol,tf,visualProfileKey,profile.visibleBars,profile.verticalZoom,profile.autoPriceScale,profile.rightGapBars,terminalAutoScale].join(':');
    const historyPhase=terminalHistoryPhase;
    const signature=`${profilePrefix}:${historyPhase}:${Math.round(width)}`;
    // Saving a gesture-edited preview must preserve its exact viewport, rather
@@ -556,40 +576,40 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    lastVisualGapRef.current=rightPaddingBars;
    terminalNavigation.current=true;
    const plotWidth=hookChartPlotWidth(width);
-   // A saved request for hundreds of visible candles needs sub-3px bars.
+   // A saved request for hundreds of visible latestCandles needs sub-3px bars.
    // The canvas already uses aggregated rasterization for tiny bar widths.
    const minBar=.12;
-   // Fit the requested number of candles AND the right-hand empty slots.
-   // Previously a 144-candle view + an 81-bar gap displayed only ~63 candles.
-   const visibleSlots=Math.max(1,visualProfile.visibleBars+Math.max(0,rightPaddingBars));
+   // Fit the requested number of latestCandles AND the right-hand empty slots.
+   // Previously a 144-candle view + an 81-bar gap displayed only ~63 latestCandles.
+   const visibleSlots=Math.max(1,profile.visibleBars+Math.max(0,rightPaddingBars));
    const barWidth=Math.max(minBar,Math.min(34,plotWidth/visibleSlots));
-   const count=Math.max(1,Math.min(candles.length,Math.ceil(visualProfile.visibleBars)));
-   const recent=candles.slice(-count);
+   const count=Math.max(1,Math.min(latestCandles.length,Math.ceil(profile.visibleBars)));
+   const recent=latestCandles.slice(-count);
    let low=Infinity,high=-Infinity;
    for(const candle of recent){low=Math.min(low,candle.l);high=Math.max(high,candle.h)}
    const spread=Number.isFinite(low)&&Number.isFinite(high)?Math.max(high-low,Math.abs(high)*.01,1e-10):1;
    const center=Number.isFinite(high)&&Number.isFinite(low)?(high+low)/2:1;
-   const priceAuto=terminalAutoScale||visualProfile.autoPriceScale;
+   const priceAuto=terminalAutoScale||profile.autoPriceScale;
    // Restore the saved Terminal profile when auto-scale turns OFF. Extreme
    // manual zoom must not clip visible wicks or overlap the volume band.
    const terminalManualProfile=!priceAuto&&(terminalMode||visualProfileKey.startsWith('terminal'));
    const manualPrice=terminalManualProfile&&Number.isFinite(low)&&Number.isFinite(high)
      ? terminalSafeManualPriceViewport(low,high,Math.max(40,ref.current?.getBoundingClientRect().height||80),
-         showVolumes,visualProfile.verticalZoom)
+         showVolumes,profile.verticalZoom)
      : null;
    setVp({
      // The Graph-tab rightGapBars is applied exactly once by rightPaddingBars.
      barWidth,rightOffset:0,autoY:priceAuto,
      manualCenter:priceAuto?null:(manualPrice?.manualCenter??center),
-     manualRange:priceAuto?null:(manualPrice?.manualRange??spread*(terminalMode?1.32:1.16)/visualProfile.verticalZoom),
+     manualRange:priceAuto?null:(manualPrice?.manualRange??spread*(terminalMode?1.32:1.16)/profile.verticalZoom),
      // With auto price scaling enabled, Terminal profiles should prioritize the
      // visible candle range (including wicks) over distant DOM/target markers.
      // Use the existing volume-safe price fit with no extra market requests.
-     yZoom:terminalAutoScale?1:visualProfile.verticalZoom,fitAll:false,
+     yZoom:terminalAutoScale?1:profile.verticalZoom,fitAll:false,
      candleFit:priceAuto && (terminalMode || visualProfileKey.startsWith('terminal')),
    });
- },[symbol,tf,interactionScope,visualProfileKey,visualProfileCaptureVersion,visualProfile?.visibleBars,visualProfile?.verticalZoom,visualProfile?.autoPriceScale,visualProfile?.rightGapBars,!!candles.length,terminalHistoryPhase,initialLogicalRange,terminalMode,terminalAutoScale,visualCanvasWidth]);
- useLayoutEffect(()=>{if(visualProfile||rangeRestored.current||!candles.length||!initialLogicalRange)return;const width=ref.current?.getBoundingClientRect().width||800,restored=restoredHookViewport(candles.length,hookChartPlotWidth(width),initialLogicalRange);if(restored){rangeRestored.current=true;setVp({...restored,rightOffset:restored.rightOffset+Math.max(0,rightPaddingBars)+Math.max(0,rightPadding)/Math.max(3,restored.barWidth)})}},[candles.length,initialLogicalRange,rightPaddingBars,rightPadding,!!visualProfile]);
+ },[symbol,tf,interactionScope,visualProfileKey,visualProfileCaptureVersion,profileVisibleBars,profileZoom,profileAutoPrice,profileRightGap,hasHistoryCandles,terminalHistoryPhase,initialLogicalRange,terminalMode,terminalAutoScale,visualCanvasWidth,fitAllScopeKey,rightPaddingBars,showVolumes]);
+ useLayoutEffect(()=>{if(hasVisualProfile||rangeRestored.current||!candles.length||!initialLogicalRange)return;const width=ref.current?.getBoundingClientRect().width||800,restored=restoredHookViewport(candles.length,hookChartPlotWidth(width),initialLogicalRange);if(restored){rangeRestored.current=true;setVp({...restored,rightOffset:restored.rightOffset+Math.max(0,rightPaddingBars)+Math.max(0,rightPadding)/Math.max(3,restored.barWidth)})}},[candles.length,initialLogicalRange,rightPaddingBars,rightPadding,hasVisualProfile]);
  const [draft,setDraft]=useState<{t:number,p:number}|null>(null),[selectedDrawingId,setSelectedDrawingId]=useState<string|null>(null),[editingDrawingId,setEditingDrawingId]=useState<string|null>(null);
  const [drawingActions,setDrawingActions]=useState<{id:string;x:number;y:number}|null>(null);
  const [alertActions,setAlertActions]=useState<{id:string;x:number;y:number}|null>(null),suppressDrawingClick=useRef(false);
@@ -647,8 +667,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    // revive an interaction belonging to a previous coin, timeframe or tool.
    for(const id of ids)if(owner?.hasPointerCapture(id))owner.releasePointerCapture(id);
  };
+ const resetInteractionRef=useRef(resetInteraction);
+ resetInteractionRef.current=resetInteraction;
  useLayoutEffect(()=>{fitAllScopeRef.current=null;manualPriceAxisOverride.current=false},[symbol,tf,interactionScope]);
- useLayoutEffect(()=>{resetInteraction();setDraft(null);setDrawingActions(null);setAlertActions(null);setSelectedDrawingId(null);setEditingDrawingId(null);return resetInteraction},[symbol,tf,tool,interactionScope]);
+ useLayoutEffect(()=>{resetInteractionRef.current();setDraft(null);setDrawingActions(null);setAlertActions(null);setSelectedDrawingId(null);setEditingDrawingId(null);return()=>resetInteractionRef.current()},[symbol,tf,tool,interactionScope]);
  useLayoutEffect(()=>{jumpVersion.current++;setPendingJump(null);setJumpBusy(false);setJumpMessage('')},[symbol,tf,interactionScope]);
 
  useEffect(()=>{
@@ -661,7 +683,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    window.addEventListener('keydown',keydown,true);window.addEventListener('keyup',keyup,true);window.addEventListener('blur',stop);window.addEventListener('pointerup',stop);
    return()=>{stop();window.removeEventListener('keydown',keydown,true);window.removeEventListener('keyup',keyup,true);window.removeEventListener('blur',stop);window.removeEventListener('pointerup',stop)};
  },[transientRuler]);
- useEffect(()=>{if(!jumpOpen)setJumpDate(zoneDateKey(Date.now(),timezone))},[timezone]);useEffect(()=>{if(hideTimeJump&&jumpOpen)setJumpOpen(false)},[hideTimeJump,jumpOpen]);
+ useEffect(()=>{if(!jumpOpen)setJumpDate(zoneDateKey(Date.now(),timezone))},[timezone,jumpOpen]);useEffect(()=>{if(hideTimeJump&&jumpOpen)setJumpOpen(false)},[hideTimeJump,jumpOpen]);
  const intervalMs=TF_MS[tf]||300000;
  // Bucket labels only when prints/candle data changes, not on every cursor
  // frame or mouse movement while the chart is being drawn.
@@ -794,7 +816,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    const rightOffset=candles.length+padding-slots/2-targetIndex-.5;
    setVp(v=>({...v,barWidth:step,rightOffset,autoY:true,manualCenter:null,manualRange:null,fitAll:false}));
  };
- useEffect(()=>{if(!pendingJump||!candles.length)return;if(pendingJump.t>=candles[0].t-intervalMs){focusAtTime(pendingJump.t,pendingJump.fitDay);setPendingJump(null);setJumpBusy(false);setJumpOpen(false);setJumpMessage('')}},[candles,pendingJump]);
+ const focusAtTimeRef=useRef(focusAtTime);
+ focusAtTimeRef.current=focusAtTime;
+ useEffect(()=>{if(!pendingJump||!candles.length)return;if(pendingJump.t>=candles[0].t-intervalMs){focusAtTimeRef.current(pendingJump.t,pendingJump.fitDay);setPendingJump(null);setJumpBusy(false);setJumpOpen(false);setJumpMessage('')}},[candles,pendingJump,intervalMs]);
  const requestJump=async(date:string,mode:'day'|'time'=jumpMode,time=jumpTime)=>{const version=++jumpVersion.current;const clock=mode==='day'?'12:00':time;let target=zonedLocalTs(date,clock,timezone);if(!Number.isFinite(target)){setJumpBusy(false);setJumpMessage('Цей локальний час не існує або введений некоректно');return}setJumpDate(date);setJumpMode(mode);setJumpBusy(true);setJumpMessage('');const latest=candles.at(-1)?.t;if(latest){const latestDate=zoneDateKey(latest,timezone);if(date>latestDate){setJumpBusy(false);setJumpMessage('Для майбутньої дати ще немає свічок');return}if(mode==='time'&&target>latest+intervalMs){setJumpBusy(false);setJumpMessage('Для цього часу ще немає свічки');return}if(mode==='day'&&date===latestDate&&target>latest)target=latest}if(candles.length&&target>=candles[0].t){focusAtTime(target,mode==='day');setJumpBusy(false);setJumpOpen(false);return}setPendingJump({t:target,fitDay:mode==='day'});const ok=onNeedHistory?await onNeedHistory(target):false;if(version!==jumpVersion.current)return;if(!ok){setPendingJump(null);setJumpBusy(false);setJumpMessage('Не вдалося завантажити цю ділянку історії')}};
  const quickJump=(daysAgo:number)=>{const d=zoneDateOffset(daysAgo,timezone);void requestJump(d,'day','12:00')};
  const zone=(x:number,y:number,g:any)=>x>=g.priceX?'price':y>=g.plotH?'time':'plot';
@@ -1544,7 +1568,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    frames.current?.request(true);
  },[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,markers,timeMarkers,splitVolumes,backgroundColor,gridColor,levelLabelMode,levelLabelColor,levelLabelSize,levelLineWidth,levelLabelStyle,levelLineStyle,crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperTrendLineWidth,symbol,tf,draft,selectedDrawingId,editingDrawingId,tool,rightPadding,rightPaddingBars,roundGrid,roundness,gridHorizontal,gridVertical,showMarketPrintSums,showMarketPrintArrows,marketPrintArrowSize,marketPrintFontSize,marketPrintMinUsd,showVolumes,showLiquidations,showLiquidationCandleSums,showLiquidationDetailSums,showLiquidationArrows,liquidationArrowSize,liquidationSumFontSize,liquidationDetailFontSize,liquidationHeatmap,modeledLiquidationBands,showDensityLines,showDensityLabels,showDensityAmounts,highlightDensityReaction,candleLongColor,candleShortColor,densityLineColor,densityLabelColor,densityLineWidth,densityLineStyle,densityLabelSize,autoSR,showSRLabels,autoPrevDay,autoDayOpen,autoVWAP,autoLocalHL,autoRoundLevels,autoPOC,autoStops,autoChannel,channelModel,strategyResult,scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels,marketRecurrenceMarks,cascadeRisk.score,cascadeRisk.level,cascadeRisk.total5,cascadeRisk.count5,liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive]);
  useEffect(()=>{
-   const cancel=()=>{resetInteraction();scheduleDraw()};
+   const cancel=()=>{resetInteractionRef.current();scheduleDraw()};
    const visibility=()=>{if(document.visibilityState==='hidden')cancel()};
    window.addEventListener('blur',cancel);document.addEventListener('visibilitychange',visibility);
    return()=>{window.removeEventListener('blur',cancel);document.removeEventListener('visibilitychange',visibility)};
@@ -2066,6 +2090,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     : {barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:false});
  };
  const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true,...(terminalMode?{candleFit:true}:{})}),'focus')};
+ const fitAllHistoryRef=useRef(fitAllHistory);
+ fitAllHistoryRef.current=fitAllHistory;
  // The Terminal drawer's Apply button uses exactly the same action as the
  // per-chart "Show all history" control. Run after the saved profile layout
  // effect so fitting all candles wins over the just-applied startup view.
@@ -2079,7 +2105,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   const previousFit=lastTerminalFitAllRequestRef.current;
   if(previousFit?.request===terminalFitAllRequest&&previousFit.scope===fitAllScopeKey)return;
   lastTerminalFitAllRequestRef.current={request:terminalFitAllRequest,scope:fitAllScopeKey};
-  fitAllHistory();
+  fitAllHistoryRef.current();
  },[terminalFitAllRequest,candles.length,fitAllScopeKey]);
  const zoomButton=(factor:number)=>{
    terminalNavigation.current=true;
@@ -2223,7 +2249,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    return null;
  };
  archiveScreenshotRef.current=takeArchiveScreenshot;
- useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:fitAllHistory,zoomToLatest:reset,focusLatest:()=>{fitAllScopeRef.current=null;manualPriceAxisOverride.current=false;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:terminalMode?true:v.candleFit}))},zoom:zoomButton}),[candles,vp]);
+ const chartControlActionsRef=useRef({fitAllHistory,reset,zoomButton});
+ chartControlActionsRef.current={fitAllHistory,reset,zoomButton};
+ useImperativeHandle(controlRef,()=>({takeScreenshot:()=>{try{return ref.current?.toDataURL('image/png')||null}catch{return null}},takeArchiveScreenshot:()=>archiveScreenshotRef.current(),takeArchiveDensityScene:()=>archiveDensityRef.current(),takeArchiveOverlayScene:()=>archiveOverlayRef.current(),takeArchiveVisibleSrMarkers:()=>archiveSrMarkerRef.current(),fitContent:()=>chartControlActionsRef.current.fitAllHistory(),zoomToLatest:()=>chartControlActionsRef.current.reset(),focusLatest:()=>{fitAllScopeRef.current=null;manualPriceAxisOverride.current=false;setVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:terminalMode?true:v.candleFit}))},zoom:(factor:number)=>chartControlActionsRef.current.zoomButton(factor)}),[]);
  const actionDrawing=drawingActions?.id===selectedDrawingId?drawings.find(d=>d.id===selectedDrawingId&&d.id.startsWith(symbol+':')):null;
  // Ruler actions belong to its measurement label, not to the point last tapped.
  // Compute only for the selected ruler and reuse the same geometry as its canvas.

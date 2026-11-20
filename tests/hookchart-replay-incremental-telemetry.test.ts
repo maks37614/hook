@@ -40,7 +40,7 @@ test('historical Replay never joins shared live Kline, trade, depth or liquidati
   assert.match(canvas, /const change = replayHistoryChange\(/);
   assert.match(canvas, /const rows = toHookCandles\(klines\);/);
   assert.match(canvas, /useEffect\(\(\) => replay \? undefined : connectChartDiagnostics\(\)/);
-  assert.match(canvas, /if \(replay \|\| externalData \|\| !exchangeSymbol\)/);
+  assert.match(canvas, /if \(replay \|\| hasExternalData \|\| !exchangeSymbol\)/);
 });
 
 test('browser diagnostics are opt-in, browser-local and never upload metrics', () => {

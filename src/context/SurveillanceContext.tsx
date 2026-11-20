@@ -59,7 +59,7 @@ export const SurveillanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const fetchCoins = useCallback(async () => {
     const userId = user?.uid || 'guest';
-    if (!user) { setCoins([]); setLoading(false); return; }
+    if (userId === 'guest') { setCoins([]); setLoading(false); return; }
     const request = requestGuard.current.beginRead();
     if (!request) return;
     try {
@@ -112,7 +112,7 @@ export const SurveillanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setDesktopVisible(visible);
       // Restore the current monitored state after an inactive Desktop pane
       // returns. This does not restart a scan or create an exchange socket.
-      if (visible && user) void fetchCoins();
+      if (visible && user?.uid) void fetchCoins();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -168,8 +168,9 @@ export const SurveillanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, connected => {
       if (streamEpochRef.current === epoch) streamConnected.current = connected;
     });
+    const epochRef = streamEpochRef;
     return () => {
-      if (streamEpochRef.current === epoch) streamConnected.current = false;
+      if (epochRef.current === epoch) streamConnected.current = false;
       unsubscribe();
     };
   }, [user?.uid, fetchCoins, keepSurveillanceSSE]);

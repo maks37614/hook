@@ -106,6 +106,9 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   onReturnToPatterns,
 }) => {
   const { t, language } = useLanguage();
+  // Keep error labels current without restarting the market refresh timer on language changes.
+  const translateRef = useRef(t);
+  translateRef.current = t;
   // Stable event forwarding: chart cards do not repaint when App recreates
   // navigation callbacks for an unrelated market/UI update.
   const terminalActionsRef = useRef({ onSendMetaScalp, onOpenFullscreenModal, onOpenTelegramAlerts });
@@ -302,7 +305,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         setMarketSnapshot(next);
         setMarketError(null);
       } catch (cause) {
-        if (!controller.signal.aborted) setMarketError(cause instanceof Error ? cause.message : t('terminal.market.loadError'));
+        if (!controller.signal.aborted) setMarketError(cause instanceof Error ? cause.message : translateRef.current('terminal.market.loadError'));
       } finally {
         busy = false;
         if (!controller.signal.aborted) setMarketLoading(false);
@@ -1101,6 +1104,14 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     chartListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Key listeners are retained while the current chart and settings actions
+  // change, avoiding a document re-subscription on each Terminal render.
+  const terminalShortcutHandlersRef = useRef({
+    handleApplyGlobalTimeframe, user, profile, setAutoScaleCharts, setTerminalEcoMode,
+  });
+  terminalShortcutHandlersRef.current = {
+    handleApplyGlobalTimeframe, user, profile, setAutoScaleCharts, setTerminalEcoMode,
+  };
   // HookChart dispatches some legacy navigation hotkeys as document events.
   // Target the actual focused chart block, never an arbitrary coin in a grid.
   useEffect(() => {
@@ -1139,7 +1150,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         const index = Math.max(0, frames.indexOf(activeTimeframe));
         const next = Math.max(0, Math.min(frames.length - 1,
           index + (detail.action === 'nextTfAll' ? 1 : -1)));
-        if (index !== next) handleApplyGlobalTimeframe(frames[next]);
+        if (index !== next) terminalShortcutHandlersRef.current.handleApplyGlobalTimeframe(frames[next]);
       } else if (detail.action === 'prevCoin' || detail.action === 'nextCoin') {
         const available = getCoinsForPicker();
         const index = available.findIndex(coin => coinMarketKey(coin) === coinMarketKey(block));
@@ -1197,8 +1208,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         case 'linking': {
           // The local connector is opt-in. Never enable an unsupported provider,
           // or trigger an unsolicited external symbol switch.
-          const settings = getUserTerminalLinkSettings(user?.uid, profile);
-          if (user && profile && settings.provider !== 'none') {
+          const currentUser = terminalShortcutHandlersRef.current.user;
+          const currentProfile = terminalShortcutHandlersRef.current.profile;
+          const settings = getUserTerminalLinkSettings(currentUser?.uid, currentProfile);
+          if (currentUser && currentProfile && settings.provider !== 'none') {
             void updateProfileData({ terminalLinkSettings: { ...settings, enabled: !settings.enabled } })
               .catch(() => { /* Keep the server value authoritative on failure. */ });
           }
@@ -1206,8 +1219,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
         }
         case 'settings': setIsSettingsOpen(true); break;
         case 'fullscreen': toggleFullscreenSafe(); break;
-        case 'autoScale': setAutoScaleCharts(current => !current); break;
-        case 'eco': setTerminalEcoMode(current => !current); break;
+        case 'autoScale': terminalShortcutHandlersRef.current.setAutoScaleCharts(current => !current); break;
+        case 'eco': terminalShortcutHandlersRef.current.setTerminalEcoMode(current => !current); break;
         case 'oneColumn': case 'twoColumns': case 'threeColumns': case 'fourColumns': {
           const columns = ({ oneColumn: 1, twoColumns: 2, threeColumns: 3, fourColumns: 4 } as const)[action];
           setConfig(current => ({ ...current, columns, layoutPreset: 'custom', autoFitScreen: true }));
@@ -1217,7 +1230,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           const frames: Timeframe[] = ['30s', '1m', '5m', '15m', '1h', '4h', '1d'];
           const index = Math.max(0, frames.indexOf(activeTimeframe));
           const next = Math.max(0, Math.min(frames.length - 1, index + (action === 'nextTimeframe' ? 1 : -1)));
-          if (next !== index) handleApplyGlobalTimeframe(frames[next]);
+          if (next !== index) terminalShortcutHandlersRef.current.handleApplyGlobalTimeframe(frames[next]);
           break;
         }
         case 'previousPage': changeTerminalPage(-1); break;

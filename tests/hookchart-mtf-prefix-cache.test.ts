@@ -63,11 +63,11 @@ test('remote analysis polling is gated on a nonempty set of requested higher tim
   const source = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
   const effect = source.slice(source.indexOf('  useEffect(() => {\n    const exchangeSymbol = /^[A-Z0-9]+$/i.test(symbol);'),
     source.indexOf('  const analysisSeries = useMemo'));
-  const requestedAt = effect.indexOf('const requested = analysisTfs.filter(');
+  const requestedAt = effect.indexOf("const requested = analysisTfKey.split(',').filter(");
   const gateAt = effect.indexOf('if (!requested.length) {', requestedAt);
   const subscriptionAt = effect.indexOf('sharedPublicChartPolling.subscribe(', gateAt);
   assert.ok(requestedAt >= 0 && gateAt > requestedAt && subscriptionAt > gateAt);
   assert.match(effect.slice(gateAt, subscriptionAt), /return;\s*}/);
   assert.match(effect.slice(gateAt, subscriptionAt), /stop = requested.map/);
-  assert.match(source, /const trendIntervals = needsTrendSeries \? settings\.trendIntervals \|\| \[\] : \[\]/);
+  assert.match(source, /const trendTfKey = needsTrendSeries \? \(settings\.trendIntervals \|\| \[\]\)\.join\(','\) : ''/);
 });

@@ -25,13 +25,15 @@ export const ProfileInterfaceSettings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const savedRef = useRef<SiteAppearance>(normalizeSiteAppearance(profile?.siteAppearance));
+  const accountAppearanceRef = useRef(profile?.siteAppearance);
+  accountAppearanceRef.current = profile?.siteAppearance;
   const cssResult = useMemo(() => compilePersonalCss(draft.customCss), [draft.customCss]);
 
   // Load the preview font only while the appearance editor is open.
   useEffect(() => { ensureSiteFontLoaded('inter-light'); }, []);
 
   useEffect(() => {
-    const saved = normalizeSiteAppearance(profile?.siteAppearance);
+    const saved = normalizeSiteAppearance(accountAppearanceRef.current);
     savedRef.current = saved;
     setDraft(saved);
     applySiteAppearance(saved);

@@ -92,19 +92,21 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  const historyOwnerUid = user?.uid;
   const fetchHistory = useCallback(async () => {
-    if (!user) { setHistory([]); return; }
+    const ownerUid = historyOwnerUid;
+    if (!ownerUid) { setHistory([]); return; }
     setLoadingHistory(true);
     try {
-      const response = await apiFetch('/api/alerts/history?userId=' + encodeURIComponent(user.uid));
+      const response = await apiFetch('/api/alerts/history?userId=' + encodeURIComponent(ownerUid));
       if (!response.ok) throw new Error('History unavailable');
       const data = await response.json();
-      if (userRef.current?.uid !== user.uid) return;
+      if (userRef.current?.uid !== ownerUid) return;
       const items: AlertHistoryItem[] = Array.isArray(data.history) ? data.history : [];
       setHistory(items.sort((a, b) => b.triggeredAt - a.triggeredAt));
     } catch (error) { console.warn('[Alerts] History unavailable:', error); }
     finally { setLoadingHistory(false); }
-  }, [user?.uid]);
+  }, [historyOwnerUid]);
 
   const fetchHistoryRef = useRef(fetchHistory);
   fetchHistoryRef.current = fetchHistory;
@@ -150,7 +152,7 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     void initialize();
-    void fetchHistory();
+    void fetchHistoryRef.current();
     return () => { cancelled = true; };
   }, [user?.uid]);
 
@@ -319,7 +321,7 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return newAlert;
     },
-    [user, profile]
+    [user]
   );
 
   const addAlertsBatch = useCallback(
@@ -381,7 +383,7 @@ export const AlertsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       return newAlerts;
     },
-    [user, profile]
+    [user]
   );
 
   const deleteAlert = useCallback(

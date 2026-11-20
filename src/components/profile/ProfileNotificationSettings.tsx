@@ -52,6 +52,9 @@ export const ProfileNotificationSettings: React.FC = () => {
   const [soundError, setSoundError] = useState<string | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  // Locale changes must not trigger another personal sound library request.
+  const translateRef = useRef(t);
+  translateRef.current = t;
   const [help, setHelp] = useState<string | null>(null);
   const [symbol, setSymbol] = useState(settings.impulseSymbol.replace(/USDT$/, ''));
   const [threshold, setThreshold] = useState(String(settings.impulseThresholdPct));
@@ -79,7 +82,7 @@ export const ProfileNotificationSettings: React.FC = () => {
       setPersonalTracks(library.tracks);
       setSelectedPersonalId(library.selectedId);
     }).catch(() => {
-      if (active) setSoundError(t('notifications.sound.readError'));
+      if (active) setSoundError(translateRef.current('notifications.sound.readError'));
     });
     return () => { active = false; };
   }, [soundUid]);
