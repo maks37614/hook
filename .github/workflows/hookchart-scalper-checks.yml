@@ -1,0 +1,51 @@
+name: HookChart Scalper Geometry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hookchart-scalper-checks.yml'
+      - 'src/components/hookchart/engine.tsx'
+      - 'src/components/hookchart/scalperLineProjection.ts'
+      - 'src/components/hookchart/scalperMode.ts'
+      - 'src/components/hookchart/OriginalHookChartSettings.tsx'
+      - 'tests/hookchart-cascade-ray-to-scale.test.ts'
+      - 'tests/hookchart-scalper-cascade-levels.test.ts'
+      - 'tests/hookchart-scalper-mode.test.ts'
+      - 'tests/hookchart-trend-line-width.test.ts'
+      - 'tests/hookchart-basic-help.test.ts'
+      - 'tests/hookchart-profile-shared-settings.test.ts'
+      - 'tests/hookchart-drawing-geometry-regressions.test.ts'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hookchart-scalper-checks.yml'
+      - 'src/components/hookchart/**'
+      - 'tests/hookchart-*.test.ts'
+  workflow_dispatch:
+
+jobs:
+  scalper-geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript safety
+        run: npm run typecheck
+      - name: Isolated Scalper, cascade and drawing regression tests
+        run: >
+          node --import ./tests/fixtures/offline-network.mjs
+          --import tsx --test --test-concurrency=1
+          tests/hookchart-cascade-ray-to-scale.test.ts
+          tests/hookchart-scalper-cascade-levels.test.ts
+          tests/hookchart-scalper-mode.test.ts
+          tests/hookchart-trend-line-width.test.ts
+          tests/hookchart-basic-help.test.ts
+          tests/hookchart-profile-shared-settings.test.ts
+          tests/hookchart-drawing-geometry-regressions.test.ts
