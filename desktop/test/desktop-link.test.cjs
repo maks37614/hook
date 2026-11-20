@@ -133,3 +133,23 @@ test('MetaScalp body read deadline prevents a stalled local response',async()=>{
   assert.equal(called,1);
   assert.ok(Date.now()-start < 3000,'must move to the next port instead of stalling');
 });
+
+test('command from an expired account session is never applied after sign-out',async()=>{
+  let cookiesRead=0, pollCount=0, sent=0;
+  const command={seq:1,symbol:'BTCUSDT',exchange:'binance',
+    marketType:'futures',binding:'002',createdAt:Date.now()};
+  let client;
+  client=new DesktopTickerRelayClient({
+    getCookie:async()=> (++cookiesRead===1 ? 'h00k-session=old' : 'h00k-session=new'),
+    fetchImpl:async()=>{
+      if(++pollCount===1) return {status:200,headers:{get:()=> 'old-epoch'},json:async()=>({command})};
+      client.stop();
+      return {status:204,headers:{get:()=> 'new-epoch'}};
+    },
+    onCommand:async()=>{sent++;return {ok:true};},
+  });
+  client.start();
+  await new Promise(resolve=>setTimeout(resolve,50));
+  assert.equal(sent,0);
+  assert.ok(cookiesRead>=2);
+});
