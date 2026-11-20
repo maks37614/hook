@@ -1,4 +1,4 @@
-import type { ScalperKind, ScalperLine, ScalperStatus } from './scalperMode';
+import type { ScalperKind, ScalperLine } from './scalperMode';
 
 /**
  * Visual-only right-edge projection for horizontal cascade tiers.
@@ -20,7 +20,8 @@ export function scalperRenderedLineEndX(
     : originalEndX;
 }
 
-/** Visual-only widths in CSS px. Do not change other Scalper formations. */
-export function scalperCascadeLineWidth(line: ScalperLine, status: ScalperStatus): number {
-  return line.role === 'cascade-step' ? 0.2 : status === 'confirmed' ? 0.8 : 0.5;
+/** One visual-only width for all automatic Scalper lines, independent of manual drawings. */
+export function normalizeScalperLineWidth(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0.2, Math.min(5, value)) : 0.4;
 }

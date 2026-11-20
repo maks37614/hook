@@ -14,6 +14,7 @@ import { applyVisualDefaultsForDevice, VISUAL_ZOOM_MIN, VISUAL_ZOOM_MAX, VISUAL_
 import type { Candle, Viewport } from './engine';
 import { HookChartVisualPreview } from './HookChartVisualPreview';
 import { DEFAULT_CROSSHAIR_LINE_WIDTH, normalizeCrosshairLineWidth } from './chartCursor';
+import { normalizeScalperLineWidth } from './scalperLineProjection';
 import { STRATEGY_FUTURES_NOTE, STRATEGY_PRESETS } from './strategyEngine';
 
 export type HookChartHotkeyAction =
@@ -76,7 +77,7 @@ export const ORIGINAL_HOOKCHART_DEFAULTS: HookChartPreferences = {
   crosshairLineWidth: DEFAULT_CROSSHAIR_LINE_WIDTH,
   horizontalDrawingLineWidth: 0.4,
   trendDrawingLineWidth: 0.4,
-  scalperTrendLineWidth: 0.9,
+  scalperLineWidth: 0.4,
   showMarketPrintSums: false,
   showMarketPrintArrows: true,
   marketPrintArrowSize: 4,
@@ -205,8 +206,11 @@ export function normalizeOriginalHookChartPreferences(source?: HookChartPreferen
     ? Math.max(0.2, Math.min(5, source!.horizontalDrawingLineWidth!)) : 0.4;
   next.trendDrawingLineWidth = Number.isFinite(source?.trendDrawingLineWidth)
     ? Math.max(0.2, Math.min(5, source!.trendDrawingLineWidth!)) : 0.4;
-  next.scalperTrendLineWidth = Number.isFinite(source?.scalperTrendLineWidth)
-    ? Math.max(0.2, Math.min(5, source!.scalperTrendLineWidth!)) : 0.9;
+  // Old 0.9px was the trend-only default; switch it to the new 0.4px default.
+  // Preserve a genuinely customized legacy value when this new control is absent.
+  const legacyCustomWidth = source?.scalperTrendLineWidth === 0.9 ? undefined : source?.scalperTrendLineWidth;
+  next.scalperLineWidth = normalizeScalperLineWidth(source?.scalperLineWidth ?? legacyCustomWidth);
+  delete next.scalperTrendLineWidth;
   // Explicit true only. Existing accounts cannot opt in accidentally.
   next.showModeledLiquidationZones = source?.showModeledLiquidationZones === true;
   next.scalperMode = source?.scalperMode === true;
@@ -997,9 +1001,9 @@ export function OriginalHookChartSettings({
               value={prefs.showScalperTouchPoints !== false}
               onChange={value => set('showScalperTouchPoints', value)}
             />
-            <Setting label="Товщина трендової лінії (Скальпер)"
-              desc="Змінює лише автоматично знайдені трендові лінії Режиму Скальпера. Не впливає на ручні малюнки, трикутники чи інші фігури.">
-              <Num value={prefs.scalperTrendLineWidth ?? 0.9} min={0.2} max={5} step={0.1} set={value => set('scalperTrendLineWidth', value)} /><b className="valueBadge">px</b>
+            <Setting label="Товщина ліній"
+              desc="Змінює товщину всіх автоматичних ліній Режиму Скальпера: трендових, діапазонів, трикутників, клинів, W/M та каскадів. Не впливає на ручні малюнки чи інші шари графіка.">
+              <Num value={prefs.scalperLineWidth ?? 0.4} min={0.2} max={5} step={0.1} set={value => set('scalperLineWidth', value)} /><b className="valueBadge">px</b>
             </Setting>
           </Section>
 
