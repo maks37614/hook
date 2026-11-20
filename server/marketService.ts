@@ -102,6 +102,35 @@ function rememberKlines(key: string, data: Kline[], requestedAt: number) {
   while (klinesMemoryCache.size > 500) klinesMemoryCache.delete(klinesMemoryCache.keys().next().value!);
 }
 
+/**
+ * Reuse a completed 1m quote-turnover candle that is ALREADY in the chart
+ * cache, irrespective of the chart's requested history length (10/70/500).
+ * The AV footer previously requested its own limit=10 cache key while live
+ * charts often had limit=500, wasting IP budget and returning null under load.
+ *
+ * The entry must have been fetched after the requested candle closed: data
+ * downloaded mid-candle cannot be treated as its final quote turnover.
+ * This is cache-only: zero exchange requests, sockets, timers or cache writes.
+ */
+export function getCachedCompletedMinuteQuoteVolume(
+  exchange: ExchangeId, market: MarketType, symbol: string, minuteStart: number,
+  cache: ReadonlyMap<string, KlineCacheEntry> = klinesMemoryCache,
+): number | null {
+  if (!Number.isSafeInteger(minuteStart) || minuteStart <= 0 || minuteStart % 60_000 !== 0) return null;
+  const prefix = `${exchange}:${market}:${normalizeExchangeSymbol(symbol)}:1m:`;
+  const closedAt = minuteStart + 60_000;
+  for (const [key, entry] of cache) {
+    if (!key.startsWith(prefix) || entry.requestedAt < closedAt || !Array.isArray(entry.data)) continue;
+    for (let i = entry.data.length - 1; i >= 0; i--) {
+      const candle = entry.data[i];
+      if (candle.time * 1000 !== minuteStart) continue;
+      const volume = candle.quoteVolume;
+      if (typeof volume === 'number' && Number.isFinite(volume) && volume >= 0) return volume;
+    }
+  }
+  return null;
+}
+
 export function formationCandleData(
   klines: Kline[], timeframe: Timeframe, collectedAt: number, now = Date.now(), knownClosedBefore = collectedAt,
 ) {
