@@ -329,7 +329,7 @@ test('hidden Terminal market-presets menu only ranks the active category while p
   assert.match(panel, /selectMarketPresetCoins\(snapshot\.coins, id, selection, Number\.POSITIVE_INFINITY\)/);
 });
 
-test('Terminal reload recovers conflicting local charts rather than overwriting them with the cloud', () => {
+test('Terminal reload always trusts the cloud, even when an obsolete browser conflict backup exists', () => {
   const uid = 'terminal-conflict-recovery-test';
   const entries = new Map<string, string>();
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -350,18 +350,12 @@ test('Terminal reload recovers conflicting local charts rather than overwriting 
       blocks: [{ id: 'local', symbol: 'ETHUSDT', exchange: 'bybit', marketType: 'spot', timeframe: '5m', colSpan: 1 }],
       presets: [],
     }));
-    const local = loadTerminalWorkspace(uid, cloud);
-    assert.equal(local.blocks.length, 1);
-    assert.equal(local.blocks[0].symbol, 'ETHUSDT');
-    assert.equal(local.blocks[0].exchange, 'bybit');
-    assert.equal(local.config.columns, 3);
-    entries.delete(conflictKey);
-    const remote = loadTerminalWorkspace(uid, cloud);
-    assert.equal(remote.blocks[0].symbol, 'BTCUSDT');
-    assert.equal(remote.config.columns, 2);
+    const restored = loadTerminalWorkspace(uid, cloud);
+    assert.equal(restored.blocks.length, 1);
+    assert.equal(restored.blocks[0].symbol, 'BTCUSDT');
+    assert.equal(restored.config.columns, 2);
     entries.set(conflictKey, JSON.stringify({ blocks: 'invalid' }));
-    const corrupted = loadTerminalWorkspace(uid, cloud);
-    assert.equal(corrupted.blocks[0].symbol, 'BTCUSDT');
+    assert.equal(loadTerminalWorkspace(uid, cloud).blocks[0].symbol, 'BTCUSDT');
   } finally {
     if (original) Object.defineProperty(globalThis, 'localStorage', original);
     else Reflect.deleteProperty(globalThis, 'localStorage');
