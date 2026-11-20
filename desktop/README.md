@@ -46,7 +46,19 @@ and Tiger local integrations are kept untouched.
    Turn on **Send to h00k Desktop instead of local MetaScalp** on that tablet.
 4. Select a coin via an existing site ticker-link action. The tablet uses
    a protected account route, and the Electron main process forwards only
-   `tickerPattern` and `binding` to `127.0.0.1:17845..17855/api/change-ticker`.
+   symbol, exchange, market and binding to the running Windows MetaScalp API.
+5. When binding `002` contains Spot and Futures order books with different
+   connections, Desktop reads `GET /api/ui/state` and switches each panel
+   using `PUT /api/ui/documents/{externalId}/ticker`. Each pane retains
+   its existing spot/futures connection; no futures suffix is sent to Spot.
+   The same behavior is supported for direct website-to-local-PC linking.
+   A legacy MetaScalp without UI inventory uses the original
+   `POST /api/change-ticker` named-group behavior instead.
+
+These changes affect **ticker selection only**, not orders, positions,
+trading or terminal link settings. If the instrument does not actually
+exist in Spot on the configured exchange, the Spot book cannot display it.
+The per-panel API confirms accepting the command, not the rendered result.
 
 The tablet web browser cannot safely access the Windows process's localhost.
 For browser compatibility this design uses h00k.top HTTPS as a lightweight

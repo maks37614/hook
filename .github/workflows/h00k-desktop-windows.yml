@@ -14,6 +14,11 @@ on:
     paths:
       - 'desktop/**'
       - '.github/workflows/h00k-desktop-windows.yml'
+  # Publish a fresh Windows installer only when Desktop's version changes.
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/package.json'
 jobs:
   windows-build:
     runs-on: windows-latest
@@ -36,43 +41,43 @@ jobs:
       - name: Compile and execute read-only Win32 window agent
         run: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File win-agent.ps1 -Once
       - name: Build Windows installer
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: npm run dist
       - name: Verify installer EXE embeds original h00k robot icon
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $installer = Get-ChildItem dist -Filter '*.exe' | Select-Object -First 1
           if (-not $installer) { throw 'Windows installer not found' }
           & ./scripts/verify-installer-icon.ps1 -Installer $installer.FullName -RobotIcon ./build/h00k-installer.ico
       - name: Smoke-test NSIS installer and shortcut on real Windows
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $installer = Get-ChildItem dist -Filter '*.exe' | Select-Object -First 1
           if (-not $installer) { throw 'Windows installer not found' }
           & ./scripts/smoke-installer.ps1 -Installer $installer.FullName
       - name: Prepare animated compact setup and embed checked NSIS payload
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: node installer/prepare.cjs
       - name: Test compact setup security, progress and locales
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: npm test --prefix installer
       - name: Build isolated animated h00k Setup
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         env:
           DEBUG: electron-builder
         run: ./installer/build-isolated.ps1
       - name: Verify branded icon in animated setup EXE
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $setup = Get-ChildItem installer/dist -Filter '*.exe' | Select-Object -First 1
           if (-not $setup) { throw 'Animated h00k Setup not found' }
           & ./scripts/verify-installer-icon.ps1 -Installer $setup.FullName -RobotIcon ./build/h00k-installer.ico
       - name: Verify portable setup actually contains the NSIS payload
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $setup = Get-ChildItem installer/dist -Filter '*.exe' | Select-Object -First 1
@@ -80,7 +85,7 @@ jobs:
           $proc = Start-Process -FilePath $setup.FullName -ArgumentList '--self-test' -Wait -PassThru
           if ($proc.ExitCode -ne 0) { throw "Animated setup integrity test failed: $($proc.ExitCode)" }
       - name: Publish SHA-256 for animated setup
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $setup = Get-ChildItem installer/dist -Filter '*.exe' | Select-Object -First 1
@@ -88,7 +93,7 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($setup.Name)" | Set-Content -LiteralPath installer/dist/SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         with:
           name: h00k-animated-windows-setup
           path: |
@@ -96,7 +101,7 @@ jobs:
             desktop/installer/dist/SHA256SUMS.txt
           if-no-files-found: error
       - name: Generate SHA-256 checksum
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         shell: pwsh
         run: |
           $installer = Get-ChildItem dist -Filter '*.exe' | Select-Object -First 1
@@ -105,7 +110,7 @@ jobs:
           "$hash  $($installer.Name)" | Set-Content -LiteralPath 'dist/SHA256SUMS.txt' -Encoding ascii
           Write-Host "SHA256 $($installer.Name): $hash"
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         with:
           name: h00k-desktop-windows
           path: |

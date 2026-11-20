@@ -9,6 +9,7 @@ import {
   pingMetaScalpPort,
   saveStoredMetaScalpSettings,
   sendTickerToMetaScalp,
+  linkedMetaScalpPanels,
 } from '../src/utils/metaScalpService';
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -79,6 +80,7 @@ test('sending reaches every supported discovery port and never posts to another 
       assert.deepEqual(JSON.parse(String(options.body)), { tickerPattern: 'BINANCE:BTCUSDT.p', binding: '001' });
       return json({ status: 'ok' });
     }
+    if (url.pathname === '/api/ui/state') return json({error:'Not found'}, 400);
     assert.equal(url.pathname, '/ping');
     return port === activePort ? json({ app: 'MetaScalp' }) : json({ app: 'AnotherApp' });
   });
@@ -116,7 +118,7 @@ test('multiple running terminals honor the user preferred port', async (t) => {
   });
   const result = await sendTickerToMetaScalp('BTCUSDT', 'bybit', 'spot', { port: 17853, binding: '321' });
   assert.equal(result.portUsed, 17853);
-  assert.deepEqual(requests, [17853, 17853]);
+  assert.deepEqual(requests, [17853, 17853, 17853]); // ping, UI inventory, change-ticker
 });
 
 test('invalid preferred ports fall back to the supported range', async (t) => {
@@ -199,6 +201,11 @@ test('the actual HTTP client completes discovery and an official API command on 
       response.end(JSON.stringify({ app: 'MetaScalp', version: '0.0.9' }));
       return;
     }
+    if (request.url === '/api/ui/state' && request.method === 'GET') {
+      response.statusCode = 400; // Simulate old MetaScalp without the panel inventory API.
+      response.end(JSON.stringify({ error: 'Not found' }));
+      return;
+    }
     let body = '';
     request.on('data', (chunk) => { body += chunk; });
     request.on('end', () => {
@@ -220,4 +227,51 @@ test('the actual HTTP client completes discovery and an official API command on 
   assert.equal(result.success, true);
   assert.equal(result.portUsed, address.port);
   assert.deepEqual(payload, { tickerPattern: 'BYBIT:ETHUSDT.p', binding: '500' });
+});
+
+const FUTURES_PANEL='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const SPOT_PANEL='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+test('browser-side MetaScalp mixed group preserves each market and ignores other groups', async (t) => {
+  mockClipboard(t);
+  const calls: { path: string; method: string; body: unknown }[] = [];
+  const state={ windows:[{tabs:[{documents:[
+    { externalId:FUTURES_PANEL, linkNumber:2, kind:'orderBook', connectionId:11 },
+    { externalId:SPOT_PANEL, linkNumber:2, kind:'orderBook', connectionId:22 },
+    { externalId:'cccccccc-cccc-cccc-cccc-cccccccccccc', linkNumber:3, kind:'chart', connectionId:33 },
+  ]}]}], standaloneCharts:[] };
+  mockApi(t, (url, opts) => {
+    calls.push({path:url.pathname, method:opts.method || 'GET', body:opts.body});
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json(state);
+    if(url.pathname.includes('/api/ui/documents/'))return json({status:'ok'});
+    throw Error('Unexpected endpoint '+url.pathname);
+  });
+  const result=await sendTickerToMetaScalp('BTCUSDT','binance','futures',{binding:'002'});
+  assert.equal(result.success,true);
+  assert.match(result.message,/Spot\/Futures/);
+  const writes=calls.filter(x=>x.method==='PUT');
+  assert.deepEqual(writes.map(x=>x.path).sort(),[FUTURES_PANEL,SPOT_PANEL]
+    .map(id=>'/api/ui/documents/'+id+'/ticker').sort());
+  for(const item of writes)assert.deepEqual(JSON.parse(String(item.body)),{ticker:'BTCUSDT'});
+  assert.equal(calls.some(x=>x.path==='/api/change-ticker'),false);
+  assert.deepEqual(linkedMetaScalpPanels(state,'002')?.documents?.map(d=>d.connectionId),[11,22]);
+});
+
+test('browser side distinguishes a partial MetaScalp per-panel update from full success',async(t)=>{
+  mockClipboard(t);
+  const state={windows:[{tabs:[{documents:[
+    {externalId:FUTURES_PANEL,linkNumber:2,kind:'orderBook',connectionId:11},
+    {externalId:SPOT_PANEL,linkNumber:2,kind:'orderBook',connectionId:22},
+  ]}]}],standaloneCharts:[]};
+  mockApi(t,(url)=>{
+    if(url.pathname==='/ping')return json({app:'MetaScalp'});
+    if(url.pathname==='/api/ui/state')return json(state);
+    if(url.pathname.includes(FUTURES_PANEL))return json({status:'ok'});
+    if(url.pathname.includes(SPOT_PANEL))return json({error:'Unavailable'},400);
+    throw Error('Unexpected endpoint '+url.pathname);
+  });
+  const result=await sendTickerToMetaScalp('BTCUSDT','binance','spot',{binding:'002'});
+  assert.equal(result.success,false);
+  assert.match(result.message,/1 з 2/);
 });

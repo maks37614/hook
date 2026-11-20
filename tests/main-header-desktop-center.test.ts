@@ -89,3 +89,15 @@ test('desktop Terminal gap is reduced without moving the centered logo or hiding
     assert.match(nav, new RegExp('id="nav-category-' + tab + '-btn"'));
   }
 });
+
+test('Desktop header cannot mask the right-side notification and terminal buttons',()=>{
+  // The outer centered logo overlay occupies the full header width but must
+  // never be a hit target. Its utility child must be its intrinsic width only.
+  assert.match(brand, /xl:pointer-events-none xl:absolute xl:inset-x-0/);
+  assert.match(brand, /xl:w-max xl:justify-self-start xl:pointer-events-auto/);
+  assert.match(source, /xl:relative xl:z-20 xl:w-auto xl:flex-nowrap/);
+  assert.match(source, /<SiteNotificationBell/);
+  for(const id of ['open-metascalp-btn','open-watchlist-btn','open-telegram-btn',
+    'open-surveillance-btn','open-archive-btn','open-guide-btn'])
+    assert.ok(source.includes('id="' + id + '"'), 'Missing interactive header button ' + id);
+});

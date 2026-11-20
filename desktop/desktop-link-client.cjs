@@ -36,7 +36,44 @@ async function jsonFetch(fetchImpl, url, options, timeoutMs) {
   }
 }
 
-/** The ONLY local HTTP write is /api/change-ticker. No orders or trading APIs. */
+/**
+ * MetaScalp's UI inventory includes each panel's binding group and connection.
+ * A mixed spot/futures group must switch its panels individually: sending
+ * BINANCE:BTCUSDT.p to the whole group asks a spot book to open a futures pair.
+ *
+ * Never accept an external URL: every read/write below targets the already
+ * discovered MetaScalp loopback port and a GUID from its own UI inventory.
+ */
+const DOCUMENT_GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const MAX_LINKED_PANELS = 16;
+function linkedTickerDocuments(state, binding) {
+  if (!state || !Array.isArray(state.windows) || !Array.isArray(state.standaloneCharts))
+    return null; // Older API: no compatible inventory.
+  const docs = [];
+  for (const window of state.windows) {
+    if (!Array.isArray(window?.tabs)) continue;
+    for (const tab of window.tabs) {
+      if (Array.isArray(tab?.documents)) docs.push(...tab.documents);
+    }
+  }
+  docs.push(...state.standaloneCharts);
+  const matched = docs.filter(doc => doc && Number.isInteger(doc.linkNumber)
+    && doc.linkNumber === binding && ['orderBook','chart'].includes(doc.kind));
+  if (matched.length > MAX_LINKED_PANELS) return { error: 'METASCALP_TOO_MANY_PANELS' };
+  const found = [];
+  const ids = new Set();
+  for (const doc of matched) {
+    if (!DOCUMENT_GUID.test(doc.externalId || '') || !Number.isSafeInteger(doc.connectionId)
+      || doc.connectionId <= 0) return { error: 'METASCALP_UNBOUND_PANEL' };
+    const id = doc.externalId.toLowerCase();
+    if (ids.has(id)) continue;
+    ids.add(id);
+    found.push({ externalId: id, connectionId: doc.connectionId });
+  }
+  return { documents: found };
+}
+
+/** Local writes are restricted to ticker-only actions. NEVER trading orders. */
 class MetaScalpTickerSender {
   constructor(fetchImpl = globalThis.fetch) {
     this.fetch = fetchImpl;
@@ -67,8 +104,45 @@ class MetaScalpTickerSender {
       return {ok:true, duplicate:true};
     const port = await this.findPort();
     if (port === null) return {ok:false, reason:'METASCALP_OFFLINE'};
+    const base = 'http://127.0.0.1:'+port;
     try {
-      const response = await jsonFetch(this.fetch,'http://127.0.0.1:'+port+'/api/change-ticker',{
+      let linked=null;
+      try {
+        const inventory = await jsonFetch(this.fetch,base+'/api/ui/state',{
+          method:'GET',headers:{Accept:'application/json'},
+        },1200);
+        if (inventory.ok) linked=linkedTickerDocuments(inventory.body,Number(command.binding));
+      } catch { /* Older MetaScalp: preserve existing group-linking behavior. */ }
+      if (linked?.error) return {ok:false,reason:linked.error};
+      // Empty inventory might be a legacy binding representation; let the
+      // original MetaScalp endpoint validate the requested named group.
+      const docs=linked?.documents || [];
+      const hasMixedConnections=docs.length>1
+        && new Set(docs.map(doc=>doc.connectionId)).size>1;
+      if (hasMixedConnections) {
+        // Only per-document ticker writes: each panel inherits its existing
+        // connection (spot/futures and exchange), so no market gets converted.
+        const results = await Promise.all(docs.map(async doc => {
+          try {
+            const response = await jsonFetch(this.fetch,
+              base+'/api/ui/documents/'+doc.externalId+'/ticker',{
+                method:'PUT',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({ticker:command.symbol}),
+              },1600);
+            return response.ok && response.body?.status === 'ok';
+          } catch { return false; }
+        }));
+        const succeeded=results.filter(Boolean).length;
+        if (succeeded !== docs.length) return {
+          ok:false,reason:'METASCALP_PARTIAL',succeeded,total:docs.length,
+        };
+        this.lastCommandKey=key;
+        this.lastCommandAt=Date.now();
+        return {ok:true,port,mode:'per-panel',panels:succeeded};
+      }
+      // Single-market group (or older API without UI inventory): retain
+      // MetaScalp's original named-binding behavior and ticker suffix.
+      const response = await jsonFetch(this.fetch,base+'/api/change-ticker',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({tickerPattern:command.tickerPattern,binding:command.binding}),
@@ -76,7 +150,7 @@ class MetaScalpTickerSender {
       if (!response.ok || response.body?.status !== 'ok') return {ok:false, reason:'METASCALP_REJECTED'};
       this.lastCommandKey=key;
       this.lastCommandAt=Date.now();
-      return {ok:true, port};
+      return {ok:true,port,mode:'named-group',legacy:linked===null};
     } catch {
       this.port=null;
       return {ok:false, reason:'METASCALP_UNREACHABLE'};
@@ -211,4 +285,4 @@ class DesktopTickerRelayClient {
   }
 }
 
-module.exports = { normalizeCommand, MetaScalpTickerSender, DesktopTickerRelayClient };
+module.exports = { normalizeCommand, linkedTickerDocuments, MetaScalpTickerSender, DesktopTickerRelayClient };
