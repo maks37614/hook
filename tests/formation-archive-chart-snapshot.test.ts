@@ -192,7 +192,7 @@ test('single on-click canvas export excludes local alerts and strategy signals',
   for (const prop of ['autoSR','autoPrevDay','autoDayOpen','autoVWAP','autoLocalHL','autoRoundLevels','autoPOC','autoChannel','autoStops'])
     assert.ok(canvas.includes('runtimeSettings.'+prop));
   assert.match(canvas,/drawingsRef\.current\.filter\(d => d\.id\.startsWith\(symbol\+':'\)\)/);
-  assert.match(canvas,/scalperResult\?\.setups\.flatMap/);
+  assert.match(canvas,/visibleScalperLines\(scalperResult, candles\)/);
   assert.match(canvas,/liquidationMap:\{ enabled:!!mapChartData && liquidationMapOn/);
 });
 
