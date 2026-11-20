@@ -80,6 +80,9 @@ interface TerminalPageProps {
   coins: ScannedCoin[];
   /** The already-filtered, already-sorted list displayed on Formations. */
   formationPresetCoins?: readonly ScannedCoin[];
+  /** Optional one-shot request, only on a click with no visible Formations coins. */
+  onRequestFormationScan?: () => boolean;
+  formationScanStatus?: 'idle' | 'loading' | 'ready' | 'busy' | 'failed';
   watchlist: string[];
   onToggleWatchlist: (symbol: string) => void;
   onSendMetaScalp?: (coin: ScannedCoin) => void;
@@ -92,6 +95,8 @@ interface TerminalPageProps {
 export const TerminalPage: React.FC<TerminalPageProps> = ({
   coins: formationCoins,
   formationPresetCoins = [],
+  onRequestFormationScan,
+  formationScanStatus = 'idle',
   watchlist,
   onToggleWatchlist,
   onSendMetaScalp,
@@ -1558,6 +1563,8 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           <TerminalPresetPanel
             blocks={blocks} watchlist={localWatchlist} presets={customPresets}
             formationCoins={formationPresetCoins}
+            onRequestFormationScan={onRequestFormationScan}
+            formationScanStatus={formationScanStatus}
             selection={coinPresetSelection} timeframe={timeframe} activePreset={activeMarketPreset} autoUpdate={presetAutoUpdate}
             menuOpen={showCoinPresets}
             snapshot={marketSnapshot} loading={marketLoading} error={marketError}
