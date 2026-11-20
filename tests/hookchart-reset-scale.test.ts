@@ -34,7 +34,8 @@ test('reset protects against invalid widths and does not modify draw/feed state'
 test('HookChart candle-fit reset excludes distant overlay levels from automatic Y scale', () => {
   const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
   assert.match(engine, /const candleAutoScale=\(terminalAutoScale&&!manualPriceAxisOverride\.current\)\s*\|\|\(formationAutoScale&&vp\.autoY\)\|\|\(vp\.autoY&&vp\.candleFit===true\)/);
-  assert.match(engine, /if\(!candleAutoScale&&vp\.autoY&&candles\.length&&densities\.length\)/);
+  assert.match(engine, /if\(!candleAutoScale&&vp\.autoY&&candles\.length&&cachedNearDensityPrices\.length\)/);
+  assert.match(engine, /const cachedNearDensityPrices=useMemo\(/);
   assert.match(engine, /if\(candleAutoScale\)\{/);
   assert.match(engine, /const reset=\(\)=>\{[\s\S]*?latestCandleResetViewport\(/);
   assert.match(engine, /terminalCandlePriceRange\(lo,hi,plotH,showVolumes\)/);
