@@ -49,6 +49,12 @@
 <label class="check"><input type="checkbox" id="follow"> Слідувати за вікном</label>
 <label class="check"><input type="checkbox" id="alwaysOnTop"> Завжди поверх вікон</label>
 </div><p>Коли «Слідувати» вимкнено, можна вільно розміщувати плаваючі панелі. Їхнє розташування на моніторах автоматично зберігається й відновлюється під час наступного запуску.</p></section>
+<section id="remoteLinkSection">
+<h2>5. Лінковка MetaScalp з планшета</h2>
+<label class="check"><input type="checkbox" id="remoteLinkEnabled"> Приймати перемикання монет з планшета через h00k Desktop</label>
+<p>Увійдіть в один акаунт h00k.top на планшеті та в окремому вікні h00k Desktop. На планшеті ввімкніть «Надсилати в h00k Desktop» у налаштуваннях лінковки. Стакан і графіки MetaScalp мають бути в одній групі (наприклад 001). Команди передаються через захищений акаунт, а MetaScalp доступний тільки цьому комп’ютеру.</p>
+<div id="remoteLinkStatus" role="status">Вимкнено</div>
+</section>
 <div class="row"><button class="action primary" id="save">Зберегти налаштування</button><button class="action" id="attach">Автоприкріпити зараз</button><button class="action danger" id="detach">Відкріпити</button></div>
 <div id="feedback" role="status"></div><small>Налаштування зберігаються лише на цьому комп’ютері. Програма не запитує біржові API-ключі.</small>
 <p>Примітка: Google OAuth може не працювати у вбудованому вікні Windows через правила Google для embedded webviews. Для входу безпосередньо в h00k Desktop використовуйте email і пароль; вхід у зовнішньому браузері не переносить авторизацію автоматично.</p>
@@ -98,6 +104,7 @@ function applyLanguage(){
   }
   lastWindowsList=''; // The default choice is localized even when the window list is unchanged.
   drawStatus();
+  updateRemoteLink();
   if(feedbackValue)byId('feedback').textContent=feedbackIsStatus
     ? i18n.translateStatus(feedbackValue,language):t(feedbackValue);
 }
@@ -106,6 +113,10 @@ function setFeedback(value,isStatus=false){
   feedbackValue=value;feedbackIsStatus=isStatus;
   byId('feedback').textContent=isStatus?i18n.translateStatus(value,language):t(value);
 }
+byId('remoteLinkEnabled').onchange=async e=>{
+  try {snap=await api.setRemoteLinkEnabled(e.target.checked);updateRemoteLink();}
+  catch(err){error(err);updateRemoteLink();}
+};
 byId('language').onchange=e=>{
   if(!i18n.languages.includes(e.target.value))return;
   language=e.target.value;
@@ -163,6 +174,17 @@ function drawStatus(){
   }else byId('target').value='';
   byId('vataga').hidden=active!=='vataga';
 }
+const remoteStatusLabels={
+  'disabled':'Вимкнено', 'sign-in':'Увійдіть до h00k.top у вікні Desktop',
+  'connected':'Планшет може надсилати монети', 'metascalp-offline':'MetaScalp не знайдено на комп’ютері',
+  'metascalp-error':'MetaScalp відхилив команду',
+  'relay-unavailable':'Немає з’єднання з h00k.top',
+};
+function updateRemoteLink(){
+  if(!snap)return;
+  byId('remoteLinkEnabled').checked=!!snap.remoteLink?.enabled;
+  byId('remoteLinkStatus').textContent=t(remoteStatusLabels[snap.remoteLink?.status]||'Очікування');
+}
 function render(){
   if(!snap)return;const p=snap.settings.profiles[active];loadedMode=p.mode;
   byId('tabs').replaceChildren(...providers.map(([id,name])=>{
@@ -181,6 +203,7 @@ function render(){
   for(const id of ['width','height'])byId(id).value=p[id];
   drawOnboarding();
   drawStatus();
+  updateRemoteLink();
 }
 function form(){
   const mode=selected('mode');
@@ -221,7 +244,7 @@ api.onSnapshot(value=>{
   const pristine=previous && savedDraftMatches(previous);
   const changed=pristine && JSON.stringify(previous)!==JSON.stringify(value.settings.profiles[active]);
   snap=value;
-  if(changed)render(); else {drawOnboarding();drawStatus();}
+  if(changed)render(); else {drawOnboarding();drawStatus();updateRemoteLink();}
 });
 applyLanguage();
 api.snapshot().then(value=>{
