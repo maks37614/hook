@@ -40,7 +40,7 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
   // Includes two newly exposed Scalper styling controls; every Basic
   // setting still has exactly one contextual question-mark help trigger.
   const count = (html.match(/aria-label="Пояснення: /g) || []).length;
-  assert.equal(count, 75);
+  assert.equal(count, 76);
   assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, count);
   assert.match(html, /Пояснення: Вигляд ліній Режиму Скальпера/);
   assert.match(html, /Пояснення: Показувати точки Режиму Скальпера/);
@@ -50,6 +50,7 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
   assert.match(html, /Пояснення: Товщина лінії тренду/);
   assert.match(html, /Пояснення: Товщина трендової лінії \(Скальпер\)/);
   assert.match(html, /Пояснення: Режим Скальпера/);
+  assert.match(html, /Пояснення: Авто позначення каскадних рівнів/);
   assert.match(html, /Пояснення: Показувати підписи Режиму Скальпера/);
   assert.match(html, /Пояснення: Усереднена регресійна лінія/);
   assert.doesNotMatch(html, /Ще не реалізовано/);

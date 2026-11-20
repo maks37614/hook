@@ -1958,7 +1958,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     : visualProfile?candleView
     : {barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:false,candleFit:false});
  };
- const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true,candleFit:terminalMode?true:v.candleFit}),'focus')};
+ const fitAllHistory=()=>{terminalNavigation.current=true;manualPriceAxisOverride.current=false;fitAllScopeRef.current=fitAllScopeKey;setGestureVp(v=>({...v,rightOffset:0,autoY:true,manualCenter:null,manualRange:null,yZoom:1,fitAll:true,...(terminalMode?{candleFit:true}:{})}),'focus')};
  // The Terminal drawer's Apply button uses exactly the same action as the
  // per-chart "Show all history" control. Run after the saved profile layout
  // effect so fitting all candles wins over the just-applied startup view.

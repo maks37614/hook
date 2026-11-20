@@ -69,7 +69,10 @@ test('switching off auto-scale reapplies the saved Terminal profile, not a hardc
 
 test('restore uses existing visible candles only, without touching WebSockets or the candle renderer', () => {
   const helper = read('src/components/hookchart/terminalAutoScale.ts');
-  const body = helper.slice(helper.indexOf('export function terminalSafeManualPriceViewport('));
+  const start = helper.indexOf('export function terminalSafeManualPriceViewport(');
+  const end = helper.indexOf('export function terminalViewportHistoryPhase(', start);
+  assert.ok(start >= 0 && end > start, 'check only the intended constant-time viewport helper');
+  const body = helper.slice(start, end);
   assert.doesNotMatch(body, /fetch\(|setTimeout\(|new WebSocket|new EventSource|localStorage|document\./);
   assert.match(body, /terminalCandlePriceRange\(candleLow, candleHigh, plotHeight, showVolumes\)/);
   assert.match(body, /terminalSafeVerticalZoomRange\(/);

@@ -69,9 +69,9 @@ test('cascade switch and captions are available in all four HookChart languages'
   for (const language of ['uk', 'en', 'pl', 'ru'] as const) {
     assert.notEqual(translateHookChartPhrase(language, label), '');
     assert.notEqual(scalperLabel('cascade', language), '');
-    const prefs = normalizeOriginalHookChartPreferences({ language, scalperMode: true, scalperCascadeLevels: true });
+    const prefs = normalizeOriginalHookChartPreferences({ language, siteLanguageAtSelection: 'uk', scalperMode: true, scalperCascadeLevels: true });
     const html = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
-      open: true, embedded: true, prefs,
+      open: true, embedded: true, prefs, selectedLanguage: language,
       onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
     }));
     assert.ok(html.includes('aria-label="' + translateHookChartPhrase(language, label) + '"'));
