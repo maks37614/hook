@@ -427,7 +427,7 @@ async function startServer() {
       !/^[A-Z0-9]{3,30}$/.test(symbol)) return res.status(400).json({ success: false, error: 'Invalid market/symbol' });
     res.setHeader('Cache-Control', 'public, max-age=20');
     const reading = await minuteTurnoverService.publicCoin(exchange as ExchangeId, market as MarketType, symbol);
-    res.json({ success: true, ...reading });
+    res.json({ success: true, ...reading, serverNow: Date.now() });
   });
 
   // Exact rolling trade count from Binance's 24h ticker (null if unsupported).

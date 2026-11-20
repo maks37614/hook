@@ -74,10 +74,13 @@ test('HookChart AV footer uses only cached 24h quotes or a full day of existing 
   const chart = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
   const backend = readFileSync(new URL('../server/marketTickerFeed.ts', import.meta.url), 'utf8');
   const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
-  assert.match(chart, /data-testid="hookchart-footer-av"/);
   assert.match(chart, /<HookChartFooterMinuteVolume/);
   const minute = readFileSync(new URL('../src/components/hookchart/HookChartFooterMinuteVolume.tsx', import.meta.url), 'utf8');
+  assert.match(minute, /data-testid="hookchart-footer-av"/);
   assert.match(minute, /AV 1m:/);
+  assert.match(minute, /parseMinuteVolumeResponse/);
+  assert.match(minute, /'minute-volume'/);
+  assert.match(server, /serverNow: Date.now\(\)/);
   assert.doesNotMatch(minute, /1440|AV 24h:/);
   assert.match(chart, /sharedPublicChartPolling\.subscribe/);
   assert.match(backend, /getCached24hVolumeUsd\(/);
