@@ -1586,6 +1586,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             pickerCoins={coins} pickerFormationCoins={formationCoins}
             formationCoins={formationPresetCoins}
             onRequestFormationScan={onRequestFormationScan}
+            onRequestMarketRefresh={() => requestMarketRefreshRef.current?.(true)}
             formationScanStatus={formationScanStatus}
             selection={coinPresetSelection} timeframe={timeframe} activePreset={activeMarketPreset} autoUpdate={presetAutoUpdate}
             menuOpen={showCoinPresets}
