@@ -18,6 +18,12 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
   };
   const check = () => {
     frame = null;
+    // A background tab has no visible charts. Suspend chart-level feeds and
+    // Canvas work even if an observer reports an old intersection.
+    if (document.visibilityState === 'hidden') {
+      for (const listener of listeners.values()) listener(false);
+      return;
+    }
     const screen = {
       top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth,
     };
@@ -28,7 +34,7 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
     }
   };
   const intersection = typeof IntersectionObserver === 'undefined' ? null
-    : new IntersectionObserver(onChange, { root, rootMargin: '160px 0px' });
+    : new IntersectionObserver(onChange, { root, rootMargin: '0px' });
   const resize = typeof ResizeObserver === 'undefined' ? null
     : new ResizeObserver(onChange);
   if (root) {
@@ -38,7 +44,13 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
   window.addEventListener('scroll', onChange, { passive: true });
   window.addEventListener('resize', onChange);
   window.addEventListener('orientationchange', onChange);
-  document.addEventListener('visibilitychange', onChange);
+  const onVisibilityChange = () => {
+    if (document.visibilityState !== 'hidden') { onChange(); return; }
+    if (frame !== null) window.cancelAnimationFrame(frame);
+    frame = null;
+    for (const listener of listeners.values()) listener(false);
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   return {
     subscribe(node, listener) {
@@ -59,7 +71,7 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
         window.removeEventListener('scroll', onChange);
         window.removeEventListener('resize', onChange);
         window.removeEventListener('orientationchange', onChange);
-        document.removeEventListener('visibilitychange', onChange);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
         trackers.delete(key);
       };
     },
@@ -67,12 +79,16 @@ function createTracker(root: HTMLElement | null, key: HTMLElement): VisibilityTr
 }
 
 /**
- * Keep the Safari geometry fallback and 160px preload margin intact, but
- * coalesce expensive page-visibility geometry checks for the whole Terminal.
+ * Preserve the Safari geometry fallback without an offscreen preload band.
+ * Coalesce viewport geometry checks for all Terminal chart cards.
  * Widget state still updates independently only when its near state changes.
  */
-export function subscribeTerminalWidgetVisibility(node: HTMLElement, listener: Listener): () => void {
-  const root = node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
+export function subscribeTerminalWidgetVisibility(
+  node: HTMLElement, listener: Listener, useScreenViewport = false,
+): () => void {
+  // Maximized charts are fixed to the screen, not constrained by the
+  // scrolling panel that contains their DOM element.
+  const root = useScreenViewport ? null : node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
   const key = root ?? document.documentElement;
   let tracker = trackers.get(key);
   if (!tracker) {
