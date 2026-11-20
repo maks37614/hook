@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const { normalizeCommand, MetaScalpTickerSender, DesktopTickerRelayClient }=require('../desktop-link-client.cjs');
+const { normalizeCommand, linkedTickerDocuments, MetaScalpTickerSender, DesktopTickerRelayClient }=require('../desktop-link-client.cjs');
 
 test('symbol formatting keeps exchange, spot/futures and group',()=>{
   assert.deepEqual(normalizeCommand({symbol:'btcusdt',exchange:'binance',marketType:'futures',binding:'1'}),{
@@ -152,4 +152,97 @@ test('command from an expired account session is never applied after sign-out',a
   await new Promise(resolve=>setTimeout(resolve,50));
   assert.equal(sent,0);
   assert.ok(cookiesRead>=2);
+});
+
+const FIRST='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const SECOND='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const EXTRA='cccccccc-cccc-cccc-cccc-cccccccccccc';
+function mixedMetaScalpState() {
+  return {windows:[{tabs:[{documents:[
+    {externalId:FIRST,kind:'orderBook',linkNumber:2,connectionId:11,ticker:'ETHUSDT'},
+    {externalId:SECOND,kind:'orderBook',linkNumber:2,connectionId:22,ticker:'ETHUSDT'},
+    {externalId:EXTRA,kind:'orderBook',linkNumber:3,connectionId:33,ticker:'SOLUSDT'},
+  ]}]}],standaloneCharts:[]};
+}
+test('UI inventory selects only the requested binding and validates destinations',()=>{
+  assert.deepEqual(linkedTickerDocuments(mixedMetaScalpState(),2),{documents:[
+    {externalId:FIRST,connectionId:11},{externalId:SECOND,connectionId:22},
+  ]});
+  assert.deepEqual(linkedTickerDocuments(mixedMetaScalpState(),3),{documents:[
+    {externalId:EXTRA,connectionId:33},
+  ]});
+  assert.equal(linkedTickerDocuments({},2),null,'unsupported inventory must be recognized');
+  const malformed=mixedMetaScalpState();
+  malformed.windows[0].tabs[0].documents[0].externalId='../../orders';
+  assert.equal(linkedTickerDocuments(malformed,2).error,'METASCALP_UNBOUND_PANEL');
+});
+
+test('one click updates spot and futures books in 002 with their original connections',async()=>{
+  const calls=[];
+  const sender=new MetaScalpTickerSender(async(url,opts)=>{
+    calls.push([url,opts]);
+    if(url.endsWith('/ping')) return {ok:true,json:async()=>({app:'MetaScalp'})};
+    if(url.endsWith('/api/ui/state')) return {ok:true,json:async()=>mixedMetaScalpState()};
+    if(url.includes('/api/ui/documents/')) return {ok:true,json:async()=>({status:'ok'})};
+    throw Error('Unexpected local endpoint '+url);
+  });
+  const cmd={symbol:'btcusdt',exchange:'binance',marketType:'futures',binding:'002'};
+  const result=await sender.send(cmd);
+  assert.deepEqual(result,{ok:true,port:17845,mode:'per-panel',panels:2});
+  const writes=calls.filter(([url,opts])=>opts.method==='PUT');
+  assert.deepEqual(writes.map(([url])=>url).sort(),[FIRST,SECOND]
+    .map(id=>'http://127.0.0.1:17845/api/ui/documents/'+id+'/ticker').sort());
+  for(const [,opts] of writes) {
+    assert.deepEqual(JSON.parse(opts.body),{ticker:'BTCUSDT'});
+    assert.equal(opts.method,'PUT');
+  }
+  assert.equal(calls.filter(([url])=>url.endsWith('/api/change-ticker')).length,0,
+    'group-wide futures pattern must not be pushed into the spot book');
+  assert.ok(calls.every(([url])=>url.startsWith('http://127.0.0.1:')));
+  const again=await sender.send(cmd);
+  assert.equal(again.duplicate,true);
+  assert.equal(calls.filter(([url,opts])=>opts.method==='PUT').length,2);
+});
+
+test('mixed group includes charts and never changes other groups or empty documents',async()=>{
+  const state=mixedMetaScalpState();
+  state.standaloneCharts.push({externalId:'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    kind:'chart',linkNumber:2,connectionId:22,ticker:'ETHUSDT'});
+  state.windows[0].tabs[0].documents.push({
+    externalId:'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    kind:'chart',linkNumber:3,connectionId:22,ticker:'SOLUSDT',
+  });
+  const docs=linkedTickerDocuments(state,2);
+  assert.equal(docs.documents.length,3);
+  assert.ok(docs.documents.some(d=>d.externalId==='dddddddd-dddd-dddd-dddd-dddddddddddd'));
+  assert.ok(!docs.documents.some(d=>d.externalId===EXTRA));
+});
+
+test('mixed group reports partial delivery and does not mark it as successful',async()=>{
+  const sender=new MetaScalpTickerSender(async(url)=>{
+    if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+    if(url.endsWith('/api/ui/state'))return {ok:true,json:async()=>mixedMetaScalpState()};
+    if(url.includes('/api/ui/documents/'))return {ok:!url.includes(SECOND),json:async()=>(
+      url.includes(SECOND)?{error:'Document not found'}:{status:'ok'})};
+    throw Error('Other endpoints must not be called');
+  });
+  const r=await sender.send({symbol:'BTCUSDT',exchange:'binance',marketType:'spot',binding:'002'});
+  assert.deepEqual(r,{ok:false,reason:'METASCALP_PARTIAL',succeeded:1,total:2});
+  assert.equal(sender.lastCommandKey,'','failed delivery must allow retry');
+});
+
+test('legacy MetaScalp without UI inventory keeps the existing named-group route',async()=>{
+  const calls=[];
+  const sender=new MetaScalpTickerSender(async(url,opts)=>{
+    calls.push([url,opts]);
+    if(url.endsWith('/ping'))return {ok:true,json:async()=>({app:'MetaScalp'})};
+    if(url.endsWith('/api/ui/state'))return {ok:false,status:400,json:async()=>({error:'Not found'})};
+    if(url.endsWith('/api/change-ticker'))return {ok:true,json:async()=>({status:'ok'})};
+    throw Error('Unexpected '+url);
+  });
+  const r=await sender.send({symbol:'BTCUSDT',exchange:'binance',marketType:'futures',binding:'002'});
+  assert.equal(r.ok,true);
+  assert.equal(r.legacy,true);
+  assert.deepEqual(JSON.parse(calls.at(-1)[1].body),
+    {tickerPattern:'BINANCE:BTCUSDT.p',binding:'002'});
 });
