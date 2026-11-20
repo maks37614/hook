@@ -184,6 +184,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   const [minuteReady, setMinuteReady] = useState(false);
   const [minuteError, setMinuteError] = useState<string | null>(null);
   const [minuteRows, setMinuteRows] = useState<Array<{symbol:string;exchange:ExchangeId;marketType:MarketType;volume1mUsd:number;minuteStart:number}>>([]);
+  const presetAutoUpdate = config.presetAutoUpdate !== false;
   const minuteDemand = (showCoinPresets && minuteRequested) || (avOneMinuteActive && presetAutoUpdate);
   useEffect(() => {
     if (!minuteDemand) return;
@@ -305,7 +306,6 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
       ? current : { ...current, terminalRefreshMs: value });
   }, [setConfig]);
 
-  const presetAutoUpdate = config.presetAutoUpdate !== false;
   const setPresetAutoUpdate = useCallback((value: boolean) => {
     setConfig(current => current.presetAutoUpdate === value
       ? current : { ...current, presetAutoUpdate: value });
