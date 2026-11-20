@@ -26,7 +26,7 @@ export function parseMinuteVolumeResponse(response: unknown, receivedAt: number)
   if (!response || typeof response !== 'object') return null;
   const data = response as { success?: unknown; serverNow?: unknown; minuteStart?: unknown; volume1mUsd?: unknown };
   if (data.success !== true || !validMinuteVolume(data)) return null;
-  const serverNow = data.serverNow;
+  const serverNow = (response as { serverNow?: unknown }).serverNow;
   // Clock on the server is authoritative for validating the returned minute.
   // Never accept a still-forming candle or a minutes-old cached response.
   if (typeof serverNow !== 'number' || !Number.isFinite(serverNow)
