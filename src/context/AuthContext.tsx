@@ -40,6 +40,8 @@ interface AuthContextType {
   updateProfileData: (updates: Partial<UserProfile>) => Promise<void>;
   /** Atomic per-workspace write: a stale device receives a 409 instead of overwriting new charts. */
   updateTerminalWorkspace: (workspace: NonNullable<UserProfile['terminalSettings']>, expectedVersion: string | null) => Promise<string | null>;
+  /** Refresh the account from PostgreSQL to reconcile a stale Terminal workspace version. */
+  refreshProfile: () => Promise<UserProfile>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   listSessions: () => Promise<AuthSessionSummary[]>;
@@ -411,6 +413,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     return profileRef.current?.terminalSettings?.version ?? null;
   };
+  const refreshProfile = async (): Promise<UserProfile> => {
+    const account = userRef.current;
+    if (!account) throw new Error('Увійдіть у свій акаунт.');
+    // Do not let a refresh race an in-flight profile PATCH.
+    await writeQueue.current.catch(() => {});
+    const epoch = identityEpochRef.current;
+    const response = await fetch('/api/auth/session', {
+      credentials: 'same-origin', cache: 'no-store',
+    });
+    if (!response.ok) throw new Error('Не вдалося оновити хмарні налаштування Термінала.');
+    const payload = await response.json();
+    if (identityEpochRef.current !== epoch || userRef.current?.uid !== account.uid
+        || payload?.user?.uid !== account.uid || !payload.profile || !payload.csrf) {
+      throw new Error('Сесія змінилася під час синхронізації Термінала.');
+    }
+    setIdentity(payload);
+    return stripLegacySecrets(payload.profile as UserProfile);
+  };
   const logout = async () => {
     if (userRef.current) {
       try {
@@ -446,7 +466,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={{
     user, profile, loading, signInWithEmail, registerWithEmail,
     resendVerification, requestPasswordReset, resetPassword, resetToken,
-    updateProfileData, updateTerminalWorkspace, logout, logoutAll, listSessions, revokeSession,
+    updateProfileData, updateTerminalWorkspace, refreshProfile, logout, logoutAll, listSessions, revokeSession,
     authError, authErrorCode, authNotice, clearAuthError,
   }}>{children}</AuthContext.Provider>;
 };
