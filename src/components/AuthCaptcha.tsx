@@ -98,6 +98,7 @@ export function AuthCaptcha({ siteKey, onTokenChange }: Props) {
 
   useEffect(() => {
     let active = true;
+    const container = containerRef.current;
     let widgetId: string | null = null;
     let api: TurnstileAPI | null = null;
     let noticeTimer: number | null = null;
@@ -115,9 +116,9 @@ export function AuthCaptcha({ siteKey, onTokenChange }: Props) {
     setStatus('loading');
     startNoticeTimer();
     void loadTurnstile().then(loaded => {
-      if (!active || !containerRef.current) return;
+      if (!active || !container) return;
       api = loaded;
-      widgetId = loaded.render(containerRef.current, {
+      widgetId = loaded.render(container, {
         sitekey: siteKey,
         action: AUTH_CAPTCHA_ACTION,
         theme: 'dark',
@@ -173,7 +174,7 @@ export function AuthCaptcha({ siteKey, onTokenChange }: Props) {
         try { api.remove(widgetId); } catch { /* Widget may already have been removed. */ }
       }
       // Clear any partially rendered widget before a manual retry.
-      containerRef.current?.replaceChildren();
+      container?.replaceChildren();
     };
   }, [siteKey, retry, language]);
 
