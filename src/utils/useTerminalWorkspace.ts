@@ -263,7 +263,10 @@ export function useTerminalWorkspace() {
     const cloudVersion = profile.terminalSettings?.version ?? null;
     if (hydrated.current && cloudVersion === serverVersion.current) return;
     const cloud = loadTerminalWorkspace(uid, profile.terminalSettings);
-    const pendingEdits = revision.current !== savedRevision.current;
+    // A profile refresh and an edit can commit in the same React render, before
+    // the revision effect runs. Never drop that unsaved edit during hydration.
+    const pendingEdits = revision.current !== savedRevision.current
+      || (lastCommittedWorkspace.current !== workspace && hydrationWorkspaceRef.current !== workspace);
     const rebased = pendingEdits
       ? rebaseTerminalWorkspace(syncedWorkspaceRef.current, workspaceRef.current, cloud)
       : cloud;
