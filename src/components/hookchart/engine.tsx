@@ -29,7 +29,7 @@ import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
 import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLine, type ScalperLineStyle } from './scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, cascadeFutureRayStartX } from './scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -774,6 +774,23 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    }
    return active;
  }, [scalperResult, candles]);
+ // The same OHLC-scoped cache rejects stale diagonals without rescanning
+ // candles during mouse drags, pan/zoom or other canvas-only redraws.
+ const activeDiagonalLines = useMemo(() => {
+   const active = new Set<ScalperLine>();
+   if (!scalperResult?.setups.length || !candles.length) return active;
+   for (const setup of scalperResult.setups) {
+     if (setup.kind === 'cascade') continue;
+     for (const line of setup.lines) {
+       if (line.from.p === line.to.p) continue;
+       const side = line.role === 'upper' ? 'upper' : 'lower';
+       if (scalperDiagonalIsActive(line, setup.touches, candles, side, setup.kind === 'trend')) {
+         active.add(line);
+       }
+     }
+   }
+   return active;
+ }, [scalperResult, candles]);
  const AX=HOOKCHART_PRICE_SCALE_WIDTH,TX=0;
  const geometry=()=>{
   const c=ref.current;if(!c||!candles.length)return null;
@@ -1351,20 +1368,20 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // Every automatic Scalper line uses one preference; touch dots and text remain unchanged.
   // Keep the configured CSS width; only the raster stroke resolves to physical pixels.
   const scalperStrokeWidth = scalperRasterStrokeWidth(normalizeScalperLineWidth(scalperLineWidth), scaleX, scaleY);
-  const cascadeRayStartX = candles.length
-    ? cascadeFutureRayStartX(g.x(candles[candles.length - 1].t), g.step, scaleX, g.plotW)
-    : null;
   if (scalperResult?.setups.length) {
     q.save();
     for (const setup of scalperResult.setups) {
-      if (setup.kind === 'cascade' &&
-          (cascadeRayStartX === null || !setup.lines.some(line => activeCascadeLines.has(line)))) continue;
+      if (setup.kind === 'cascade' && !setup.lines.some(line => activeCascadeLines.has(line))) continue;
+      if (setup.kind !== 'cascade' &&
+          !setup.lines.some(line => line.from.p === line.to.p || activeDiagonalLines.has(line))) continue;
       const color = setup.status === 'failed' ? '#f0a66d'
         : setup.status === 'confirmed' ? '#57c9a4'
         : setup.status === 'possible' ? '#ead178' : '#8baac8';
       q.globalAlpha = setup.status === 'forming' ? .67 : .92;
       for (const line of setup.lines) {
         if (setup.kind === 'cascade' && !activeCascadeLines.has(line)) continue;
+        if (setup.kind !== 'cascade' && line.from.p !== line.to.p &&
+            !activeDiagonalLines.has(line)) continue;
         const x0 = g.x(line.from.t), x1 = g.x(line.to.t);
         const rawY0 = g.y(line.from.p), rawY1 = g.y(line.to.p);
         // Horizontal pixel-centering only; diagonals retain exact wick pivots.
@@ -1383,8 +1400,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
         const cascadeRay = setup.kind === 'cascade' && renderedEndX === g.plotW
           && line.from.p === line.to.p;
         if (cascadeRay && x0 > g.plotW) continue; // Do not paint before the pivot exists.
-        // Cascade levels are future-facing alerts, never historical candle overlays.
-        q.moveTo(cascadeRay ? cascadeRayStartX! : x0, y0);
+        // A surviving cascade starts at its real historical wick pivot.
+        // The ray spans the existing chart all the way to the price scale;
+        // a later crossing has already removed it from activeCascadeLines.
+        q.moveTo(cascadeRay ? Math.max(0, x0) : x0, y0);
         q.lineTo(renderedEndX, y1);
         q.stroke();
         if (cascadeRay && y1 >= 0 && y1 <= g.plotH) {
@@ -1440,7 +1459,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   if (scalperResult?.setups.length) for (const setup of scalperResult.setups) {
     if (setup.kind !== 'cascade') continue;
     const boundary = setup.lines.find(line => line.role === 'upper' || line.role === 'lower');
-    if (!boundary || !activeCascadeLines.has(boundary) || cascadeRayStartX === null ||
+    if (!boundary || !activeCascadeLines.has(boundary) ||
         boundary.from.p !== boundary.to.p || g.x(boundary.from.t) > g.plotW) continue;
     const color = setup.status === 'failed' ? '#f0a66d'
       : setup.status === 'confirmed' ? '#57c9a4'
