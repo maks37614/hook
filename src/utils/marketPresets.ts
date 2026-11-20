@@ -2,7 +2,8 @@ import type { MarketCoin, ScannedCoin, ScreenerPresetFilter, Timeframe } from '.
 import type { MarketSelection } from './marketCoinLoader';
 
 export type QuoteMarketPreset = Exclude<ScreenerPresetFilter, 'all'>;
-export type TerminalMarketPreset = QuoteMarketPreset | 'formations';
+export type TerminalMarketPreset = QuoteMarketPreset | 'formations' | 'av';
+export type TerminalQuoteMarketPreset = QuoteMarketPreset | 'av';
 /** Enough information to open a chart; scanner-only form metadata is optional. */
 export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quoteAsset' | 'exchange' | 'marketType'> & {
   timeframe?: Timeframe;
@@ -12,6 +13,7 @@ export type TerminalPresetCoin = Pick<MarketCoin, 'symbol' | 'baseAsset' | 'quot
 export const MARKET_PRESETS: Array<{ id: TerminalMarketPreset; label: string; description: string }> = [
   { id: 'active', label: 'Активні', description: 'Активні монети за волатильністю 5 хв, як у скрінері' },
   { id: 'formations', label: 'Формації', description: 'Монети з поточного списку Формацій або раннього W/M з урахуванням фільтрів та сортування' },
+  { id: 'av', label: 'AV', description: 'Середній обсяг торгів за хвилину (USDT), розрахований за оборотом 24г. Від найбільшого до найменшого.' },
   { id: 'top_gainers', label: 'Топ ріст 24г', description: 'Найбільше зростання за 24 години' },
   { id: 'top_losers', label: 'Топ спад 24г', description: 'Найбільше падіння за 24 години' },
   { id: 'near_highs', label: 'На хаях', description: 'Монети у верхній зоні діапазонів за 30–730 днів, найвища позиція першою' },
@@ -53,20 +55,22 @@ export function coinMarketKey(coin: { symbol: string; exchange: string; marketTy
   return `${coin.exchange}:${coin.marketType}:${coin.symbol.toUpperCase()}`;
 }
 
-export function selectMarketPresetCoins(coins: MarketCoin[], preset: QuoteMarketPreset, selection: MarketSelection, limit: number): MarketCoin[] {
+export function selectMarketPresetCoins(coins: MarketCoin[], preset: TerminalQuoteMarketPreset, selection: MarketSelection, limit: number): MarketCoin[] {
   const seen = new Set<string>();
   const result = coins.filter(coin => {
     const key = coinMarketKey(coin);
     if (seen.has(key) || !Number.isFinite(coin.price) || coin.price <= 0 || !Number.isFinite(coin.change24h)) return false;
     if (selection.exchange !== 'all' && selection.exchange !== coin.exchange) return false;
     if (selection.marketType !== 'all' && selection.marketType !== coin.marketType) return false;
-    if (!matchesMarketPreset(coin, preset)) return false;
+    if (preset === 'av' && (!Number.isFinite(coin.volumeUsd) || coin.volumeUsd < 0)) return false;
+    if (preset !== 'av' && !matchesMarketPreset(coin, preset)) return false;
     seen.add(key);
     return true;
   });
   result.sort((a, b) => {
     let difference = 0;
     switch (preset) {
+      case 'av': difference = b.volumeUsd - a.volumeUsd; break; // AV = 24h USD turnover / 1,440 minutes.
       case 'active': difference = getCoinVol5m(b) - getCoinVol5m(a); break;
       case 'top_gainers': difference = b.change24h - a.change24h; break;
       case 'top_losers': difference = a.change24h - b.change24h; break;
