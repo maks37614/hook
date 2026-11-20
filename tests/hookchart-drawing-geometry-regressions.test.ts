@@ -40,7 +40,7 @@ test('translating a shape across the viewport preserves dimensions even off-scre
 
 test('chart scope changes clear an unfinished two-click drawing', () => {
   const src = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
-  assert.match(src, /useLayoutEffect\(\(\)=>\{resetInteraction\(\);setDraft\(null\);[\s\S]*?\},\[symbol,tf,tool,interactionScope\]\)/);
+  assert.match(src, /useLayoutEffect\(\(\)=>\{resetInteractionRef\.current\(\);setDraft\(null\);[\s\S]*?\},\[symbol,tf,tool,interactionScope\]\)/);
 });
 
 test('rectangles and rays have proper scene and draft-preview branches', () => {
@@ -55,7 +55,7 @@ test('switching between Binance, Bybit, futures and spot resets editing state', 
   const parent = readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url), 'utf8');
   assert.match(parent, /interactionScope=\{scope\}/);
   assert.match(engine, /const key=\x60\$\{interactionScope\|\|symbol\}:\$\{tf\}:\$\{oldestTime\}\x60/);
-  assert.match(engine, /useLayoutEffect\(\(\)=>\{resetInteraction\(\);setDraft\(null\);/);
+  assert.match(engine, /useLayoutEffect\(\(\)=>\{resetInteractionRef\.current\(\);setDraft\(null\);/);
 });
 
 test('pending jump-to-date requests cannot focus a different exchange or coin', () => {
