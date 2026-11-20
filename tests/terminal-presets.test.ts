@@ -64,6 +64,13 @@ test('Terminal Formations preset is wired to existing filtered results without e
   assert.match(panel, /id === 'formations'\s*\? selectFormationPresetCoins/);
   assert.match(panel, /preset\.id !== 'formations' && loading/);
   assert.match(panel, /onActivePresetChange\(id\);\s*onApplyCoins\(readyCoins\[id\]\)/);
+  assert.match(app, /onRequestFormationScan=\{requestTerminalFormationScan\}/);
+  assert.match(app, /formationScanStatus=\{terminalFormationScanStatus\}/);
+  assert.match(app, /if \(earlyMode\) return false/);
+  assert.match(terminal, /onRequestFormationScan=\{onRequestFormationScan\}/);
+  assert.match(panel, /onRequestFormationScan\?\.\(\)/);
+  assert.match(panel, /pendingFormationPreset/);
+  assert.match(panel, /applyRef\.current\(readyCoins\.formations\)/);
   const locale = readFileSync(new URL('../src/locales/terminalPage20261115.ts', import.meta.url), 'utf8');
   assert.ok(locale.includes('No coins match the current Formations filters.'));
   assert.ok(locale.includes('Monety z bieżącej listy formacji'));
