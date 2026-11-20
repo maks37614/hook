@@ -909,6 +909,11 @@
   opacity:.45;
   cursor:not-allowed;
 }
+.hookchart-root .hookchart-toolbar .trade-level-toggle-button.active {
+  background:rgba(16,185,129,.15);
+  color:#34d399;
+  border-color:rgba(52,211,153,.5);
+}
 .hookchart-root .hookchart-toolbar .trade-level-toggle-button:disabled {
   opacity:.48;
   cursor:not-allowed;
