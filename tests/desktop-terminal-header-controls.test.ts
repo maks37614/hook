@@ -48,13 +48,13 @@ test('header timeframe controls update chart blocks, not only the highlighted pi
   assert.match(widget,/timeframe=\{block\.timeframe\}/);
 });
 
-test('workspace conflict no longer covers charts but recovery remains inside settings', () => {
-  const terminal=readFileSync(new URL('../src/components/TerminalPage.tsx',import.meta.url),'utf8');
-  const drawer=readFileSync(new URL('../src/components/terminal/TerminalSettingsDrawer.tsx',import.meta.url),'utf8');
-  assert.doesNotMatch(terminal,/<div role="alert" className="z-30 flex shrink-0/);
-  assert.match(terminal,/syncConflict=\{syncConflict\} backupFailed=\{backupFailed\}/);
-  assert.match(drawer,/syncConflict && \(/);
-  assert.match(drawer,/onClick=\{onDownloadLocalBackup\}/);
-  assert.match(drawer,/onClick=\{onRestoreCloudWorkspace\}/);
-  assert.match(drawer,/role="alert"/);
+test('Terminal settings use cloud-only workspace without displaying a conflict banner', () => {
+  const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const drawer = readFileSync(new URL('../src/components/terminal/TerminalSettingsDrawer.tsx', import.meta.url), 'utf8');
+  const hook = readFileSync(new URL('../src/utils/useTerminalWorkspace.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(terminal, /syncConflict|restoreCloudWorkspace|backupFailed/);
+  assert.doesNotMatch(drawer, /syncConflict|onRestoreCloudWorkspace|onDownloadLocalBackup|role="alert"/);
+  assert.match(terminal, /<TerminalSettingsDrawer/);
+  assert.match(hook, /auth\.updateTerminalWorkspace\(\{/);
+  assert.match(hook, /rebaseTerminalWorkspace/);
 });
