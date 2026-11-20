@@ -177,10 +177,10 @@ export const terminalPagePhraseRows = [
     "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
   ],
   [
-    "10 найбільших перевірених обсягів за останню завершену хвилину (USDT), лише від 200 000 USDT. Пошук обмежений вибіркою ліквідних монет, а не всіма ринками.",
-    "Top 10 measured USDT turnovers from the last completed 1-minute candle, minimum 200,000 USDT. Scans a limited liquid-market candidate set, not the entire exchange universe.",
-    "Топ-10 измеренных объёмов за последнюю закрытую минутную свечу (USDT), минимум 200 000 USDT. Проверяется ограниченная выборка ликвидных монет, а не все рынки.",
-    "Top 10 zmierzonych obrotów USDT z ostatniej zamkniętej świecy 1-minutowej, minimum 200 000 USDT. Skanowana jest ograniczona próbka płynnych rynków, a nie cała giełda."
+    "Топ-10 монет за середнім хвилинним оборотом (USDT): оборот за 24 години / 1440, мінімум 200 000 USDT за хвилину.",
+    "Top 10 coins by average minute turnover (USDT): 24h turnover / 1440, minimum 200,000 USDT per minute.",
+    "Топ-10 монет по среднему обороту в минуту (USDT): оборот за 24 часа / 1440, минимум 200 000 USDT в минуту.",
+    "Top 10 monet według średniego obrotu na minutę (USDT): obrót z 24 godzin / 1440, minimum 200 000 USDT na minutę."
   ],
   [
     "10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.",
@@ -199,6 +199,12 @@ export const terminalPagePhraseRows = [
     "No market quotes are currently available for the chosen exchange and market. Check filters or retry.",
     "Для выбранной биржи и рынка сейчас нет доступных котировок. Проверьте фильтры или повторите.",
     "Brak obecnie notowań dla wybranej giełdy i rynku. Sprawdź filtry lub spróbuj ponownie."
+  ],
+  [
+    "Немає монет із середнім AV 1m від 200 000 USDT для вибраної біржі та ринку.",
+    "No coins have an average AV 1m of at least 200,000 USDT for this exchange and market.",
+    "Для выбранной биржи и рынка нет монет со средним AV 1m от 200 000 USDT.",
+    "Dla wybranej giełdy i rynku nie ma monet ze średnim AV 1m od 200 000 USDT."
   ],
   [
     "Топ ріст 24г",
