@@ -717,7 +717,23 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   let lo=readableExtrema?.low??Infinity,hi=readableExtrema?.high??-Infinity;
   if(!readableExtrema)for(const z of scaleData){if(z.l<lo)lo=z.l;if(z.h>hi)hi=z.h}
   if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1}
-  if(!candleAutoScale&&vp.autoY&&candles.length&&densities.length){const cp=candles.at(-1)!.c;const near=[...densities].filter(d=>d.active&&Math.abs(d.p-cp)/Math.max(cp,1e-12)<=.03).sort((a,b)=>Math.abs(a.p-cp)-Math.abs(b.p-cp)).slice(0,4);for(const d of near){if(d.p<lo)lo=d.p;if(d.p>hi)hi=d.p}}
+  if(!candleAutoScale&&vp.autoY&&candles.length&&densities.length){
+    // Geometry runs on every pan/zoom frame. The old filter + full sort copied
+    // and sorted every active depth level merely to expand Y to the four closest.
+    // Keep the same distance, stable tie order and 3% gate in one bounded pass.
+    const cp=candles.at(-1)!.c,limit=Math.max(cp,1e-12)*.03;
+    const nearest:{price:number;distance:number}[]=[];
+    for(let i=0;i<densities.length;i++){
+      const d=densities[i];if(!d.active)continue;
+      const distance=Math.abs(d.p-cp);if(distance>limit)continue;
+      let at=nearest.findIndex(v=>v.distance>distance);
+      if(at<0)at=nearest.length;
+      if(at>=4)continue;
+      nearest.splice(at,0,{price:d.p,distance});
+      if(nearest.length>4)nearest.pop();
+    }
+    for(const d of nearest){if(d.price<lo)lo=d.price;if(d.price>hi)hi=d.price}
+  }
   if(!candleAutoScale&&(terminalMode||expandPriceScaleToMarkers)&&vp.autoY){for(const marker of markers){if(Number.isFinite(marker.price)&&marker.price>0){lo=Math.min(lo,marker.price);hi=Math.max(hi,marker.price)}}}
   if(candleAutoScale){
     // Price-only auto fit: reserve the bottom volume band and a visible gap.
