@@ -76,7 +76,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const noChangesMessage = {
+    uk: 'Немає змін для збереження. Спочатку змініть потрібний параметр.',
+    en: 'No changes to save. Choose a different setting first.',
+    ru: 'Нет изменений для сохранения. Сначала измените нужный параметр.',
+    pl: 'Brak zmian do zapisania. Najpierw zmień wybrane ustawienie.',
+  }[language];
   const [sessions, setSessions] = useState<Array<{id:string;userAgent:string;createdAt:string;expiresAt:string}>>([]);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [sessionsBusy, setSessionsBusy] = useState(false);
@@ -87,6 +94,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const touchedFields = useRef(newTouchedFields());
   const markTouched = (field: keyof ReturnType<typeof newTouchedFields>) => {
     touchedFields.current[field] = true;
+    setSaveNotice(null);
+    setSaveSuccess(false);
+    setErrorMessage(null);
   };
 
   useEffect(() => {
@@ -123,6 +133,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setIsSaving(true);
     setErrorMessage(null);
     setSaveSuccess(false);
+    setSaveNotice(null);
 
     try {
       // Only edited inputs belong in this PATCH. Unchanged fields might already
@@ -130,7 +141,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       const patch = buildProfileAccountPatch({
         displayName, defaultExchange, defaultMarketType, defaultTimeframe, timeZone,
       }, touchedFields.current, user.email?.split('@')[0] || 'Користувач');
-      if (Object.keys(patch).length === 0) return;
+      if (Object.keys(patch).length === 0) {
+        setSaveNotice(noChangesMessage);
+        return;
+      }
       await updateProfileData(patch);
 
       // updateProfileData already publishes the server-confirmed defaults.
@@ -383,21 +397,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           </div>
 
-          {/* Feedback messages */}
-          {saveSuccess && (
-            <div role="status" className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Зміни профілю та налаштування збережено успішно!</span>
-            </div>
-          )}
-
-          {errorMessage && (
-            <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>{translatePhrase(language, errorMessage)}</span>
-            </div>
-          )}
-
           <form onSubmit={handleSaveProfile} className="space-y-5">
             {/* Section 1: User Identity */}
             <div className="space-y-3">
@@ -553,6 +552,28 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               )}
             </section>
+
+            {/* Keep the response next to Save: on phones the top of this form
+                is often outside the scroll viewport when a request finishes. */}
+            <div aria-live="polite" className="space-y-2">
+              {saveSuccess && (
+                <div role="status" className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{translatePhrase(language, 'Зміни профілю та налаштування збережено успішно!')}</span>
+                </div>
+              )}
+              {saveNotice && (
+                <div role="status" className="p-3 rounded-xl border border-slate-700 bg-slate-950 text-slate-300 text-xs">
+                  {saveNotice}
+                </div>
+              )}
+              {errorMessage && (
+                <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span>{translatePhrase(language, errorMessage)}</span>
+                </div>
+              )}
+            </div>
 
             {/* Save Buttons */}
             <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-800">
