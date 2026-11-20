@@ -1497,8 +1497,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
    if(!candles.length)return null;
    // Hover must follow layout changes immediately; captured drags use their
    // pointer-down rectangle, invalidated by scroll/resize above.
-   const r=(pointers.current.has(e.pointerId)?activePointerRect.current:null)
+   const captured=pointers.current.has(e.pointerId);
+   const r=(captured?activePointerRect.current:null)
      ||ref.current?.getBoundingClientRect();if(!r)return null;
+   if(captured&&!activePointerRect.current)activePointerRect.current=r;
    const cached=geom.current,g=cached&&cached.r.width===r.width&&cached.r.height===r.height?cached:geometry();
    if(!g)return null;
    return{g,x:e.clientX-r.left,y:e.clientY-r.top,rect:r};
