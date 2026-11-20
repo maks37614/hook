@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, cascadeFutureRayStartX } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -57,7 +57,7 @@ test('Scalper draw uses the plot boundary, without changing stroke, labels or ca
   const layer=engine.slice(start,end);
   assert.match(layer,/scalperRenderedLineEndX\(setup\.kind, line, x1, g\.plotW\)/);
   assert.match(layer,/if \(cascadeRay && x0 > g\.plotW\) continue/);
-  assert.match(layer,/q\.moveTo\(cascadeRay \? cascadeRayStartX! : x0, y0\)/);
+  assert.match(layer,/q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
   assert.match(layer,/q\.lineTo\(renderedEndX, y1\)/);
   assert.match(layer,/if \(cascadeRay && y1 >= 0 && y1 <= g\.plotH\)/);
   assert.match(layer,/q\.moveTo\(Math\.max\(0, g\.plotW - 2\), y1\)/);
@@ -125,7 +125,7 @@ test('horizontal Scalper strokes align their center without moving diagonal wick
   assert.match(layer, /const y0 = horizontalLine \? scalperPixelCenteredHorizontalY\(rawY0, scalperStrokeWidth, scaleY\) : rawY0/);
   assert.match(layer, /const y1 = horizontalLine \? y0 : rawY1/);
   assert.match(layer, /q\.lineWidth = scalperStrokeWidth/);
-  assert.match(layer, /q\.moveTo\(cascadeRay \? cascadeRayStartX! : x0, y0\)/);
+  assert.match(layer, /q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
   assert.match(layer, /q\.lineTo\(renderedEndX, y1\)/);
 });
 
@@ -168,19 +168,79 @@ test('outer cascade boundary activates at its last matching wick pivot, not its 
     'an old inner tier crossed by later pivots must not be projected');
 });
 
-test('cascade rays begin only after the last candle, leaving past candle geometry clear',()=>{
-  assert.equal(cascadeFutureRayStartX(100,10,2,200),105.5);
-  assert.equal(cascadeFutureRayStartX(100,10,1,200),106);
-  assert.equal(cascadeFutureRayStartX(198,10,2,200),null,
-    'nothing projects when no future chart space remains');
-  assert.equal(cascadeFutureRayStartX(-100,10,2,200),0,
-    'a chart panned into empty future space may start at the plot edge');
-  assert.equal(cascadeFutureRayStartX(100,10,0,200),null);
+test('surviving cascade rays start at historical wick pivots and reach the scale', () => {
+  const engine = readFileSync(new URL('../src/components/hookchart/engine.tsx', import.meta.url), 'utf8');
+  const start = engine.indexOf('if (scalperResult?.setups.length) {');
+  const end = engine.indexOf('drawHookTimeMarkers(q,g,timeMarkers,mouse);',start);
+  const layer = engine.slice(start,end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(layer, /q\\.moveTo\\(cascadeRay \\? Math\\.max\\(0, x0\\) : x0, y0\\)/);
+  assert.match(layer, /q\\.lineTo\\(renderedEndX, y1\\)/);
+  assert.doesNotMatch(layer, /cascadeRayStartX|cascadeFutureRayStartX/,
+    'do not begin rays after the last candle; historical origins must remain visible');
+  assert.match(engine, /const activeCascadeLines = useMemo\\(/);
+  assert.match(engine, /cascadeLineIsActive\\(line, setup\\.touches, candles, side\\)/);
+  assert.match(engine, /\\[scalperResult, candles\\]/,
+    'viewport moves should not rescan price history');
+  assert.match(layer, /if \\(setup\\.kind === 'cascade' && !activeCascadeLines\\.has\\(line\\)\\) continue/);
+});
+
+test('scalper diagonal expires after a later wick crosses a downward resistance',()=>{
+  const base=1_700_000_000_000;
+  const minutes=(i:number)=>base+i*60_000;
+  const line:ScalperLine={
+    role:'upper',from:{t:minutes(0),p:110},to:{t:minutes(5),p:105},
+  };
+  const bar=(i:number,h:number,l:number,c:number):ScalperCandle=>({
+    t:minutes(i),o:c,c,h,l,
+  });
+  const touches=[{t:minutes(0),p:110},{t:minutes(2),p:108}];
+  const valid=[
+    bar(0,110,108.5,109), bar(1,108.7,106.8,107.9),
+    bar(2,108,106.1,107.5), bar(3,106.7,105.2,106),
+    bar(4,105.7,104.2,105.3), bar(5,104.7,103.4,104),
+  ];
+  assert.equal(scalperDiagonalIsActive(line,touches,valid,'upper',true),true,
+    'confirmed structural wick contact does not itself cancel the line');
+  assert.equal(scalperDiagonalIsActive(line,touches,[
+    ...valid.slice(0,5),bar(5,105.01,103.4,104),
+  ],'upper',true),false,'first later wick crossing expires the line');
+});
+
+test('standalone trend disappears when price has moved far away from its slope',()=>{
+  const base=1_700_000_000_000;
+  const line:ScalperLine={role:'upper',
+    from:{t:base,p:110},to:{t:base+5*60_000,p:105}};
+  const touches=[{t:base+2*60_000,p:108}];
+  const bar=(i:number,h:number,l:number,c:number):ScalperCandle=>({
+    t:base+i*60_000,o:c,c,h,l,
+  });
+  const rows=[
+    bar(0,110,108.5,109),bar(1,108.7,106.8,107.9),
+    bar(2,108,106.1,107.5),bar(3,106.6,105.2,105.8),
+    bar(4,103.9,103.3,103.5),bar(5,100.8,100.1,100.5),
+  ];
+  assert.equal(scalperDiagonalIsActive(line,touches,rows,'upper',true),false,
+    'downward impulse should remove an abandoned resistance line');
+  assert.equal(scalperDiagonalIsActive(line,touches,rows,'upper',false),true,
+    'separation alone does not erase a second wall of a valid triangle');
+});
+
+test('lower ascending scalper diagonal vanishes after a later wick crosses it',()=>{
+  const base=1_700_000_000_000;
+  const line:ScalperLine={role:'lower',
+    from:{t:base,p:100},to:{t:base+4*60_000,p:104}};
+  const touches=[{t:base+2*60_000,p:102}];
+  const bar=(i:number,l:number):ScalperCandle=>({
+    t:base+i*60_000,o:l+2,c:l+2,h:l+3,l,
+  });
+  const safe=[bar(0,100),bar(1,101),bar(2,102),bar(3,103.2),bar(4,104.3)];
+  assert.equal(scalperDiagonalIsActive(line,touches,safe,'lower'),true);
+  assert.equal(scalperDiagonalIsActive(line,touches,[
+    ...safe.slice(0,4),bar(4,103.9),
+  ],'lower'),false);
   const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
-  assert.match(engine,/const activeCascadeLines = useMemo\(/);
-  assert.match(engine,/cascadeLineIsActive\(line, setup\.touches, candles, side\)/);
-  assert.match(engine,/\[scalperResult, candles\]/,
-    'pan and zoom must not recheck all recent price levels');
-  assert.match(engine,/if \(setup\.kind === 'cascade' && !activeCascadeLines\.has\(line\)\) continue/);
-  assert.match(engine,/cascadeFutureRayStartX\(g\.x\(candles\[candles\.length - 1\]\.t\), g\.step, scaleX, g\.plotW\)/);
+  assert.match(engine,/const activeDiagonalLines = useMemo\\(/);
+  assert.match(engine,/scalperDiagonalIsActive\\(line, setup\\.touches, candles, side, setup\\.kind === 'trend'\\)/);
+  assert.match(engine,/!activeDiagonalLines\\.has\\(line\\)\\) continue/);
 });
