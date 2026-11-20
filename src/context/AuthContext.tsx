@@ -4,6 +4,7 @@ import { mergeProfileUpdate } from '../utils/hookchartData';
 import { DEFAULT_APP_PREFERENCES, getStoredPreferences, saveStoredPreferences, setPreferencesIdentity } from '../utils/userPreferences';
 import { DEFAULT_METASCALP_SETTINGS, saveStoredMetaScalpSettings } from '../utils/metaScalpService';
 import { setApiIdentity, apiFetch } from '../utils/apiFetch';
+import { setDesktopRemoteLinkIdentity } from '../utils/desktopRemoteLink';
 import { applySiteAppearance, cacheSiteAppearance, normalizeSiteAppearance, setSiteAppearanceIdentity } from '../utils/siteAppearance';
 import {
   PROFILE_GUEST_FOCUS_REFRESH_MS, PROFILE_SIGNAL_COALESCE_MS, PROFILE_SYNC_SIGNAL_KEY,
@@ -80,6 +81,7 @@ function applySitePreferences(profile: UserProfile, uid: string) {
   // Profile data from PostgreSQL is authoritative for this UID, including
   // missing fields on older accounts. Never reuse the previous owner's values.
   setPreferencesIdentity(uid);
+  setDesktopRemoteLinkIdentity(uid);
   saveStoredPreferences({
     defaultExchange: profile.defaultExchange ?? DEFAULT_APP_PREFERENCES.defaultExchange,
     defaultMarketType: profile.defaultMarketType ?? DEFAULT_APP_PREFERENCES.defaultMarketType,
@@ -137,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     identityEpochRef.current += 1;
     lastSessionCheckRef.current = Date.now();
     setApiIdentity(null, null);
+    setDesktopRemoteLinkIdentity(null);
     setPreferencesIdentity(null);
     setSiteAppearanceIdentity(null);
     userRef.current = null;

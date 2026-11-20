@@ -1,4 +1,5 @@
 import type { ExchangeId, MarketType, UserProfile } from '../types';
+import { desktopRemoteLinkEnabled, sendTickerViaDesktop } from './desktopRemoteLink';
 
 export interface MetaScalpSettings {
   enabled: boolean;
@@ -130,6 +131,15 @@ export async function sendTickerToMetaScalp(
   const port = settings.port || 17845;
   const binding = settings.binding || '001';
   const ticker = formatMetaScalpTicker(symbol, exchange, marketType);
+
+  // Tablet mode is an explicit per-device opt-in. Never scan the tablet's
+  // localhost (where MetaScalp cannot be running) or send orders over this link.
+  if (desktopRemoteLinkEnabled()) {
+    const response = await sendTickerViaDesktop({ symbol, exchange, marketType, binding });
+    return {
+      success: response.success, message: response.message, ticker, binding,
+    };
+  }
 
   const payload = { tickerPattern: ticker, binding };
   const activePort = await findActiveMetaScalpPort(port);

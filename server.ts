@@ -1,6 +1,7 @@
 import { initializeIdentity } from './server/pgIdentity';
 import { installPostgresIdentityRoutes } from './server/pgIdentityRoutes';
 import { installReplayProfileRoutes } from './server/replayProfileRoutes';
+import { installDesktopLinkRelay } from './server/desktopLinkRelay';
 import { startAuthMailWorker } from './server/authMailWorker';
 import express from 'express';
 import path from 'path';
@@ -85,6 +86,8 @@ async function startServer() {
   });
   installPostgresIdentityRoutes(app);
   installReplayProfileRoutes(app);
+  // Opt-in Desktop channel: user-scoped and idle when no Desktop is connected.
+  installDesktopLinkRelay(app);
 
   // Read-only operator endpoint is disabled unless H00K_OPS_TOKEN is configured.
   let chartDepthMetrics: (() => ReturnType<ReturnType<typeof installHookChartDepthStream>['stats']>) | null = null;

@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, WebContentsView, BrowserView, Menu, ipcMain, screen, shell, nativeTheme, dialog } = require('electron');
+const { app, BrowserWindow, WebContentsView, BrowserView, Menu, ipcMain, screen, shell, nativeTheme, dialog, session } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -12,6 +12,7 @@ const { CHROME_HEIGHT, standaloneWindowChrome, standaloneHeaderCSS, dockedWindow
 const { SITE_LANGUAGE_PICKER_CSS, siteLanguagePickerScript } = require('./site-language-picker.cjs');
 const { LANGUAGES, nativeT } = require('./native-i18n.cjs');
 const { PROVIDERS, PANELS, normalizeSettings, normalizeProfile, matchesTerminal, availablePanels } = require('./profiles.cjs');
+const { DesktopTickerRelayClient, MetaScalpTickerSender } = require('./desktop-link-client.cjs');
 
 const WEBSITE = 'https://h00k.top/';
 // Make the native Windows captions match the dark h00k desktop surfaces.
@@ -24,6 +25,36 @@ let settings = normalizeSettings();
 let statePath = '';
 let agent = null;
 let quitting = false;
+let desktopLinkStatus = 'disabled';
+let desktopLinkClient = null;
+const metaScalpTickerSender = new MetaScalpTickerSender();
+async function desktopSessionCookie() {
+  // Read the existing *web-app* session; never place credentials in renderer IPC.
+  // Sign in using h00k Desktop's separate h00k window first.
+  const cookies = await session.fromPartition('persist:h00k').cookies.get({url: WEBSITE});
+  const record = cookies.find(cookie =>
+    cookie.name === '__Host-h00k-session' || cookie.name === 'h00k-session');
+  return record ? record.name + '=' + record.value : null;
+}
+function syncDesktopLink() {
+  if (!settings.remoteLinkEnabled) {
+    desktopLinkClient?.stop();
+    desktopLinkClient = null;
+    desktopLinkStatus = 'disabled';
+    pushSnapshot();
+    return;
+  }
+  if (desktopLinkClient) return;
+  desktopLinkClient = new DesktopTickerRelayClient({
+    getCookie: desktopSessionCookie,
+    onCommand: command => metaScalpTickerSender.send(command),
+    onStatus: status => {
+      desktopLinkStatus = status;
+      pushSnapshot();
+    },
+  });
+  desktopLinkClient.start();
+}
 let detected = [];
 let manualTargets = new Map(); // handle choices last only for this run
 let manualAttached = new Set();
@@ -800,7 +831,7 @@ function syncWindows() {
 }
 function snapshot() {
   return {
-    settings, terminals: PROVIDERS.map(provider=>({
+    settings, remoteLink: { enabled: settings.remoteLinkEnabled === true, status: desktopLinkStatus }, terminals: PROVIDERS.map(provider=>({
       id:provider, label:LABELS[provider],
       target:findTarget(provider), selectedWindowId: manualTargets.get(provider) || null,
       status:lastDockStatus[provider] || 'Очікування',
@@ -955,6 +986,15 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('desktop:snapshot',event => { verifySettingsSender(event); return snapshot(); });
+  ipcMain.handle('desktop:remote-link', (event, enabled) => {
+    verifySettingsSender(event);
+    if (typeof enabled !== 'boolean') throw new Error('Invalid remote link option');
+    settings.remoteLinkEnabled = enabled;
+    saveSettings();
+    syncDesktopLink();
+    pushSnapshot();
+    return snapshot();
+  });
   ipcMain.handle('desktop:save',(event,provider,patch) => {
     verifySettingsSender(event);
     if (!PROVIDERS.includes(provider) || !patch || typeof patch !== 'object') throw new Error('Invalid profile');
@@ -1032,11 +1072,11 @@ else {
     if (isUnmaintainedElectron(process.versions.electron)) {
       if (dialog.showMessageBoxSync(legacyBrowserWarning()) !== 1) { app.quit(); return; }
     }
-    loadSettings();registerIpc();createSettingsWindow();runAgent();
+    loadSettings();registerIpc();createSettingsWindow();runAgent();syncDesktopLink();
     if (process.platform !== 'win32') {
       for (const provider of PROVIDERS) lastDockStatus[provider] = 'Прикріплення вікон підтримується лише у Windows';
     }
   });
-  app.on('before-quit',()=>{quitting=true;if(agent){agent.kill();agent=null;}});
+  app.on('before-quit',()=>{quitting=true;desktopLinkClient?.stop();if(agent){agent.kill();agent=null;}});
   app.on('window-all-closed',()=>app.quit());
 }

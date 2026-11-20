@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, Save, PlugZap, RefreshCw, BookOpen, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { DesktopRemoteLinkSettings } from './DesktopRemoteLinkSettings';
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase } from '../../locales';
 import { findActiveMetaScalpPort, getUserMetaScalpSettings, type MetaScalpSettings } from '../../utils/metaScalpService';
@@ -134,7 +135,7 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
       <div>
         <h3 className="flex items-center gap-2 text-base font-semibold text-white"><PlugZap size={19} className="text-cyan-400" /> Лінковка з торговими терміналами</h3>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">
-          Вкажіть один термінал для відкриття монет з h00k. Дані надсилаються лише у локальну програму на вашому комп’ютері.
+          Вкажіть один термінал для відкриття монет з h00k. Дані надсилаються в локальну програму або через h00k Desktop, залежно від вибраного режиму.
           Торгові заявки, паролі, API-ключі й рівні Entry/SL/TP не передаються.
         </p>
       </div>
@@ -160,6 +161,8 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
           </label>
         )}
       </section>
+
+      {selected === 'metascalp' && <DesktopRemoteLinkSettings uid={user?.uid} language={language} />}
 
       {selected !== 'none' && (
         <>
