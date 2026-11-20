@@ -29,7 +29,7 @@ import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
 import type { StrategyResult } from './strategyEngine';
 import { scalperLabel, scalperLineDash, type ScalperScene, type ScalperLine, type ScalperLineStyle } from './scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive } from './scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive, cascadeStrokeAppearance } from './scalperLineProjection';
 import type { MarketRecurrenceMark } from './marketRecurrence';
 import { INDICATOR_META, indicatorData, type IndicatorId, type OIPoint } from './indicatorEngine';
 import type { ArchivedAutoOverlayScene, ChartMarkerInfo, DetectedFormation } from '../../types';
@@ -1368,6 +1368,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // Every automatic Scalper line uses one preference; touch dots and text remain unchanged.
   // Keep the configured CSS width; only the raster stroke resolves to physical pixels.
   const scalperStrokeWidth = scalperRasterStrokeWidth(normalizeScalperLineWidth(scalperLineWidth), scaleX, scaleY);
+  const cascadeStroke = cascadeStrokeAppearance(scalperLineWidth, scaleX, scaleY);
   if (scalperResult?.setups.length) {
     q.save();
     for (const setup of scalperResult.setups) {
@@ -1377,21 +1378,26 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       const color = setup.status === 'failed' ? '#f0a66d'
         : setup.status === 'confirmed' ? '#57c9a4'
         : setup.status === 'possible' ? '#ead178' : '#8baac8';
-      q.globalAlpha = setup.status === 'forming' ? .67 : .92;
+      const setupAlpha = setup.status === 'forming' ? .67 : .92;
+      q.globalAlpha = setupAlpha;
       for (const line of setup.lines) {
         if (setup.kind === 'cascade' && !activeCascadeLines.has(line)) continue;
         if (setup.kind !== 'cascade' && line.from.p !== line.to.p &&
             !activeDiagonalLines.has(line)) continue;
         const x0 = g.x(line.from.t), x1 = g.x(line.to.t);
         const rawY0 = g.y(line.from.p), rawY1 = g.y(line.to.p);
-        // Horizontal pixel-centering only; diagonals retain exact wick pivots.
+        // Cascade levels alone are 0.1 CSS px thinner; diagonal geometry and
+        // other Scalper styles retain the user's existing line-width setting.
+        const drawStrokeWidth = setup.kind === 'cascade' ? cascadeStroke.width : scalperStrokeWidth;
         const horizontalLine = line.from.p === line.to.p;
-        const y0 = horizontalLine ? scalperPixelCenteredHorizontalY(rawY0, scalperStrokeWidth, scaleY) : rawY0;
+        const y0 = horizontalLine ? scalperPixelCenteredHorizontalY(rawY0, drawStrokeWidth, scaleY) : rawY0;
         const y1 = horizontalLine ? y0 : rawY1;
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
         q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
         q.lineWidth = scalperStrokeWidth;
+        if (setup.kind === 'cascade') q.lineWidth = cascadeStroke.width;
+        q.globalAlpha = setupAlpha * (setup.kind === 'cascade' ? cascadeStroke.coverage : 1);
         q.strokeStyle = color;
         // Project horizontal cascade tiers and the breakout boundary all
         // the way to the price-scale divider, independently of future candles.
@@ -1416,6 +1422,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
           q.stroke();
         }
       }
+      q.globalAlpha = setupAlpha;
       q.setLineDash([]);
       if (showScalperTouchPoints) for (const touch of setup.touches) {
         const x = g.x(touch.t), y = g.y(touch.p);
