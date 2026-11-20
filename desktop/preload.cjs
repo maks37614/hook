@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Only installed in the local settings window. h00k.top never gets a preload.
 contextBridge.exposeInMainWorld('h00kDesktop', {
   snapshot: () => ipcRenderer.invoke('desktop:snapshot'),
+  setRemoteLinkEnabled: (enabled) => ipcRenderer.invoke('desktop:remote-link', enabled),
   setLanguage: language => ipcRenderer.invoke('desktop:set-language', language),
   save: (provider, patch) => ipcRenderer.invoke('desktop:save', provider, patch),
   pick: (provider, id) => ipcRenderer.invoke('desktop:pick', provider, id),
