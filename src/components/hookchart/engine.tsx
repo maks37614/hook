@@ -1452,14 +1452,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // Date/time axis is rendered as a dedicated synchronized row below indicator panels.
  };
  drawRef.current=draw;
- // Grid cards can commit repeatedly between two browser frames (price, depth,
- // liquidations and account UI). Their newest scene wins, so coalesce all
- // commits into one RAF paint instead of blocking React's commit phase with
- // a full Canvas redraw each time. Fullscreen/Replay still paint immediately.
+ // Every HookChart can receive multiple market/viewport commits per display frame.
+ // Paint the freshest complete scene once per RAF, including the standalone chart:
+ // synchronous fullscreen/Replay paints used to block mouse drag and zoom input.
+ // The actual candles remain drawn at the selected native Canvas DPR.
  useLayoutEffect(()=>{
    if(document.visibilityState==='hidden'||!chartOnScreen.current){frames.current?.cancel();return}
-   if(terminalMode)frames.current?.request(true);
-   else frames.current?.flush();
+   frames.current?.request(true);
  },[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,markers,timeMarkers,splitVolumes,backgroundColor,gridColor,levelLabelMode,levelLabelColor,levelLabelSize,levelLineWidth,levelLabelStyle,levelLineStyle,crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperTrendLineWidth,symbol,tf,draft,selectedDrawingId,editingDrawingId,tool,rightPadding,rightPaddingBars,roundGrid,roundness,gridHorizontal,gridVertical,showMarketPrintSums,showMarketPrintArrows,marketPrintArrowSize,marketPrintFontSize,marketPrintMinUsd,showVolumes,showLiquidations,showLiquidationCandleSums,showLiquidationDetailSums,showLiquidationArrows,liquidationArrowSize,liquidationSumFontSize,liquidationDetailFontSize,liquidationHeatmap,modeledLiquidationBands,showDensityLines,showDensityLabels,showDensityAmounts,highlightDensityReaction,candleLongColor,candleShortColor,densityLineColor,densityLabelColor,densityLineWidth,densityLineStyle,densityLabelSize,autoSR,showSRLabels,autoPrevDay,autoDayOpen,autoVWAP,autoLocalHL,autoRoundLevels,autoPOC,autoStops,autoChannel,channelModel,strategyResult,scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels,marketRecurrenceMarks,cascadeRisk.score,cascadeRisk.level,cascadeRisk.total5,cascadeRisk.count5,liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive]);
  useEffect(()=>{
    const cancel=()=>{resetInteraction();scheduleDraw()};
