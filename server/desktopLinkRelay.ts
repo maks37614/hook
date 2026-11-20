@@ -1,4 +1,5 @@
 import type { Express, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { requireUserAuth } from './userAuth';
 
 /**
@@ -16,6 +17,7 @@ export interface DesktopTickerCommand {
 }
 type WaitingClient = { deliver: (command: DesktopTickerCommand) => void; cancel: () => void };
 type DesktopSlot = {
+  epoch: string;
   seq: number;
   latest: DesktopTickerCommand | null;
   lastPollAt: number;
@@ -38,7 +40,7 @@ function findOrCreateSlot(uid: string): DesktopSlot | null {
   if (slot) return slot;
   if (slots.size >= MAX_SLOTS) cleanSlots(Date.now());
   if (slots.size >= MAX_SLOTS) return null;
-  slot = { seq: 0, latest: null, lastPollAt: 0, lastPushAt: 0, waiters: new Set() };
+  slot = { epoch: randomUUID(), seq: 0, latest: null, lastPollAt: 0, lastPushAt: 0, waiters: new Set() };
   slots.set(uid, slot);
   return slot;
 }
@@ -72,6 +74,7 @@ export function installDesktopLinkRelay(app: Express) {
     const slot = findOrCreateSlot(uid);
     if (!slot) return void res.status(503).json({ error: 'BUSY' });
     const now = Date.now();
+    res.set('X-h00k-Desktop-Epoch', slot.epoch);
     // Bound concurrent long polls per account to avoid hanging-request abuse.
     if (slot.waiters.size >= 2) return void res.status(429).json({ error: 'TOO_MANY_CLIENTS' });
     slot.lastPollAt = now;
