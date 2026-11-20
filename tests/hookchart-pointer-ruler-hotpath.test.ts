@@ -35,9 +35,13 @@ test('ruler hover and dragging keep original topmost hit ordering and endpoint s
 });
 
 test('pointer hover does not allocate reversed drawings or compute the winning ruler hit twice',()=>{
-  assert.doesNotMatch(engine,/\[\.\.\.drawings\]\.reverse\(\)\.find\(item=>item\.type==='ruler'/);
-  assert.doesNotMatch(engine,/\[\.\.\.drawings\]\.reverse\(\)\.find\(d=>d\.type==='ruler'/);
-  assert.match(engine,/for\(let i=drawings\.length-1;i>=0;i--\)/);
-  assert.match(engine,/if\(candidate\)\{hit=item;action=candidate;break\}/);
-  assert.match(engine,/if\(candidate\)\{found=item;hit=candidate;break\}/);
+  const startDown=engine.indexOf('const handlePointerDown='),startMove=engine.indexOf('const handlePointerMove='),startUp=engine.indexOf('const handlePointerUp=');
+  assert.ok(startDown>=0&&startMove>startDown&&startUp>startMove);
+  const down=engine.slice(startDown,startMove),move=engine.slice(startMove,startUp);
+  for(const handler of [down,move]){
+    assert.doesNotMatch(handler,/\[\.\.\.drawings\]\.reverse\(\)\.find/);
+    assert.match(handler,/for\(let i=drawings\.length-1;i>=0;i--\)/);
+  }
+  assert.match(move,/if\(candidate\)\{hit=item;action=candidate;break\}/);
+  assert.match(down,/if\(candidate\)\{found=item;hit=candidate;break\}/);
 });
