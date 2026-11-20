@@ -164,6 +164,13 @@ const OVERLAYS = [
   ['channel', 'Канал'], ['stops', 'Зони стопів'],
 ] as const;
 
+const AV_FOOTER_TOOLTIP: Record<string, string> = {
+  uk: 'AV 24h — середній обсяг торгів у USDT за хвилину: оборот за 24 години / 1440. Коли котирування недоступне, використовується оцінка за повною добою завантажених свічок.',
+  en: 'AV 24h — average trading turnover in USDT per minute: 24h turnover / 1440. When the quote is unavailable, a full day of loaded candles is used as an estimate.',
+  ru: 'AV 24h — средний объём торгов в USDT за минуту: оборот за 24 часа / 1440. Если котировка недоступна, используется оценка по полным суткам загруженных свечей.',
+  pl: 'AV 24h — średni obrót w USDT na minutę: obrót z 24 h / 1440. Gdy brak notowań, wykorzystywane jest oszacowanie z pełnej doby załadowanych świec.',
+};
+
 const NECKLINE_TOGGLE_LABELS: Record<string, { show: string; hide: string }> = {
   uk: { show: 'Показати лінію шиї', hide: 'Приховати лінію шиї' },
   en: { show: 'Show neckline', hide: 'Hide neckline' },
@@ -821,16 +828,16 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const statsScope = [exchange, marketType, normalizeExchangeSymbol(symbol), timeframe].join(':');
   const showMarketStats = !replay && !archiveMode && !externalData && runtimeSettings.showMarketStatsBar !== false;
   const [btcReference, setBtcReference] = useState<{ scope: string; rows: Kline[] } | null>(null);
-  const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null } | null>(null);
+  const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null; volume24hUsd: number | null } | null>(null);
 
   useEffect(() => {
-    if (!showMarketStats || timeframe === '30s') return;
+    if (!showMarketStats) return;
     const cleanedSymbol = normalizeExchangeSymbol(symbol);
     const benchmark = btcBenchmarkSymbol(cleanedSymbol);
     if (!/^[A-Z0-9]{3,30}$/.test(cleanedSymbol)) return;
     const stops: Array<() => void> = [];
     // A single BTC benchmark fetch serves every chart of this market/TF.
-    if (benchmark && benchmark !== cleanedSymbol) {
+    if (benchmark && benchmark !== cleanedSymbol && timeframe !== '30s') {
       const params = new URLSearchParams({
         exchange, market: marketType, symbol: benchmark, timeframe, limit: '250',
       });
@@ -845,7 +852,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         },
       ));
     }
-    if (exchange === 'binance') {
+    // A single memoized 60s public quote endpoint serves AV on both exchanges
+    // and the pre-existing Binance trade count; no extra exchange REST for AV.
+    {
       const params = new URLSearchParams({ exchange, market: marketType, symbol: cleanedSymbol });
       stops.push(sharedPublicChartPolling.subscribe(
         ['trades24h', exchange, marketType, cleanedSymbol].join(':'),
@@ -854,9 +863,12 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           onData: data => {
             const count = data.success && Number.isSafeInteger(data.trades24h) && data.trades24h >= 0
               ? data.trades24h as number : null;
-            setTradeCount24h({ scope: statsScope, count });
+            const volume24hUsd = data.success && typeof data.volume24hUsd === 'number'
+              && Number.isFinite(data.volume24hUsd) && data.volume24hUsd >= 0
+              ? data.volume24hUsd as number : null;
+            setTradeCount24h({ scope: statsScope, count, volume24hUsd });
           },
-          onError: () => setTradeCount24h({ scope: statsScope, count: null }),
+          onError: () => setTradeCount24h({ scope: statsScope, count: null, volume24hUsd: null }),
         },
       ));
     }
@@ -883,6 +895,17 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     () => chartMarketStatistics(statsCandles, settings.natrPeriod),
     [statsCandles, settings.natrPeriod],
   );
+  // Prefer the precise exchange 24h ticker; use the existing candle statistics
+  // only when an entire 24h window is available. Never present partial data as 24h.
+  const quotedVolume24hUsd = tradeCount24h?.scope === statsScope ? tradeCount24h.volume24hUsd : null;
+  const hasFullDayHistory = candles.length >= 2 && !!TF_MS[timeframe]
+    && candles[0].t <= (candles[candles.length - 1].t - 86_400_000 + TF_MS[timeframe]);
+  const estimatedVolume24hUsd = !ecoActive && hasFullDayHistory && marketStats.vol24 > 0
+    ? marketStats.vol24 : null;
+  const av24hUsdPerMinute = quotedVolume24hUsd !== null
+    ? quotedVolume24hUsd / 1440
+    : estimatedVolume24hUsd !== null ? estimatedVolume24hUsd / 1440 : null;
+  const avIsEstimate = quotedVolume24hUsd === null && estimatedVolume24hUsd !== null;
 
   const flush = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -2192,7 +2215,10 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
 
     <div className="hookchart-footer">
       {(showMarketStats || screenerCardCompactLayout) && <div ref={statsBarRef} className="marketStatsBar" role="region" aria-label="Показники ринку" tabIndex={0}>
-        {showMarketStats && <span>Vol 24h: <b>{marketStats.vol24 ? `$${formatUsd(marketStats.vol24)}` : '—'}</b></span>}
+        {showMarketStats && <span>Vol 24h: <b>{marketStats.vol24 ? `${formatUsd(marketStats.vol24)}` : '—'}</b></span>}
+        {showMarketStats && <span data-testid="hookchart-footer-av" title={AV_FOOTER_TOOLTIP[chartLanguage] ?? AV_FOOTER_TOOLTIP.uk}>
+          AV 24h: <b>{av24hUsdPerMinute !== null ? `${avIsEstimate ? '≈' : ''}${formatUsd(av24hUsdPerMinute)}/min` : '—'}</b>
+        </span>}
         {screenerCardCompactLayout ? (
           <div className="screenerCardTimeframes" role="group" aria-label="Таймфрейм">
             {TIMEFRAMES.map(tf => (
