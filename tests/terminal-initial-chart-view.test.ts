@@ -447,7 +447,10 @@ test('identical 30-second market snapshots do not reapply the preset page twice'
   assert.ok(start >= 0 && end > start);
   const handler = page.slice(start, end);
   assert.match(handler, /current\.length === selected\.length/);
-  assert.match(handler, /current\.every\(\(coin, index\) => coinMarketKey\(coin\) === coinMarketKey\(selected\[index\]\)\)/);
+  assert.match(handler, /current\.every\(\(coin, index\) => coinMarketKey\(coin\) === coinMarketKey\(selected\[index\]\)/);
+  assert.match(handler, /coin\.timeframe === selected\[index\]\.timeframe/);
+  assert.match(handler, /coin\.formationId === selected\[index\]\.formationId/,
+    'a changed formation or timeframe must refresh the displayed chart');
   assert.match(handler, /\? current : selected/);
   assert.match(handler, /applyPresetPage\(selected, presetPageRef\.current\)/);
 });

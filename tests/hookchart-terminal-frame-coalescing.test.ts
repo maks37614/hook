@@ -48,8 +48,8 @@ test('Terminal queues regular scene paints but fullscreen / Replay preserve sync
   assert.match(engine, /if\(terminalMode\)frames\.current\?\.request\(true\);\s*else frames\.current\?\.flush\(\)/);
   assert.match(engine, /if\(document\.visibilityState==='hidden'\|\|!chartOnScreen\.current\)\{frames\.current\?\.cancel\(\);return\}/);
   assert.match(engine, /\[candles,vp,drawings,alerts,densities,marketPrints,liquidations,autoLevels,/);
-  assert.match(engine, /strategyResult,scalperResult,showScalperLabels,/,
-    'turning off scalp captions must trigger a chart repaint');
+  assert.match(engine, /strategyResult,scalperResult,scalperLineStyle,showScalperTouchPoints,showScalperLabels,/,
+    'changing Scalper lines, points or captions must trigger a chart repaint');
   assert.match(engine, /liquidationCut,timezone,language,terminalMode,keyboardMagnifierActive\]\)/,
     'keyboard magnifier visibility must also trigger a chart repaint');
 });

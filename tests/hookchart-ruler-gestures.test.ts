@@ -31,6 +31,7 @@ test('repositioning handles and two-finger pinch are preserved', () => {
   assert.match(code, /if\(isRangeDrawingTool\(tool\)\)setDraft\(null\)/);
   assert.match(code, /d\.kind==='pinch'&&pointers\.current\.size>=2&&\(tool==='cursor'\|\|isRangeDrawingTool\(tool\)\|\|isPointDrawingTool\(tool\)\)/);
   assert.match(code, /const end=tool==='ruler'\?freeDrawingPoint/);
-  assert.match(code, /if\(tool==='ruler'&&draft&&!mouse\)/);
+  assert.match(code, /if\(isRangeDrawingTool\(tool\)&&draft&&!mouse\)/,
+    'ruler and the other two-point tools retain the first-anchor preview');
   assert.match(code, /const rulerActionPosition=actionDrawing\?\.type==='ruler'/);
 });

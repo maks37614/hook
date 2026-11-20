@@ -804,6 +804,12 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
 
   const currentCandle = visibleCandles[visibleCandles.length - 1] || null;
   const currentPrice = currentCandle ? currentCandle.close : 0;
+  // Recorded seconds must timestamp manual market entries, pending orders
+  // and manual exits at the currently visible second, not the parent candle.
+  const replayActionTime = secondsForNext && partialCandle && secondsForNext.parentTime === partialCandle.time
+    ? secondsForNext.parentTime + Math.max(0, Math.ceil(
+        playbackPhase * secondsForNext.seconds / REPLAY_INTRABAR_PHASES) - 1)
+    : currentCandle?.time ?? Math.floor(Date.now() / 1000);
   // Display the simulated last price/PnL while leaving the persisted open
   // position untouched until the next historical candle is committed.
   const displayPosition = useMemo(() => {
@@ -1129,7 +1135,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         leverage: params.leverage,
         slPrice: params.slPrice,
         tpPrice: params.tpPrice,
-        entryTime: currentCandle ? currentCandle.time : Math.floor(Date.now() / 1000),
+        entryTime: replayActionTime,
         unrealizedPnlUsd: 0,
         unrealizedPnlPct: 0,
         liquidationPrice: liqPrice,
@@ -1150,7 +1156,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.marketOpenDescription', { symbol, size: params.sizeUsd, leverage: params.leverage, price: execPrice.toFixed(2) })
       );
     },
-    [currentPrice, position, settings, symbol, currentCandle, partialCandle, playbackPhase, showToast, playSound, t]
+    [currentPrice, position, settings, symbol, currentCandle, partialCandle, playbackPhase, replayActionTime, showToast, playSound, t]
   );
 
   // Place Pending Order (Limit / Stop)
@@ -1178,7 +1184,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         tpPrice: params.tpPrice,
         tag: params.tag,
         notes: params.notes,
-        createdAtTime: currentCandle ? currentCandle.time : Math.floor(Date.now() / 1000),
+        createdAtTime: replayActionTime,
       };
 
       if (partialCandle && playbackPhase > 0) {
@@ -1192,7 +1198,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         t('replay.order.pendingCreatedDescription', { side: params.side.toUpperCase(), price: params.price.toFixed(2) })
       );
     },
-    [symbol, currentCandle, partialCandle, playbackPhase, showToast, t]
+    [symbol, currentCandle, partialCandle, playbackPhase, replayActionTime, showToast, t]
   );
 
   // Close Position Manually
@@ -1229,7 +1235,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       entryPrice: position.entryPrice,
       exitPrice,
       entryTime: position.entryTime,
-      exitTime: currentCandle ? currentCandle.time : Math.floor(Date.now() / 1000),
+      exitTime: replayActionTime,
       sizeUsd: position.sizeUsd,
       marginUsd: position.marginUsd,
       leverage: position.leverage,
@@ -1265,6 +1271,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     marketType,
     timeframe,
     currentCandle,
+    replayActionTime,
     showToast,
     playSound,
     t,

@@ -76,6 +76,13 @@ test('the Replay page gates animation on loading, checks 1s fills, and labels fa
   assert.match(page,/fetchReplaySecondBatch\(/);
   assert.match(page,/firstReplaySecondEvent\(/);
   assert.match(page,/replaySecondPreview\(/);
+  assert.match(page,/entryTime: replayActionTime/);
+  assert.match(page,/createdAtTime: replayActionTime/);
+  assert.match(page,/exitTime: replayActionTime/);
+  assert.match(page,/secondsForNext\.parentTime \+ Math\.max\(0, Math\.ceil\(/);
+  const secondSource=readFileSync('src/utils/replaySecondHistory.ts','utf8');
+  assert.match(secondSource,/AbortSignal\.any\(\[signal,timeout\]\)/);
+  assert.match(secondSource,/AbortSignal\.timeout\(4500\)/);
   assert.match(page,/supportsReplaySeconds\(/);
   assert.match(page,/if \(secondIsLoading\)/);
   assert.match(page,/replayIntrabarCandle\(/);

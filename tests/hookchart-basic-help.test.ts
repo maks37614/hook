@@ -37,10 +37,13 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
     open: true, embedded: true, prefs: normalizeOriginalHookChartPreferences(),
     onChange: () => {}, onApplyStrategy: () => {}, onClose: () => {},
   }));
-  // Every visible Basic control, including the three independent large-trade
-  // arrow/text controls, has exactly one contextual help trigger.
-  assert.equal((html.match(/aria-label="Пояснення: /g) || []).length, 73);
-  assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, 73);
+  // Includes two newly exposed Scalper styling controls; every Basic
+  // setting still has exactly one contextual question-mark help trigger.
+  const count = (html.match(/aria-label="Пояснення: /g) || []).length;
+  assert.equal(count, 75);
+  assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, count);
+  assert.match(html, /Пояснення: Вигляд ліній Режиму Скальпера/);
+  assert.match(html, /Пояснення: Показувати точки Режиму Скальпера/);
   assert.match(html, /Пояснення: Максимальний DPR полотна/);
   assert.match(html, /Пояснення: Прогнозні зони Liq · модель за історією/);
   assert.match(html, /Пояснення: Товщина горизонтальної лінії/);

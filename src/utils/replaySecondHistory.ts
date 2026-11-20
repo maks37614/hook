@@ -103,8 +103,12 @@ export async function fetchReplaySecondBatch(
   for(const base of ['https://data-api.binance.vision/api/v3/klines','https://api.binance.com/api/v3/klines']){
     if(signal?.aborted)return result;
     try{
+      // Cancellation must also have a deadline: a hung provider request
+      // cannot leave the Replay clock paused indefinitely.
+      const timeout=AbortSignal.timeout(4500);
+      const combinedSignal=signal?AbortSignal.any([signal,timeout]):timeout;
       const response=await fetcher(base+'?'+query.toString(),{
-        signal:signal??AbortSignal.timeout(4500),cache:'force-cache',
+        signal:combinedSignal,cache:'force-cache',
       });
       if(!response.ok)continue;
       const parsed=await response.json() as unknown;
