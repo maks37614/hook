@@ -68,9 +68,9 @@ function linkedTickerDocuments(state, binding) {
     const id = doc.externalId.toLowerCase();
     if (ids.has(id)) continue;
     ids.add(id);
-    found.push({ externalId: id, connectionId: doc.connectionId });
+    found.push({ externalId: id, connectionId: doc.connectionId, kind: doc.kind });
   }
-  return { documents: found };
+  return { documents: found, orderBookCount: found.filter(doc => doc.kind === 'orderBook').length };
 }
 
 /** Local writes are restricted to ticker-only actions. NEVER trading orders. */
@@ -117,9 +117,11 @@ class MetaScalpTickerSender {
       // Empty inventory might be a legacy binding representation; let the
       // original MetaScalp endpoint validate the requested named group.
       const docs=linked?.documents || [];
-      const hasMixedConnections=docs.length>1
-        && new Set(docs.map(doc=>doc.connectionId)).size>1;
-      if (hasMixedConnections) {
+      // One order book: honor the exact Spot/Futures market selected on h00k.
+      // Two or more books in ANY link group (001-500): keep each book's
+      // existing market/connection, even when the connection IDs coincide.
+      // Charts alone never turn a single-book group into mixed-market mode.
+      if (linked?.orderBookCount >= 2) {
         // Only per-document ticker writes: each panel inherits its existing
         // connection (spot/futures and exchange), so no market gets converted.
         const results = await Promise.all(docs.map(async doc => {
@@ -140,8 +142,8 @@ class MetaScalpTickerSender {
         this.lastCommandAt=Date.now();
         return {ok:true,port,mode:'per-panel',panels:succeeded};
       }
-      // Single-market group (or older API without UI inventory): retain
-      // MetaScalp's original named-binding behavior and ticker suffix.
+      // Zero/one order book (or older API without UI inventory): honor
+      // the website-selected market and its original .p futures suffix.
       const response = await jsonFetch(this.fetch,base+'/api/change-ticker',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
