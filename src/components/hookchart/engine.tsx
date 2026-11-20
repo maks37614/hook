@@ -1325,7 +1325,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   // All Scalper-only circular markers (filled contacts and outlined breakout rings)
   // are presentation gated by one preference, never by separate saved layers.
   // Every automatic Scalper line uses one preference; touch dots and text remain unchanged.
-  // Keep the configured CSS width; only the raster stroke resolves to physical pixels.\n  const scalperStrokeWidth = scalperRasterStrokeWidth(normalizeScalperLineWidth(scalperLineWidth), scaleX, scaleY);
+  // Keep the configured CSS width; only the raster stroke resolves to physical pixels.
+  const scalperStrokeWidth = scalperRasterStrokeWidth(normalizeScalperLineWidth(scalperLineWidth), scaleX, scaleY);
   if (scalperResult?.setups.length) {
     q.save();
     for (const setup of scalperResult.setups) {
@@ -1335,7 +1336,11 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.globalAlpha = setup.status === 'forming' ? .67 : .92;
       for (const line of setup.lines) {
         const x0 = g.x(line.from.t), x1 = g.x(line.to.t);
-        const rawY0 = g.y(line.from.p), rawY1 = g.y(line.to.p);\n        // Horizontal pixel-centering only; diagonals retain exact wick pivots.\n        const horizontalLine = line.from.p === line.to.p;\n        const y0 = horizontalLine ? scalperPixelCenteredHorizontalY(rawY0, scalperStrokeWidth, scaleY) : rawY0;\n        const y1 = horizontalLine ? y0 : rawY1;
+        const rawY0 = g.y(line.from.p), rawY1 = g.y(line.to.p);
+        // Horizontal pixel-centering only; diagonals retain exact wick pivots.
+        const horizontalLine = line.from.p === line.to.p;
+        const y0 = horizontalLine ? scalperPixelCenteredHorizontalY(rawY0, scalperStrokeWidth, scaleY) : rawY0;
+        const y1 = horizontalLine ? y0 : rawY1;
         if (![x0,x1,y0,y1].every(Number.isFinite)) continue;
         q.beginPath();
         q.setLineDash(scalperLineDash(scalperLineStyle, setup.status));
