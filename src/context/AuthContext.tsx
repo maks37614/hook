@@ -383,6 +383,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (userRef.current?.uid !== account.uid) throw new Error('Обліковий запис змінився.');
       const nextProfile = stripLegacySecrets(result.profile as UserProfile);
+      // A 200 response must not be presented as a successful profile save
+      // unless PostgreSQL returned the requested account values. This also
+      // catches accidentally dropped fields after a backend change.
+      const accountFields: Array<keyof UserProfile> = [
+        'displayName', 'defaultExchange', 'defaultMarketType', 'defaultTimeframe', 'timeZone',
+      ];
+      if (accountFields.some(field => clean[field] !== undefined && nextProfile[field] !== clean[field])) {
+        throw new Error('Сервер не підтвердив збереження налаштувань профілю. Спробуйте ще раз.');
+      }
       profileRef.current = nextProfile;
       setProfile(nextProfile);
       setUser(result.user as H00kUser);
