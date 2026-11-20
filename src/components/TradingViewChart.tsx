@@ -70,6 +70,8 @@ interface TradingViewChartProps {
   customMarkers?: ChartMarkerInfo[];
   /** Provisional W/M levels are a chart preview, independent of saved TP/SL visibility. */
   previewMarkers?: boolean;
+  /** Per-Terminal-block display override. Never updates the account-wide TP/SL preference. */
+  tradeLevelToggle?: { visible: boolean; onToggle: () => void };
   /** Optional controller from early W/M's own prediction-level toolbar. */
   earlyNecklineToggle?: { visible: boolean; available: boolean; onToggle: () => void };
   /** Always render the native HookChart in fullscreen, regardless of legacy provider settings. */
@@ -198,6 +200,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   isSavingArchive,
   customMarkers,
   previewMarkers = false,
+  tradeLevelToggle,
   earlyNecklineToggle,
   forceHookChart = false,
   savedChartParams,
@@ -590,16 +593,22 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   // its neckline button merely because the other trade levels are previewed.
   const earlyPreviewOwnsNeckline = previewMarkers && !formation;
   const [earlyNecklineVisible, setEarlyNecklineVisible] = useState(true);
+  const terminalTradeLevelsVisible = tradeLevelToggle?.visible;
   const availableHookMarkers = useMemo(() => {
-    const visibility = { entry: showEntryLevel, target: showTargetLevel, stop: showStopLevel };
+    const visibility = terminalTradeLevelsVisible === undefined
+      ? { entry: showEntryLevel, target: showTargetLevel, stop: showStopLevel }
+      : { entry: terminalTradeLevelsVisible, target: terminalTradeLevelsVisible, stop: terminalTradeLevelsVisible };
     const markers = customMarkers?.length
       ? withCalculatedNecklineMarker(formation, customMarkers, timeframe as Timeframe)
       : formationChartMarkers(formation, visibility, timeframe as Timeframe);
-    const displayed = previewMarkers ? markers : filterVisibleTradeMarkers(markers, visibility);
+    // Early W/M predictions retain their own preview visibility. Terminal
+    // previews are *not* exempt from each card's explicit TP/SL switch.
+    const displayed = previewMarkers && terminalTradeLevelsVisible === undefined
+      ? markers : filterVisibleTradeMarkers(markers, visibility);
     return displayed.map(marker => ({ ...marker,
       label: marker.label ? localizeFormationRuntime(language, marker.label) : marker.label,
     }));
-  }, [customMarkers, formation, showEntryLevel, showTargetLevel, showStopLevel, timeframe, previewMarkers, language]);
+  }, [customMarkers, formation, showEntryLevel, showTargetLevel, showStopLevel, terminalTradeLevelsVisible, timeframe, previewMarkers, language]);
   const necklineAvailable = hasFormationNeckline(availableHookMarkers);
   const effectiveNecklineVisible = earlyPreviewOwnsNeckline
     ? (earlyNecklineToggle?.visible ?? earlyNecklineVisible) : showNeckline;
@@ -1210,7 +1219,11 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
 
   // One control always changes all three plotted levels together, regardless
   // of chart provider, page or fullscreen state.
-  const combinedTradeLevels = {
+  const combinedTradeLevels = tradeLevelToggle ? {
+    visible: tradeLevelToggle.visible,
+    available: hasTradeLevels,
+    onToggle: tradeLevelToggle.onToggle,
+  } : {
     visible: showEntryLevel && showTargetLevel && showStopLevel,
     available: hasTradeLevels,
     onToggle: () => applyTradeLevels(toggleCombinedTradeLevels({
@@ -1427,7 +1440,7 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           terminalEcoMode={terminalEcoMode}
           markers={hookMarkers} expandPriceScaleToMarkers={previewMarkers} savedChartParams={savedChartParams} onTimeframeChange={onTimeframeChange}
           onCrosshairPriceChange={onCrosshairPriceChange}
-          tradeLevelToggle={previewMarkers ? undefined : combinedTradeLevels}
+          tradeLevelToggle={tradeLevelToggle || !previewMarkers ? combinedTradeLevels : undefined}
           necklineToggle={necklineToolbarToggle}
           toolbarActions={hookchartToolbarActions} toolbarOverlays={hookchartToolbarOverlays}
           chartActions={showNavigationControls ? chartActions : null} />
