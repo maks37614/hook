@@ -6,12 +6,16 @@ import { Activity, BarChart3, ChevronDown, ChevronUp, Download, Plus, Save, Scan
 import type { MarketCoin, ScannedCoin, TerminalChartBlock, TerminalSavedPreset, Timeframe } from '../../types';
 import type { MarketCoinSnapshot, MarketSelection } from '../../utils/marketCoinLoader';
 import { MARKET_PRESETS, coinMarketKey, selectFormationPresetCoins, selectMarketPresetCoins, type TerminalMarketPreset, type TerminalPresetCoin } from '../../utils/marketPresets';
-import { blocksForSavedFavorites } from '../../utils/terminalPresets';
+import { blocksForSavedFavorites, MAX_TERMINAL_CHARTS, toggleTerminalPresetCoin } from '../../utils/terminalPresets';
+import { AddChartModal } from './AddChartModal';
 
 interface Props {
   blocks: TerminalChartBlock[];
   watchlist: string[];
   presets: TerminalSavedPreset[];
+  /** The same all-markets data fed to the Terminal's + button. */
+  pickerCoins: ScannedCoin[];
+  pickerFormationCoins: ScannedCoin[];
   /** Matches the trader-visible Formations page (including early W/M). */
   formationCoins: readonly ScannedCoin[];
   onRequestFormationScan?: () => boolean;
@@ -41,14 +45,15 @@ interface Props {
 const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, av_1m: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
-export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, onRequestFormationScan, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
+export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, pickerFormationCoins, formationCoins, onRequestFormationScan, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
   onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [source, setSource] = useState<'favorites' | 'workspace'>('favorites');
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [selectedBlocks, setSelectedBlocks] = useState<TerminalChartBlock[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ key: string; params?: LocaleParams } | { text: string } | null>(null);
   const [pendingFormationPreset, setPendingFormationPreset] = useState(false);
@@ -139,18 +144,36 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
     watchlist, favoritesQuotesBySymbol, workspaceBlocksByMarket, timeframe,
   ), [watchlist, favoritesQuotesBySymbol, workspaceBlocksByMarket, timeframe]);
   const candidates = source === 'favorites' ? favoriteBlocks : blocks;
-  const selectedBlocks = candidates.filter(block => selectedKeys.includes(block.id));
+  const selectedMarketKeys = selectedBlocks.map(coinMarketKey);
+  const selectedMarketSet = new Set(selectedMarketKeys);
 
   const openForm = useCallback((nextSource: 'favorites' | 'workspace') => {
     // Opening a draft is not a workspace change. Do not disable a running
     // market preset just because the user wants to save their current view.
     setSource(nextSource);
-    setSelectedKeys((nextSource === 'favorites' ? favoriteBlocks : blocks).slice(0, 50).map(block => block.id));
+    setSelectedBlocks((nextSource === 'favorites' ? favoriteBlocks : blocks).slice(0, MAX_TERMINAL_CHARTS));
+    setPickerOpen(false);
     setName('');
     setFormError(null);
     setShowForm(true);
     setShowPresets(true);
   }, [favoriteBlocks, blocks]);
+
+  const selectAllVisible = () => {
+    setSelectedBlocks(current => {
+      const known = new Set(current.map(coinMarketKey));
+      const additions = candidates.filter(block => !known.has(coinMarketKey(block)))
+        .slice(0, MAX_TERMINAL_CHARTS - current.length);
+      return additions.length ? [...current, ...additions] : current;
+    });
+    setFormError(null);
+  };
+
+  const chooseMarketFromPicker: React.ComponentProps<typeof AddChartModal>['onAddChart'] = (coin, tf, formationId) => {
+    // Exactly the same market picker as Terminal +, but no live chart is created.
+    setSelectedBlocks(current => toggleTerminalPresetCoin(current, coin, tf, formationId));
+    setFormError(null);
+  };
 
   const handleBackupFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -181,6 +204,7 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
     if (selectedBlocks.length > 50) { setFormError('У пресеті може бути до 50 графіків.'); return; }
     if (presets.length >= 30) { setFormError('Можна зберегти до 30 пресетів. Видаліть зайвий пресет.'); return; }
     onSavePreset(cleanName, selectedBlocks);
+    setPickerOpen(false);
     setShowForm(false);
     setMessage({ key: 'terminal.presets.saved', params: { name: cleanName, count: selectedBlocks.length } });
   };
@@ -246,24 +270,49 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
             <input aria-label={t('terminal.drawer.presetNameAria')} value={name} onChange={event => setName(event.target.value)} maxLength={60}
               placeholder={t('terminal.drawer.presetNameExample')} className={`${controlClass} w-full min-w-0 select-text`} />
           </label>
-          <button type="button" aria-label={t('terminal.drawer.presetClose')} onClick={() => setShowForm(false)} className="p-1 text-slate-400 hover:text-white"><X className="h-4 w-4" /></button>
+          <button type="button" aria-label={t('terminal.drawer.presetClose')} onClick={() => { setPickerOpen(false); setShowForm(false); }} className="p-1 text-slate-400 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-slate-400">
           <span>{t('terminal.drawer.presetCoinsLabel')}</span>
-          <button type="button" aria-pressed={source === 'favorites'} onClick={() => { setSource('favorites'); setSelectedKeys(favoriteBlocks.slice(0, 50).map(block => block.id)); }}
-            className={`rounded-lg px-2 py-1 ${source === 'favorites' ? 'bg-amber-500/15 text-amber-300' : 'hover:bg-slate-800'}`}>{t('terminal.drawer.presetFavorites')}</button>
-          <button type="button" aria-pressed={source === 'workspace'} onClick={() => { setSource('workspace'); setSelectedKeys(blocks.slice(0, 50).map(block => block.id)); }}
-            className={`rounded-lg px-2 py-1 ${source === 'workspace' ? 'bg-cyan-500/15 text-cyan-300' : 'hover:bg-slate-800'}`}>{t('terminal.drawer.presetCurrent')}</button>
-          <button type="button" onClick={() => setSelectedKeys(candidates.slice(0, 50).map(block => block.id))} className="ml-auto hover:text-white">{t('terminal.drawer.presetSelectAll')}</button>
-          <button type="button" onClick={() => setSelectedKeys([])} className="hover:text-white">{t('terminal.drawer.presetClearSelection')}</button>
+          <button type="button" onClick={() => setPickerOpen(true)}
+            className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/50 bg-cyan-500/15 px-2.5 py-1.5 font-semibold text-cyan-200 hover:bg-cyan-500/25">
+            <Plus className="h-3.5 w-3.5" />
+            {({ uk: 'Додати монети зі списку +', en: 'Add coins from + list', pl: 'Dodaj monety z listy +', ru: 'Добавить монеты из списка +' } as const)[language]}
+          </button>
+          <span className="font-semibold text-cyan-300">{selectedBlocks.length}/{MAX_TERMINAL_CHARTS}</span>
         </div>
-        {candidates.length ? <div className="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto">
+        <div className="flex flex-wrap items-center gap-2 text-slate-400">
+          <button type="button" aria-pressed={source === 'favorites'} onClick={() => setSource('favorites')}
+            className={`rounded-lg px-2 py-1 ${source === 'favorites' ? 'bg-amber-500/15 text-amber-300' : 'hover:bg-slate-800'}`}>{t('terminal.drawer.presetFavorites')}</button>
+          <button type="button" aria-pressed={source === 'workspace'} onClick={() => setSource('workspace')}
+            className={`rounded-lg px-2 py-1 ${source === 'workspace' ? 'bg-cyan-500/15 text-cyan-300' : 'hover:bg-slate-800'}`}>{t('terminal.drawer.presetCurrent')}</button>
+          <button type="button" onClick={selectAllVisible} className="ml-auto hover:text-white">{t('terminal.drawer.presetSelectAll')}</button>
+          <button type="button" onClick={() => { setSelectedBlocks([]); setFormError(null); }} className="hover:text-white">{t('terminal.drawer.presetClearSelection')}</button>
+        </div>
+        {candidates.length ? <div className="grid max-h-32 grid-cols-1 gap-1 overflow-y-auto">
           {candidates.map(block => <label key={block.id} className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-950/70 px-2 py-2 text-slate-300">
-            <input type="checkbox" aria-label={t("terminal.presets.selectCoin", { symbol: block.symbol, exchange: block.exchange, marketType: block.marketType })} checked={selectedKeys.includes(block.id)}
-              onChange={event => { const checked = event.target.checked; setSelectedKeys(current => checked ? [...current, block.id] : current.filter(id => id !== block.id)); }} className="accent-cyan-500" />
+            <input type="checkbox" aria-label={t("terminal.presets.selectCoin", { symbol: block.symbol, exchange: block.exchange, marketType: block.marketType })}
+              checked={selectedMarketSet.has(coinMarketKey(block))}
+              disabled={!selectedMarketSet.has(coinMarketKey(block)) && selectedBlocks.length >= MAX_TERMINAL_CHARTS}
+              onChange={event => {
+                const key = coinMarketKey(block);
+                setSelectedBlocks(current => event.target.checked
+                  ? current.length < MAX_TERMINAL_CHARTS && !current.some(item => coinMarketKey(item) === key) ? [...current, block] : current
+                  : current.filter(item => coinMarketKey(item) !== key));
+                setFormError(null);
+              }} className="accent-cyan-500" />
             <span><strong data-no-translate>{block.symbol}</strong><span className="ml-1 text-[10px] text-slate-500">{block.exchange === 'binance' ? 'Binance' : 'Bybit'} · {block.marketType} · {block.timeframe}</span></span>
           </label>)}
         </div> : <p className="text-slate-400">{t(source === 'favorites' ? 'terminal.drawer.presetNoFavorites' : 'terminal.drawer.presetNoCharts')}</p>}
+        {selectedBlocks.length > 0 && <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-slate-700/80 bg-slate-950/40 p-2"
+          aria-label={({ uk: 'Обрані монети пресета', en: 'Selected preset coins', pl: 'Wybrane monety presetu', ru: 'Выбранные монеты пресета' } as const)[language]}>
+          {selectedBlocks.map(block => <div key={coinMarketKey(block)} className="flex min-w-0 items-center justify-between gap-2 text-slate-300">
+            <span className="min-w-0 truncate"><strong data-no-translate>{block.symbol}</strong> <span className="text-[10px] text-slate-500">{block.exchange} · {block.marketType} · {block.timeframe}</span></span>
+            <button type="button" aria-label={`${t('terminal.drawer.presetClearSelection')}: ${block.symbol} ${block.exchange} ${block.marketType}`}
+              onClick={() => setSelectedBlocks(current => current.filter(item => coinMarketKey(item) !== coinMarketKey(block)))}
+              className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"><X className="h-3 w-3" /></button>
+          </div>)}
+        </div>}
         {formError && <p role="alert" className="text-rose-300">{translatePhrase(language, formError)}</p>}
         <button type="submit" className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-2 font-semibold text-white hover:bg-cyan-500">
           <Save className="h-3.5 w-3.5" />{t('terminal.presets.saveCount', { count: selectedBlocks.length })}
@@ -281,5 +330,19 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
         {!presets.length && !showForm && <p className="py-1 text-slate-500">{t('terminal.drawer.presetEmpty')}</p>}
       </div>
     </div>}
+    <AddChartModal
+      isOpen={pickerOpen && showForm && showPresets}
+      onClose={() => setPickerOpen(false)}
+      context="preset"
+      mode="preset"
+      coins={pickerCoins}
+      formationCoins={pickerFormationCoins}
+      terminalMarketCoins={snapshot.coins}
+      watchlist={watchlist}
+      initialTimeframe={timeframe}
+      atChartLimit={selectedBlocks.length >= MAX_TERMINAL_CHARTS}
+      presetSelectedKeys={selectedMarketKeys}
+      onAddChart={chooseMarketFromPicker}
+    />
   </section>;
 }
