@@ -4,7 +4,7 @@ export type TimeAxisMemoInputs = {
   tf: string;
   timezone: string;
   language?: string;
-  viewport: {barWidth:number;rightOffset:number;fitAll?:boolean};
+  viewport: {barWidth:number;rightOffset:number;fitAll?:boolean;autoY?:boolean;manualCenter?:number|null;manualRange?:number|null;yZoom?:number;candleFit?:boolean};
   rightPadding?: number;
   rightPaddingBars?: number;
   countdownRef?: unknown;
