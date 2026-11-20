@@ -92,6 +92,7 @@ test('Terminal warm cache never replaces the fresh history fetch or changes DPR'
   const page = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   assert.match(chart, /readTerminalChartHistory\(\{ exchange, marketType, symbol, timeframe \}\)/);
   assert.match(chart, /saveTerminalChartHistory\(/);
+  assert.match(chart, /const \[initialHistoryLoaded, setInitialHistoryLoaded\] = useState\(klines\.length > 1\)/);
   assert.match(chart, /async function loadFullHistory\(\)/);
   assert.match(chart, /await fetchSharedHistoricalKlines\(/);
   assert.match(widget, /terminalChartMountQueue\.enqueue\(\(\) => \{/);
