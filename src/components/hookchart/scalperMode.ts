@@ -411,29 +411,64 @@ function structureCandidates(rows: readonly ScalperCandle[], averagedRegression 
  * preserve the individual wick prices visually without painting huge rays
  * across an already-crowded chart. All work remains in the <=90-candle cache.
  */
+/**
+ * A price-level cascade is a compact stack of DISTINCT local High/Low levels,
+ * not repeated tests of the same horizontal resistance/support.
+ * Preserve repeated touches as evidence without counting them as new tiers.
+ * Only confirmed wick pivots in the existing bounded, closed-bar snapshot
+ * can create tiers; the newest completed bar is reserved for confirmation.
+ */
 function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
   const volatility = atr(rows);
   if (!Number.isFinite(volatility) || volatility <= 0) return [];
   const { highs, lows } = pivots(rows);
   const last = rows.length - 1;
-  const tolerance = Math.max(volatility * .65, rows[last].c * .00015);
+  const price = rows[last].c;
+  // Require a real price difference between tiers while allowing liquid and
+  // micro-priced symbols to scale with volatility. Keep the full stack compact
+  // (at most 0.8% of price), rather than accepting arbitrary trend extremes.
+  const minimumStep = Math.max(volatility * .12, price * .00004);
+  const maximumSpread = Math.min(Math.max(volatility * 3, price * .0015), price * .008);
   const found: Structure[] = [];
   for (const side of ['upper', 'lower'] as const) {
     const recent = (side === 'upper' ? highs : lows).filter(p => last - p.i <= 46);
     if (recent.length < 3 || last - recent[recent.length - 1].i > 20) continue;
+
+    // Traverse from the latest confirmed swing and collapse repeat tests of
+    // one price. A level can be revisited without fabricating another tier.
+    const distinct: Pivot[] = [];
+    for (let i = recent.length - 1; i >= 0 && distinct.length < 5; i--) {
+      const pivot = recent[i];
+      if (distinct.every(existing => Math.abs(existing.p - pivot.p) >= minimumStep))
+        distinct.unshift(pivot);
+    }
+    if (distinct.length < 3) continue;
+
     let selected: Pivot[] | null = null;
-    for (let n = Math.min(5, recent.length); n >= 3; n--) {
-      const group = recent.slice(-n);
+    for (let n = Math.min(5, distinct.length); n >= 3; n--) {
+      const group = distinct.slice(-n);
       const values = group.map(p => p.p);
       const high = Math.max(...values), low = Math.min(...values);
-      if (high - low > tolerance || group[n - 1].i - group[0].i < 9) continue;
+      if (high - low > maximumSpread || group[n - 1].i - group[0].i < 9) continue;
       if (group.slice(1).some((p, i) => p.i - group[i].i > 20)) continue;
+      // Each swing needs a meaningful counter-move; adjacent candle noise
+      // that barely forms a local pivot must not become a scalp level.
+      const retraces = group.slice(1).every((p, i) => {
+        const previous = group[i];
+        const intervening = rows.slice(previous.i + 1, p.i);
+        if (!intervening.length) return false;
+        return side === 'upper'
+          ? Math.min(previous.p, p.p) - Math.min(...intervening.map(bar => bar.l)) >= volatility * .35
+          : Math.max(...intervening.map(bar => bar.h)) - Math.max(previous.p, p.p) >= volatility * .35;
+      });
+      if (!retraces) continue;
       const boundary = side === 'upper' ? high : low;
       const buffer = Math.max(volatility * .24, boundary * .00004);
-      // Never resurrect a level already broken by an older closed candle.
+      // A closed break of the OUTERMOST tier invalidates an old stack.
+      // Crossing an inner tier does not incorrectly erase the outer ones.
       const violated = rows.slice(group[0].i).some(bar =>
         side === 'upper' ? bar.c > boundary + buffer : bar.c < boundary - buffer);
-      if (violated || Math.abs(rows[last].c - boundary) > volatility * 4) continue;
+      if (violated || Math.abs(price - boundary) > Math.max(volatility * 4, price * .004)) continue;
       selected = group;
       break;
     }
@@ -441,7 +476,7 @@ function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
     const boundary = side === 'upper'
       ? Math.max(...selected.map(p => p.p))
       : Math.min(...selected.map(p => p.p));
-    const endPivot: Pivot = { i: last, t: rows[last].t, p: rows[last].c };
+    const endPivot: Pivot = { i: last, t: rows[last].t, p: price };
     const line = flat(boundary, selected[0], endPivot);
     found.push({
       id: 'cascade:' + side + ':' + selected[0].t,
@@ -452,8 +487,8 @@ function cascadeCandidates(rows: readonly ScalperCandle[]): Structure[] {
       touches: uniqueTouches(selected), cascadeSteps: selected, atr: volatility,
     });
   }
-  // Only one independent cascade in a dense multi-chart Terminal layout.
-  return found.sort((a, b) => b.score - a.score).slice(0, 1);
+  // Keep at most one upper and one lower stack; preserve both when present.
+  return found.sort((a, b) => b.score - a.score).slice(0, 2);
 }
 
 function project(fit: Fit, rows: readonly ScalperCandle[], lastIndex: number, role: ScalperLine['role']): ScalperLine {
