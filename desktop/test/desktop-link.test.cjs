@@ -96,7 +96,7 @@ test('session switch resets cursor so new account receives ticker sequence 1',as
     fetchImpl:async(url)=>{
       polls++;
       if(polls===1) return {status:204,headers:{get:()=> 'epoch-A'}};
-      assert.match(url,/poll\\?after=0(?:&|$)/);
+      assert.match(url,/poll\?after=0(?:&|$)/);
       return {status:200,headers:{get:()=> 'epoch-B'},json:async()=>({command})};
     },
     onCommand:async()=>{received++;client.stop();return {ok:true}},
