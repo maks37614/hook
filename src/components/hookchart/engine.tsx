@@ -1372,9 +1372,13 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
   if (scalperResult?.setups.length) {
     q.save();
     for (const setup of scalperResult.setups) {
-      if (setup.kind === 'cascade' && !setup.lines.some(line => activeCascadeLines.has(line))) continue;
-      if (setup.kind !== 'cascade' &&
-          !setup.lines.some(line => line.from.p === line.to.p || activeDiagonalLines.has(line))) continue;
+      // Use the same visible-line subset for drawing, contact dots and labels.
+      // Otherwise the first (expired) level can leave ghost captions/markers
+      // even when only another cascade tier is still active.
+      const visibleLines = setup.lines.filter(line =>
+        setup.kind === 'cascade' ? activeCascadeLines.has(line)
+          : line.from.p === line.to.p || activeDiagonalLines.has(line));
+      if (!visibleLines.length) continue;
       const color = setup.status === 'failed' ? '#f0a66d'
         : setup.status === 'confirmed' ? '#57c9a4'
         : setup.status === 'possible' ? '#ead178' : '#8baac8';
@@ -1425,6 +1429,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.globalAlpha = setupAlpha;
       q.setLineDash([]);
       if (showScalperTouchPoints) for (const touch of setup.touches) {
+        // Cascade tier annotations cannot outlive their own removed rays.
+        // Exact wick prices are used, with only a floating-point tolerance.
+        if (setup.kind === 'cascade' && !visibleLines.some(line =>
+          Math.abs(line.from.p - touch.p) <= Math.max(1e-12, Math.abs(touch.p) * 1e-12))) continue;
         const x = g.x(touch.t), y = g.y(touch.p);
         if (!Number.isFinite(x) || !Number.isFinite(y) || x < -3 || x > g.plotW + 3 || y < -3 || y > g.plotH + 3) continue;
         q.beginPath(); q.arc(x,y,2.3,0,Math.PI*2);
@@ -1441,7 +1449,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
           q.lineWidth = 1.5; q.strokeStyle = color; q.stroke();
         }
       }
-      const anchor = setup.lines[0]?.to;
+      const anchor = visibleLines[0]?.to;
       if (anchor && showScalperLabels) {
         const y = g.y(anchor.p), x = g.x(anchor.t);
         if (Number.isFinite(x) && Number.isFinite(y) && y > 9 && y < g.plotH - 9) {
