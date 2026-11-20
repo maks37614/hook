@@ -233,5 +233,5 @@ test('manually drawn trend and horizontal widths default to 0.4 px and remain ad
   assert.match(canvas, /trendDrawingLineWidth=\{runtimeSettings\.trendDrawingLineWidth \?\? 0\.4\}/);
   assert.match(engine, /q\.lineWidth=d\.type==='trend'\?trendStrokeWidth:/);
   assert.match(engine, /q\.lineWidth=tool==='trend'\?trendStrokeWidth:1\.25/);
-  assert.match(engine, /crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperTrendLineWidth,symbol,tf,draft/);
+  assert.match(engine, /crosshairLineWidth,maxCanvasDpr,horizontalDrawingLineWidth,trendDrawingLineWidth,scalperLineWidth,symbol,tf,draft/);
 });
