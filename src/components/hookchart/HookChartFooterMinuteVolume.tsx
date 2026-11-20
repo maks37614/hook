@@ -55,7 +55,9 @@ export const HookChartFooterMinuteVolume = memo(function HookChartFooterMinuteVo
     return () => { active = false; if (timeout !== undefined) clearTimeout(timeout); };
   }, [enabled]);
 
-  const chartMinute = enabled ? freshChartMinute(observedMinute, Date.now()) : null;
+  // ECO disables extra market requests but the chart's own completed 1m
+  // candle remains an accurate, zero-request source of quote turnover.
+  const chartMinute = freshChartMinute(observedMinute, Date.now());
   const needFallback = enabled && !chartMinute;
   useEffect(() => {
     if (!needFallback || !/^[A-Z0-9]{3,30}$/.test(normalized)) return;
@@ -69,11 +71,12 @@ export const HookChartFooterMinuteVolume = memo(function HookChartFooterMinuteVo
       }, 30_000);
   }, [needFallback, scope, exchange, marketType, normalized, clockMinute]);
 
-  const value = enabled ? selectMinuteVolume(chartMinute, reading?.scope === scope ? reading.value : null, Date.now()) : null;
+  const value = selectMinuteVolume(chartMinute, enabled && reading?.scope === scope ? reading.value : null, Date.now());
   const waiting = enabled && needFallback && (reading === null || reading.scope !== scope);
   const title = value ? `${TOOLTIP[language]} ${new Date(value.minuteStart).toLocaleTimeString()}`
-    : `${TOOLTIP[language]} ${UNAVAILABLE[language]}`;
+    : !enabled ? 'ECO: додаткові запити хвилинного обсягу вимкнено.'
+      : `${TOOLTIP[language]} ${UNAVAILABLE[language]}`;
   return <span data-testid="hookchart-footer-av" title={title}>
-    AV 1m: <b>{value ? `${formatUsd(value.volume1mUsd)}/min` : waiting ? '…' : '—'}</b>
+    AV 1m: <b>{value ? `${formatUsd(value.volume1mUsd)}/min` : !enabled ? 'ECO' : waiting ? '…' : '—'}</b>
   </span>;
 });
