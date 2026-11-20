@@ -30,7 +30,6 @@ interface Props {
   onLoadPreset: (preset: TerminalSavedPreset) => void;
   onDeletePreset: (id: string) => void;
   syncError: boolean;
-  syncConflict: boolean;
   onRetrySync: () => void;
   onDownloadLocalBackup: () => void;
   onImportWorkspaceBackup: (json: string) => boolean;
@@ -41,7 +40,7 @@ const ICONS = { active: Activity, formations: ScanLine, top_gainers: TrendingUp,
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
 export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins, selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
-  onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, syncConflict, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
+  onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -205,15 +204,9 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, formationCoins
       </div>
       {syncError && (
         <p role="status" className="mt-2 text-amber-300">
-          {t(syncConflict ? 'terminal.drawer.syncPresetConflict' : 'terminal.drawer.syncPresetFailed')}
+          {t('terminal.drawer.syncPresetFailed')}
           {' '}
-          {syncConflict ? (
-            <button type="button" onClick={onDownloadLocalBackup} className="underline hover:text-white">
-              {t('terminal.drawer.syncDownload')}
-            </button>
-          ) : (
-            <button type="button" onClick={onRetrySync} className="underline hover:text-white">{t('terminal.drawer.syncRetry')}</button>
-          )}
+          <button type="button" onClick={onRetrySync} className="underline hover:text-white">{t('terminal.drawer.syncRetry')}</button>
         </p>
       )}
       {showForm && <form onSubmit={savePreset} className="mt-3 space-y-3 rounded-xl border border-slate-700 bg-slate-900/80 p-3">
