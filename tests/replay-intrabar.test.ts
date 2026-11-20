@@ -12,7 +12,7 @@ function bar(close = 110): Kline {
 
 test('Replay progressively builds a valid historical candle without leaking high/low or volume before those phases', () => {
   const original = bar();
-  assert.equal(REPLAY_INTRABAR_PHASES, 64);
+  assert.equal(REPLAY_INTRABAR_PHASES, 900);
   assert.ok(REPLAY_INTRABAR_TICK_MS >= 30);
   const previews = Array.from({ length: REPLAY_INTRABAR_PHASES + 1 },
     (_, step) => replayIntrabarCandle(original, step / REPLAY_INTRABAR_PHASES));
@@ -43,7 +43,7 @@ test('Replay progressively builds a valid historical candle without leaking high
   // interpolation is a bounded browser-only visualization.
   assert.equal(600 / 0.1, 6000);
   assert.ok(REPLAY_INTRABAR_TICK_MS >= 40);
-  assert.ok(REPLAY_INTRABAR_PHASES * REPLAY_INTRABAR_TICK_MS <= 6000);
+  assert.ok(REPLAY_INTRABAR_PHASES >= 15 * 60, '15m bars need one-second internal resolution');
   assert.equal(replayIntrabarCandle(original, 1), original);
 });
 

@@ -51,6 +51,34 @@ export const replayStaticRows = [
     "🎲 Losowo"
   ],
   [
+    "toolbar.secondBadge",
+    "Історія 1с · реальна",
+    "Historical 1s · real",
+    "История 1с · реальная",
+    "Historia 1 s · rzeczywista"
+  ],
+  [
+    "toolbar.secondDisclaimer",
+    "Рух ціни відтворюється за перевіреними історичними секундними свічками Binance Spot. Порядок торгів усередині однієї секунди невідомий.",
+    "Price follows verified historical Binance Spot 1-second candles. Trade ordering within the same second is unknown.",
+    "Цена следует проверенным историческим секундным свечам Binance Spot. Порядок сделок внутри одной секунды неизвестен.",
+    "Cena jest odtwarzana na podstawie zweryfikowanych historycznych świec 1 s Binance Spot. Kolejność transakcji w tej samej sekundzie pozostaje nieznana."
+  ],
+  [
+    "toolbar.secondLoading",
+    "Завантаження історії 1с",
+    "Loading 1s history",
+    "Загрузка истории 1с",
+    "Wczytywanie historii 1 s"
+  ],
+  [
+    "toolbar.secondLoadingHelp",
+    "Завантаження історичних секундних свічок безпосередньо з біржі в браузері, без навантаження на VPS.",
+    "Downloading historic 1-second candles directly to your browser; no VPS processing.",
+    "Загрузка исторических секундных свечей напрямую в браузер без обработки на VPS.",
+    "Pobieranie historycznych świec 1 s bezpośrednio do przeglądarki, bez obciążania VPS."
+  ],
+  [
     "toolbar.intrabarBadge",
     "OHLC · симуляція",
     "OHLC · simulated",

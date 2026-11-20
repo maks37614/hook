@@ -28,6 +28,7 @@ import {
 import { fetchReplayHistoryBoundary, resolveReplayHistoryDate } from '../utils/replayHistoryAvailability';
 import { prependCachedReplayHistory, replayVisibleCandles } from '../utils/replayHistoryExtend';
 import { REPLAY_INTRABAR_PHASES, REPLAY_INTRABAR_TICK_MS, replayIntrabarCandle, replayRemainingCandle } from '../utils/replayIntrabar';
+import { supportsReplaySeconds, replaySecondDuration, replaySecondPreview, firstReplaySecondEvent, fetchReplaySecondBatch, type ReplaySecondHistory } from '../utils/replaySecondHistory';
 import { useReplayProfileState } from '../utils/useReplayProfileState';
 import { storeReplayScreenshot, deleteReplayScreenshots, clearReplayScreenshots, replayImageKey } from '../utils/replayScreenshots';
 import {
@@ -83,6 +84,10 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
   // advances exactly once per completed bar, preserving journal/profile writes.
   const [playbackPhase, setPlaybackPhase] = useState(0);
   const playbackFractionRef = useRef(0);
+  // Browser-only, bounded public 1-second history. Cache key includes the
+  // precise exchange/market/symbol/timeframe/bar; nothing lives on the VPS.
+  const replaySecondCacheRef = useRef(new Map<string, ReplaySecondHistory | null>());
+  const [secondLookup, setSecondLookup] = useState<{key:string;ready:boolean}|null>(null);
   const nextBarCutoffRef = useRef<{ time: number; phase: number; id: string } | null>(null);
   const orderCutoffsRef = useRef(new Map<string, { time: number; phase: number }>());
   const resetIntrabar = useCallback(() => {
@@ -121,6 +126,8 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     resetIntrabar();
     nextBarCutoffRef.current = null;
     orderCutoffsRef.current.clear();
+    replaySecondCacheRef.current.clear();
+    setSecondLookup(null);
     setAllCandles([]);
     setCurrentIndex(0);
     setCutoffIndex(0);
@@ -593,6 +600,8 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       resetIntrabar();
       nextBarCutoffRef.current = null;
       orderCutoffsRef.current.clear();
+      replaySecondCacheRef.current.clear();
+      setSecondLookup(null);
       setAllCandles([]);
       if (!restoringProfile) {
         setPosition(null);
@@ -690,11 +699,59 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     () => replayVisibleCandles(allCandles, currentIndex, historyExpanded, cachedHistoryPrefix),
     [allCandles, currentIndex, historyExpanded, cachedHistoryPrefix],
   );
-  // Only the next candle is reconstructed, from its already fetched OHLC.
-  // The unaltered future candles never enter any renderer, journal or overlay.
-  const partialCandle = useMemo(() => playbackPhase > 0 && currentIndex + 1 < allCandles.length
-    ? replayIntrabarCandle(allCandles[currentIndex + 1], playbackPhase / REPLAY_INTRABAR_PHASES)
-    : null, [allCandles, currentIndex, playbackPhase]);
+  const secondParent = allCandles[currentIndex + 1] ?? null;
+  const secondScope = [exchange,marketType,symbol,timeframe].join(':');
+  const secondKey = secondParent ? secondScope + ':' + secondParent.time : '';
+  const secondModeEligible = supportsReplaySeconds(exchange,marketType,timeframe)
+    && playbackSpeed <= 1 && secondParent !== null;
+  // Request just one <=15-minute Binance Spot batch, directly from the
+  // browser. A missing, truncated or inconsistent 1s series is NOT treated as
+  // genuine historical price progression.
+  useEffect(() => {
+    if (!isPlaying || !secondModeEligible || !secondParent) return;
+    const cache = replaySecondCacheRef.current;
+    if (cache.has(secondKey)) {
+      setSecondLookup(previous => previous?.key === secondKey && previous.ready
+        ? previous : { key:secondKey,ready:true });
+      return;
+    }
+    setSecondLookup({key:secondKey,ready:false});
+    const controller = new AbortController();
+    const duration = replaySecondDuration(timeframe);
+    const until = Math.min(allCandles.length, currentIndex + 1 + Math.floor(900 / duration));
+    const parents = allCandles.slice(currentIndex + 1,until);
+    void fetchReplaySecondBatch(symbol,timeframe,parents,controller.signal)
+      .then(batch => {
+        if (controller.signal.aborted) return;
+        for (const parent of parents) {
+          cache.set(secondScope+':'+parent.time,batch.get(parent.time)??null);
+        }
+        // A tiny FIFO cache prevents 1s arrays from growing across long sessions.
+        while (cache.size > 24) cache.delete(cache.keys().next().value!);
+        setSecondLookup({key:secondKey,ready:true});
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        cache.set(secondKey,null);
+        setSecondLookup({key:secondKey,ready:true});
+      });
+    return () => controller.abort();
+  }, [isPlaying,secondModeEligible,secondParent,secondKey,secondScope,
+    currentIndex,allCandles,symbol,timeframe]);
+
+  const secondsForNext = secondLookup?.ready && secondLookup.key === secondKey
+    ? replaySecondCacheRef.current.get(secondKey) ?? null : null;
+  const secondIsLoading = secondModeEligible &&
+    (!secondLookup || secondLookup.key !== secondKey || !secondLookup.ready);
+  const intrabarSource: 'seconds'|'loading'|'simulated' = secondsForNext
+    ? 'seconds' : secondIsLoading && isPlaying ? 'loading' : 'simulated';
+  // Confirmed history stays immutable. Only the currently emerging bar is
+  // reconstructed from recorded 1-second prices when the source is valid.
+  const partialCandle = useMemo(() => playbackPhase > 0 && secondParent
+    ? secondsForNext
+      ? replaySecondPreview(secondParent,secondsForNext,playbackPhase/REPLAY_INTRABAR_PHASES)
+      : replayIntrabarCandle(secondParent,playbackPhase/REPLAY_INTRABAR_PHASES)
+    : null, [secondParent,secondsForNext,playbackPhase,secondLookup]);
   const visibleCandles = useMemo(() => partialCandle
     ? [...confirmedReplayCandles, partialCandle] : confirmedReplayCandles,
     [confirmedReplayCandles, partialCandle]);
@@ -782,8 +839,15 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         const cutoff = orderCutoffsRef.current.get(order.id);
         const effectiveBar = cutoff?.time === nextCandle.time
           ? replayRemainingCandle(nextCandle, cutoff.phase) : nextCandle;
+        const firstSecond = secondsForNext?.parentTime === nextCandle.time
+          ? firstReplaySecondEvent(secondsForNext,
+              nextCandle.time + (cutoff?.time === nextCandle.time
+                ? Math.ceil(cutoff.phase * secondsForNext.seconds) : 0),
+              row => checkOrderFill(order,row) ? true : null)
+          : null;
         orderCutoffsRef.current.delete(order.id);
-        const isFilled = checkOrderFill(order, effectiveBar);
+        const isFilled = secondsForNext?.parentTime === nextCandle.time
+          ? firstSecond !== null : checkOrderFill(order,effectiveBar);
         if (isFilled) {
           // Fill order into active position
           const fillPrice = order.price;
@@ -818,7 +882,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
               leverage: order.leverage,
               slPrice: order.slPrice,
               tpPrice: order.tpPrice,
-              entryTime: nextCandle.time,
+              entryTime: firstSecond?.time ?? nextCandle.time,
               unrealizedPnlUsd: 0,
               unrealizedPnlPct: 0,
               liquidationPrice: liqPrice,
@@ -850,7 +914,17 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
       // Check triggers on this new candle's High & Low
       const postEntryBar = currentEntryCutoff?.id === prevPos.id && currentEntryCutoff.time === nextCandle.time
         ? replayRemainingCandle(nextCandle, currentEntryCutoff.phase) : nextCandle;
-      const trigger = checkPositionTriggers(prevPos, postEntryBar);
+      // Resolve SL/TP using the FIRST historical second where it was hit.
+      // This avoids using the entire future minute's high/low on a new entry.
+      const minSecond = currentEntryCutoff?.id === prevPos.id && currentEntryCutoff.time === nextCandle.time
+        ? nextCandle.time + Math.ceil(currentEntryCutoff.phase * (secondsForNext?.seconds ?? 0))
+        : prevPos.entryTime >= nextCandle.time && prevPos.entryTime < nextCandle.time+(secondsForNext?.seconds ?? 0)
+          ? prevPos.entryTime+1 : nextCandle.time;
+      const secondTrigger = secondsForNext?.parentTime === nextCandle.time
+        ? firstReplaySecondEvent(secondsForNext,minSecond,row=>checkPositionTriggers(prevPos,row))
+        : null;
+      const trigger = secondsForNext?.parentTime === nextCandle.time
+        ? secondTrigger?.result ?? null : checkPositionTriggers(prevPos,postEntryBar);
       if (trigger) {
         // Position closed by SL, TP, or Liquidation!
         const exitPrice = trigger.exitPrice;
@@ -877,7 +951,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
           entryPrice: prevPos.entryPrice,
           exitPrice,
           entryTime: prevPos.entryTime,
-          exitTime: nextCandle.time,
+          exitTime: secondTrigger?.time ?? nextCandle.time,
           sizeUsd: prevPos.sizeUsd,
           marginUsd: prevPos.marginUsd,
           leverage: prevPos.leverage,
@@ -939,6 +1013,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     playSound,
     t,
     resetIntrabar,
+    secondsForNext,
   ]);
 
   const handleStepForwardRef = useRef(handleStepForward);
@@ -958,6 +1033,9 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
     playbackTimerRef.current = setInterval(() => {
       const now = performance.now();
       if (document.visibilityState === 'hidden') { lastTickAt = now; return; }
+      // Never start playback with a fake path while the real 1s segment is
+      // loading. On unavailable/invalid data, the labelled OHLC fallback runs.
+      if (secondIsLoading) { lastTickAt = now; return; }
       const deltaMs = Math.max(0, Math.min(120, now - lastTickAt));
       lastTickAt = now;
       playbackFractionRef.current = Math.min(1, playbackFractionRef.current + deltaMs / intervalMs);
@@ -978,7 +1056,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
         playbackTimerRef.current = null;
       }
     };
-  }, [isPlaying, playbackSpeed, resetIntrabar]);
+  }, [isPlaying, playbackSpeed, resetIntrabar, secondIsLoading]);
 
   // Global Keyboard Shortcuts (Space: Play/Pause, Right Arrow: Step +1)
   useEffect(() => {
@@ -1376,6 +1454,7 @@ export const ReplayPage: React.FC<ReplayPageProps> = ({ coins }) => {
             onToggleHistory={toggleCachedHistory}
             isPlaying={isPlaying}
             isIntrabarPreview={partialCandle !== null}
+            intrabarSource={intrabarSource}
             canAdvance={allCandles.length > 0 && currentIndex < allCandles.length - 1}
             onTogglePlay={toggleReplayPlayback}
             onStepForward={handleStepForward}

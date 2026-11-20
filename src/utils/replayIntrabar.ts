@@ -8,7 +8,7 @@ import type { Kline } from '../types';
  */
 // 64 levels keep 0.1x playback visually fluid (about 11 painted states per
 // six-second candle), while 40ms scheduling caps any Replay chart at 25 fps.
-export const REPLAY_INTRABAR_PHASES = 64;
+export const REPLAY_INTRABAR_PHASES = 900;
 export const REPLAY_INTRABAR_TICK_MS = 40;
 
 function normalized(progress: number): number {

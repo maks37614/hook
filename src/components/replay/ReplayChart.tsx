@@ -45,6 +45,8 @@ interface ReplayChartProps {
   isPlaying: boolean;
   /** The last displayed candle is a reconstructed, not tick-recorded, live-looking bar. */
   isIntrabarPreview?: boolean;
+  /** Actual verified 1s Binance history, pending fetch, or OHLC approximation. */
+  intrabarSource?: 'seconds' | 'loading' | 'simulated';
   canAdvance: boolean;
   onTogglePlay: () => void;
   onStepForward: () => void;
@@ -71,6 +73,7 @@ export const ReplayChart = forwardRef<ReplayChartHandle, ReplayChartProps>(({
   onToggleHistory,
   isPlaying,
   isIntrabarPreview = false,
+  intrabarSource = 'simulated',
   canAdvance,
   onTogglePlay,
   onStepForward,
@@ -630,9 +633,17 @@ export const ReplayChart = forwardRef<ReplayChartHandle, ReplayChartProps>(({
               </span>
             )}
             {(isPlaying || isIntrabarPreview) && (
-              <span role="note" title={t('replay.static.toolbar.intrabarDisclaimer')}
+              <span role="note" title={t(intrabarSource === 'seconds'
+                  ? 'replay.static.toolbar.secondDisclaimer'
+                  : intrabarSource === 'loading'
+                    ? 'replay.static.toolbar.secondLoadingHelp'
+                    : 'replay.static.toolbar.intrabarDisclaimer')}
                 className="shrink-0 rounded border border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5 text-[9px] font-medium text-amber-200/80">
-                {t('replay.static.toolbar.intrabarBadge')}
+                {t(intrabarSource === 'seconds'
+                  ? 'replay.static.toolbar.secondBadge'
+                  : intrabarSource === 'loading'
+                    ? 'replay.static.toolbar.secondLoading'
+                    : 'replay.static.toolbar.intrabarBadge')}
               </span>
             )}
             {isFocusedBadge && (
