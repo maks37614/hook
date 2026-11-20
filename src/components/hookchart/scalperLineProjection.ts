@@ -97,19 +97,62 @@ export function cascadeLineIsActive(
 }
 
 /**
- * Active cascade rays start just beyond the latest candle's right edge.
- * This prevents projecting old tiers through / behind historical candles.
- * The right end still reaches the price-scale divider.
+ * Visible auto trend/triangle/wedge diagonal: use the latest *supporting wick*
+ * as its activation time. Older touches are evidence for the structure, not
+ * post-formation breaches. Only later bars can expire its painted line.
+ *
+ * A wick crossing the projected diagonal removes that line. A single exposed
+ * trendline also expires once price moves decisively away from it: unlike a
+ * two-wall triangle, an abandoned standalone line must not linger over an
+ * unrelated impulse. No market data, fit coordinates or detector state changes.
  */
-export function cascadeFutureRayStartX(
-  lastCandleCenterX: number,
-  barStep: number,
-  scaleX: number,
-  plotWidth: number,
-): number | null {
-  if (![lastCandleCenterX, barStep, scaleX, plotWidth].every(Number.isFinite) ||
-      barStep <= 0 || scaleX <= 0 || plotWidth <= 0) return null;
-  const devicePixel = 1 / scaleX;
-  const x = Math.max(0, lastCandleCenterX + barStep * 0.5 + devicePixel);
-  return x + devicePixel < plotWidth ? x : null;
+export function scalperDiagonalIsActive(
+  line: ScalperLine,
+  touches: readonly ScalperPoint[],
+  candles: readonly ScalperCandle[],
+  side: 'upper' | 'lower',
+  expireWhenFar = false,
+): boolean {
+  const elapsed = line.to.t - line.from.t;
+  if (!Number.isFinite(elapsed) || elapsed <= 0 ||
+      !Number.isFinite(line.from.p) || !Number.isFinite(line.to.p) ||
+      line.from.p <= 0 || line.to.p <= 0 || !candles.length) return false;
+  const last = candles[candles.length - 1];
+  if (!Number.isFinite(last.t) || last.t < line.from.t) return false;
+  const priceAt = (t: number) =>
+    line.from.p + (line.to.p - line.from.p) * (t - line.from.t) / elapsed;
+
+  // The input is the existing in-memory chart. A 12-bar volatility estimate
+  // is enough for visual tolerances and is calculated only when OHLC changes.
+  const recent = candles.slice(-12);
+  let rangeSum = 0;
+  for (const bar of recent) {
+    if (!Number.isFinite(bar.h) || !Number.isFinite(bar.l) || bar.h < bar.l) return false;
+    rangeSum += bar.h - bar.l;
+  }
+  const avgRange = rangeSum / recent.length;
+  const matchTolerance = Math.max(avgRange * .3, line.from.p * .0001);
+  const farThreshold = Math.max(avgRange * 2, last.c * .0015);
+  let activatedAt = line.from.t;
+  for (const touch of touches) {
+    if (touch.t >= activatedAt && touch.t <= line.to.t &&
+        Number.isFinite(touch.p) && Number.isFinite(touch.t) &&
+        Math.abs(touch.p - priceAt(touch.t)) <= matchTolerance) {
+      activatedAt = touch.t;
+    }
+  }
+  for (let i = candles.length - 1; i >= 0; i--) {
+    const bar = candles[i];
+    if (!Number.isFinite(bar.t)) return false;
+    if (bar.t <= activatedAt) break;
+    if (![bar.h, bar.l, bar.c].every(Number.isFinite) || bar.h < bar.l) return false;
+    const projected = priceAt(bar.t);
+    if (!Number.isFinite(projected) || projected <= 0) return false;
+    // The contact after the final structural pivot invalidates the visual line.
+    if (side === 'upper' ? bar.h >= projected : bar.l <= projected) return false;
+    if (expireWhenFar &&
+        (side === 'upper' ? projected - bar.c > farThreshold
+          : bar.c - projected > farThreshold)) return false;
+  }
+  return true;
 }
