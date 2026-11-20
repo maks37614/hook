@@ -139,11 +139,6 @@ export const MetaScalpModal: React.FC<MetaScalpModalProps> = ({
     handleSave(updated);
   };
 
-  const handleToggleAutoSwitch = () => {
-    const updated = { ...settings, autoSwitchOnClick: !settings.autoSwitchOnClick };
-    handleSave(updated);
-  };
-
   const handleToggleSoundFeedback = () => {
     const current = settings.soundFeedback ?? true;
     const updated = { ...settings, soundFeedback: !current };
@@ -316,29 +311,6 @@ export const MetaScalpModal: React.FC<MetaScalpModalProps> = ({
             <p className="text-[11px] text-slate-400">{' '}{tr("Вкажіть у MetaScalp цей же номер групи на стакані або графіку для синхронізації.")}{' '}</p>
           </div>
 
-          {/* Auto-switch on click */}
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-            <div>
-              <span className="font-semibold text-white block">{tr("Автоперемикання при виборі")}</span>
-              <span className="text-[11px] text-slate-400">{' '}{tr("Миттєво надсилати монету в MetaScalp при кліку на картку чи рядок таблиці")}{' '}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleToggleAutoSwitch}
-              aria-label={tr("Автоперемикання при виборі")}
-              aria-pressed={Boolean(settings.autoSwitchOnClick)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-                settings.autoSwitchOnClick ? 'bg-cyan-600' : 'bg-slate-700'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.autoSwitchOnClick ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
           {/* Sound Feedback */}
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
             <div className="flex items-center gap-2.5">
@@ -413,7 +385,7 @@ export const MetaScalpModal: React.FC<MetaScalpModalProps> = ({
             <p>{' '}{tr("1. Запустіть")}{' '}<strong>MetaScalp</strong>{' '}{tr("на цьому комп'ютері. Локальний API (порт 17845) активний автоматично.")}{' '}</p>
             <p>{' '}{tr("2. У MetaScalp встановіть групу лінковки (наприклад,")}{' '}<strong>001</strong>{tr(") на потрібних стаканах чи графіках.")}{' '}</p>
             <p>{' '}{tr("Якщо браузер запитає дозвіл на доступ до локальної мережі, надайте його цьому сайту.")}{' '}</p>
-            <p>{' '}{tr("3. Клікайте на кнопку")}{' '}<strong>⚡ MetaScalp</strong>{' '}{tr("або на будь-яку монету в скрінері — термінал миттєво переключиться на обраний інструмент.")}{' '}</p>
+            <p>{' '}{tr("3. Клікайте на кнопку")}{' '}<strong>⚡ MetaScalp</strong>.{' '}</p>
           </div>
         </div>
 

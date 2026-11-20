@@ -13,7 +13,7 @@ export const DEFAULT_METASCALP_SETTINGS: MetaScalpSettings = {
   enabled: true,
   port: 17845,
   binding: '001',
-  autoSwitchOnClick: true,
+  autoSwitchOnClick: false,
   soundFeedback: true,
 };
 
@@ -25,7 +25,7 @@ export function getStoredMetaScalpSettings(userId?: string): MetaScalpSettings {
     const saved = localStorage.getItem(`${STORAGE_KEY}_${userId}`);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_METASCALP_SETTINGS, ...parsed };
+      return { ...DEFAULT_METASCALP_SETTINGS, ...parsed, autoSwitchOnClick: false };
     }
   } catch (e) {
     console.error('Failed to load MetaScalp settings from localStorage:', e);
@@ -36,7 +36,7 @@ export function getStoredMetaScalpSettings(userId?: string): MetaScalpSettings {
 export function saveStoredMetaScalpSettings(settings: MetaScalpSettings, userId?: string): void {
   if (!userId) return;
   try {
-    localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify(settings));
+    localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify({ ...settings, autoSwitchOnClick: false }));
   } catch (e) {
     console.error('Failed to save MetaScalp settings:', e);
   }
@@ -47,7 +47,7 @@ export function getUserMetaScalpSettings(
   profile?: Pick<UserProfile, 'uid' | 'metaScalpSettings'> | null
 ): MetaScalpSettings {
   if (userId && profile?.uid === userId && profile.metaScalpSettings) {
-    return { ...DEFAULT_METASCALP_SETTINGS, ...profile.metaScalpSettings };
+    return { ...DEFAULT_METASCALP_SETTINGS, ...profile.metaScalpSettings, autoSwitchOnClick: false };
   }
   return getStoredMetaScalpSettings(userId);
 }

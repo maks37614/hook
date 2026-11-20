@@ -10,6 +10,7 @@ import { DEFAULT_METASCALP_SETTINGS } from '../src/utils/metaScalpService';
 test('terminal preferences are isolated per user and legacy MetaScalp settings are preserved', () => {
   const previous = { uid: 'owner-a', metaScalpSettings: { ...DEFAULT_METASCALP_SETTINGS, autoSwitchOnClick: false } };
   assert.equal(getUserTerminalLinkSettings('owner-a', previous).switchOnChartOpen, false);
+  assert.equal(getUserTerminalLinkSettings('owner-a', { ...previous, metaScalpSettings: { ...DEFAULT_METASCALP_SETTINGS, autoSwitchOnClick: true } }).switchOnChartOpen, false);
   assert.equal(getUserTerminalLinkSettings('owner-b', previous).provider, 'none');
   assert.equal(getUserTerminalLinkSettings(undefined, previous).enabled, false);
   assert.equal(getUserTerminalLinkSettings('owner-a', previous).provider, 'metascalp');
@@ -33,6 +34,10 @@ test('terminal settings normalize corrupt or incomplete persisted objects', () =
   assert.deepEqual(p.tigerGroups, { formations: '11' });
   assert.deepEqual(p.metaScalpGroups, { formations: '012' });
   assert.equal(p.autoSignals, false);
+  assert.equal(p.switchOnChartOpen, false);
+  const priorAuto = normalizeTerminalLinkSettings({ switchOnChartOpen: true, autoSignals: true });
+  assert.equal(priorAuto.switchOnChartOpen, false);
+  assert.equal(priorAuto.autoSignals, false);
   assert.equal(normalizeMetaScalpGroup('500'), '500');
   assert.equal(normalizeMetaScalpGroup('0'), null);
   assert.equal(normalizeTigerGroup('z'), 'Z');

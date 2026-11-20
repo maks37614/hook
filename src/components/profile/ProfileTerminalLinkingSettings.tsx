@@ -12,6 +12,18 @@ import {
   type TerminalLinkSettings, type TerminalProvider, type TerminalLinkSource,
 } from '../../utils/terminalLinkService';
 
+const MANUAL_LINK_TITLES = {
+  uk: '5. Ручна лінковка та захист від повторних команд',
+  en: '5. Manual linking and duplicate-command protection',
+  pl: '5. Ręczne łączenie i ochrona przed powtarzaniem poleceń',
+  ru: '5. Ручная линковка и защита от повторных команд',
+} as const;
+const MANUAL_LINK_MESSAGES = {
+  uk: 'Термінал змінює монету лише після натискання кнопки лінковки. Відкриття графіка, повний екран та сповіщення не перемикають монету автоматично.',
+  en: 'The terminal changes symbols only after you press a linking button. Opening charts, fullscreen mode and notifications never switch symbols automatically.',
+  pl: 'Terminal zmienia instrument tylko po naciśnięciu przycisku łączenia. Wykresy, pełny ekran i powiadomienia nie przełączają go automatycznie.',
+  ru: 'Терминал меняет монету только после нажатия кнопки линковки. Открытие графика, полный экран и уведомления не переключают монету автоматически.',
+} as const;
 const inputClass = 'rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none';
 const GROUP_SOURCES: TerminalLinkSource[] = LINK_SOURCES.map(source => source.id);
 const REMOTE_TEST_LABELS = {
@@ -105,7 +117,7 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
         terminalLinkSettings: next,
         metaScalpSettings: { ...meta,
           enabled: next.provider === 'metascalp' ? next.enabled : meta.enabled,
-          autoSwitchOnClick: next.switchOnChartOpen,
+          autoSwitchOnClick: false,
           binding: normalizeMetaScalpGroup(meta.binding) || '001',
         },
       });
@@ -332,26 +344,10 @@ export const ProfileTerminalLinkingSettings: React.FC = () => {
           )}
 
           <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-            <h4 className="text-sm font-semibold text-slate-100">5. Автоматизація та захист від випадкових перемикань</h4>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-200">
-              <input type="checkbox" className="mt-0.5 accent-cyan-500" checked={draft.switchOnChartOpen}
-                onChange={e => change({ switchOnChartOpen: e.target.checked })}/>
-              <span>Перемикати інструмент під час відкриття графіка з h00k
-                <span className="mt-0.5 block text-[11px] text-slate-400">Якщо вимкнути, працюватимуть тільки кнопки ручної лінковки.</span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-200">
-              <input type="checkbox" checked={draft.autoSignals && selected !== 'vataga'}
-                disabled={selected === 'vataga'} className="mt-0.5 accent-cyan-500"
-                onChange={e => change({ autoSignals: e.target.checked })}/>
-              <span>Автоматично перемикати за новими сповіщеннями
-                <span className="mt-0.5 block text-[11px] text-slate-400">
-                  Вимкнено за замовчуванням. Лише нові події з увімкненого Центру сповіщень, які мають тикер, біржу та ринок.
-                  Може перемкнути стакан під час вашої роботи — використовуйте обережно.
-                  {selected === 'vataga' && ' ' + translatePhrase(language, 'Автоматизація Vataga недоступна до реалізації прямого API.')}
-                </span>
-              </span>
-            </label>
+            <h4 className="text-sm font-semibold text-slate-100">{MANUAL_LINK_TITLES[language as keyof typeof MANUAL_LINK_TITLES] ?? MANUAL_LINK_TITLES.uk}</h4>
+            <p className="text-xs text-slate-300">
+              {MANUAL_LINK_MESSAGES[language as keyof typeof MANUAL_LINK_MESSAGES] ?? MANUAL_LINK_MESSAGES.uk}
+            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-xs text-slate-300">Захисний інтервал між командами
                 <select className={inputClass + ' w-full'} value={draft.cooldownMs} onChange={e => change({ cooldownMs: Number(e.target.value) })}>

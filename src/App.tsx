@@ -41,7 +41,7 @@ import {
   playMetaScalpClickSound,
   getUserMetaScalpSettings,
 } from './utils/metaScalpService';
-import { getUserTerminalLinkSettings, sendToSelectedTerminal, terminalLabel, notificationTerminalSource, isFreshTerminalNotification, type TerminalLinkSource } from './utils/terminalLinkService';
+import { getUserTerminalLinkSettings, sendToSelectedTerminal, terminalLabel, notificationTerminalSource, type TerminalLinkSource } from './utils/terminalLinkService';
 import { desktopRemoteLinkEnabled } from './utils/desktopRemoteLink';
 import type { SiteNotificationItem } from './utils/siteNotifications';
 import { notificationChartTarget } from './utils/notificationChartLink';
@@ -718,7 +718,7 @@ export default function App() {
 
   // Routes all existing external-terminal buttons through the user-selected adapter.
   const handleSendToMetaScalp = useCallback(
-    async (coin: ScannedCoin, source: TerminalLinkSource = 'screener', isBackground = false) => {
+    async (coin: ScannedCoin, source: TerminalLinkSource = 'screener') => {
       if (!user) { handleOpenAuthModal('signin', 'linking'); return; }
       if (terminalLinkSettings.provider === 'none' || !terminalLinkSettings.enabled) {
         setProfileInitialSection('linking');
@@ -736,7 +736,7 @@ export default function App() {
       try {
         res = await sendToSelectedTerminal(
           coin.symbol, coin.exchange, coin.marketType, source,
-          terminalLinkSettings, metaScalpSettings, quality, !isBackground
+          terminalLinkSettings, metaScalpSettings, quality, true
         );
       } catch {
         // Allow immediate retry and report a failure instead of leaving an unhandled rejection.
@@ -776,7 +776,7 @@ export default function App() {
       && (item.marketType === 'futures' || item.marketType === 'spot'));
   }, [user, terminalLinkSettings]);
 
-  const handleLinkNotification = useCallback((item: SiteNotificationItem, isBackground = false) => {
+  const handleLinkNotification = useCallback((item: SiteNotificationItem) => {
     if (!canLinkNotification(item)) return;
     const source = notificationTerminalSource(item.kind);
     if (!source || !item.symbol || (item.exchange !== 'binance' && item.exchange !== 'bybit')
@@ -791,37 +791,11 @@ export default function App() {
       currentPrice: 0, priceChange24h: 0, highPrice24h: 0, lowPrice24h: 0,
       volume24hUsd: 0, formations: [], lastUpdated: Date.now(), exchangeUrl: '',
     };
-    void handleSendToMetaScalp(minimalCoin, source, isBackground);
+    void handleSendToMetaScalp(minimalCoin, source);
   }, [canLinkNotification, coins, handleSendToMetaScalp]);
 
-  // Only newly emitted notifications qualify for optional auto-linking.
-  // Existing history, cross-account events, and stale notifications are never replayed.
-  const autoLinkCursor = useRef<{ uid: string | null; id: string | null; enabled: boolean; since: number }>({
-    uid: user?.uid ?? null, id: notificationCenter?.items?.[0]?.id ?? null,
-    enabled: terminalLinkSettings.autoSignals, since: Date.now(),
-  });
-  useEffect(() => {
-    const uid = user?.uid ?? null;
-    const item = notificationCenter?.items?.[0];
-    const cursor = autoLinkCursor.current;
-    if (cursor.uid !== uid || cursor.enabled !== terminalLinkSettings.autoSignals) {
-      // New user or newly granted consent: the currently visible history is the baseline.
-      autoLinkCursor.current = {
-        uid, id: item?.id ?? null, enabled: terminalLinkSettings.autoSignals, since: Date.now(),
-      };
-      return;
-    }
-    const isNew = !!item?.id && cursor.id !== item.id;
-    cursor.id = item?.id ?? null;
-    if (!isNew || !item || !terminalLinkSettings.autoSignals ||
-      terminalLinkSettings.provider === 'vataga' ||
-      !notificationCenter?.settings.enabled || !notificationCenter.settings.optedIn ||
-      item.read || !isFreshTerminalNotification(item.timestamp, cursor.since, Date.now())
-      || !canLinkNotification(item)) return;
-    handleLinkNotification(item, true);
-  }, [user?.uid, notificationCenter?.items, notificationCenter?.settings.enabled,
-    notificationCenter?.settings.optedIn, terminalLinkSettings.autoSignals,
-    canLinkNotification, handleLinkNotification]);
+  // Terminal commands are never dispatched by background notification updates.
+  // The notification center retains its explicit manual linking button.
 
   // Enter a dedicated chart URL without losing the originating Screener tab.
   // A small per-user session snapshot restores the exact formation/archive
@@ -893,12 +867,8 @@ export default function App() {
         kind: 'coin', formationId: rawFormation?.id,
         origin: activePage === 'patterns' ? 'formations' : 'screener',
       }, selected);
-      if (terminalLinkSettings.enabled && terminalLinkSettings.switchOnChartOpen
-        && (activePage !== 'patterns' || !earlyMode || terminalLinkSettings.sources.early)) {
-        handleSendToMetaScalp(coin, activePage === 'patterns' ? (earlyMode ? 'early' : 'formations') : 'screener');
-      }
     },
-    [user, coins, terminalLinkSettings, activePage, earlyMode, handleSendToMetaScalp, handleOpenAuthModal, openChartPage, preferences.defaultTimeframe]
+    [user, coins, activePage, handleOpenAuthModal, openChartPage, preferences.defaultTimeframe]
   );
 
   const [selectedEarly, setSelectedEarly] = useState<{ coin: ScannedCoin; candidate: EarlyFormationCandidate } | null>(null);
@@ -920,10 +890,7 @@ export default function App() {
       timeframe: selectedCoin.timeframe,
       kind: 'coin',
     }, { coin: selectedCoin });
-    if (terminalLinkSettings.enabled && terminalLinkSettings.switchOnChartOpen && terminalLinkSettings.sources.favorites) {
-      void handleSendToMetaScalp(selectedCoin, 'favorites');
-    }
-  }, [user, handleOpenAuthModal, preferences.defaultTimeframe, openChartPage, terminalLinkSettings, handleSendToMetaScalp]);
+  }, [user, handleOpenAuthModal, preferences.defaultTimeframe, openChartPage]);
 
   // A's chart and projected trade levels must never remain open for user B
   // after switching accounts on the same browser.
@@ -968,10 +935,7 @@ export default function App() {
       symbol: raw.coin.symbol.toUpperCase(), timeframe: raw.coin.timeframe,
       kind: 'early', formationId: raw.candidate.id,
     }, { coin: raw.coin, earlyCandidate: raw.candidate });
-    if (terminalLinkSettings.enabled && terminalLinkSettings.switchOnChartOpen && terminalLinkSettings.sources.early) {
-      void handleSendToMetaScalp(raw.coin, 'early');
-    }
-  }, [user, handleOpenAuthModal, fullEarlyScan?.data, openChartPage, terminalLinkSettings, handleSendToMetaScalp]);
+  }, [user, handleOpenAuthModal, fullEarlyScan?.data, openChartPage]);
 
   // Handler when selecting archived formation to restore
   const handleSelectArchivedFormation = useCallback(
@@ -1015,11 +979,8 @@ export default function App() {
         origin: activePage === 'screener' ? 'screener' : 'formations',
       }, { coin: matchingCoin, formation: archived.formation, archived });
       setIsArchiveModalOpen(false);
-      if (terminalLinkSettings.enabled && terminalLinkSettings.switchOnChartOpen) {
-        handleSendToMetaScalp(matchingCoin, 'formations');
-      }
     },
-    [coins, activePage, terminalLinkSettings, handleSendToMetaScalp, openChartPage]
+    [coins, activePage, openChartPage]
   );
 
   // Browser Back/Forward switches between real Screener and chart pages.
