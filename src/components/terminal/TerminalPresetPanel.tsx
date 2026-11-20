@@ -307,7 +307,8 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
               disabled={!selectedMarketSet.has(coinMarketKey(block)) && selectedBlocks.length >= MAX_TERMINAL_CHARTS}
               onChange={event => {
                 const key = coinMarketKey(block);
-                setSelectedBlocks(current => event.target.checked
+                const checked = event.target.checked;
+                setSelectedBlocks(current => checked
                   ? current.length < MAX_TERMINAL_CHARTS && !current.some(item => coinMarketKey(item) === key) ? [...current, block] : current
                   : current.filter(item => coinMarketKey(item) !== key));
                 setFormError(null);
