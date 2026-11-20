@@ -19,6 +19,8 @@ interface Props {
   /** Matches the trader-visible Formations page (including early W/M). */
   formationCoins: readonly ScannedCoin[];
   onRequestFormationScan?: () => boolean;
+  /** Retry the existing shared public quote refresh when a preset was clicked before quotes arrived. */
+  onRequestMarketRefresh?: () => void;
   formationScanStatus?: 'idle' | 'loading' | 'ready' | 'busy' | 'failed';
   selection: MarketSelection;
   timeframe: Timeframe;
@@ -45,7 +47,7 @@ interface Props {
 const ICONS = { active: Activity, formations: ScanLine, av: BarChart3, av_1m: BarChart3, top_gainers: TrendingUp, top_losers: TrendingDown, near_highs: ChevronUp, near_lows: ChevronDown };
 const controlClass = 'rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 
-export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, pickerFormationCoins, formationCoins, onRequestFormationScan, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
+export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, pickerFormationCoins, formationCoins, onRequestFormationScan, onRequestMarketRefresh, formationScanStatus = 'idle', selection, timeframe, activePreset, autoUpdate, menuOpen, snapshot, loading, error,
   onActivePresetChange, onPresetChosen, onApplyCoins, onSavePreset, onLoadPreset, onDeletePreset, syncError, onRetrySync, onDownloadLocalBackup, onImportWorkspaceBackup, signedIn }: Props) {
   const { language, t } = useLanguage();
   const [showPresets, setShowPresets] = useState(false);
@@ -57,6 +59,8 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
   const [formError, setFormError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ key: string; params?: LocaleParams } | { text: string } | null>(null);
   const [pendingFormationPreset, setPendingFormationPreset] = useState(false);
+  const [pendingMarketPreset, setPendingMarketPreset] = useState<TerminalMarketPreset | null>(null);
+  const pendingQuoteSnapshot = useRef(snapshot);
   const applyRef = useRef(onApplyCoins);
   applyRef.current = onApplyCoins;
 
@@ -106,10 +110,20 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
 
   const chooseReadyPreset = (id: TerminalMarketPreset) => {
     setPendingFormationPreset(false);
+    setPendingMarketPreset(null);
     if (id === 'formations' && !readyCoins.formations.length && onRequestFormationScan?.()) {
       setMessage({ text: 'Завантаження монет зі сторінки Формацій…' });
       setPendingFormationPreset(true);
       onActivePresetChange(id);
+      return;
+    }
+    if (id !== 'formations' && !readyCoins[id].length) {
+      // A transient empty snapshot is not evidence of an empty exchange. Keep
+      // existing charts intact and apply this exact preset when quotes return.
+      pendingQuoteSnapshot.current = snapshot;
+      setPendingMarketPreset(id);
+      setMessage({ text: 'Оновлюємо ринкові котирування для пресету…' });
+      onRequestMarketRefresh?.();
       return;
     }
     if ((id !== 'formations' && error) || !readyCoins[id].length) {
@@ -123,6 +137,25 @@ export function TerminalPresetPanel({ blocks, watchlist, presets, pickerCoins, p
     onApplyCoins(readyCoins[id], id);
     onPresetChosen?.();
   };
+
+  useEffect(() => {
+    if (!pendingMarketPreset) return;
+    const matched = readyCoins[pendingMarketPreset];
+    if (matched.length && !error) {
+      setPendingMarketPreset(null);
+      setMessage(null);
+      onActivePresetChange(pendingMarketPreset);
+      applyRef.current(matched, pendingMarketPreset);
+      onPresetChosen?.();
+      return;
+    }
+    // Wait for a *new* quote snapshot or an explicit error before deciding
+    // that a selected exchange really has no usable ticker rows.
+    if (error || snapshot !== pendingQuoteSnapshot.current) {
+      setPendingMarketPreset(null);
+      setMessage(error ? { text: error } : { key: 'terminal.presets.emptySelection' });
+    }
+  }, [pendingMarketPreset, readyCoins, error, snapshot, onActivePresetChange, onPresetChosen]);
 
   // Favorite keys include an exact exchange/market/symbol identity.
   // Index once per quote refresh instead of scanning the full exchange universe
