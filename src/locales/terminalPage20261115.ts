@@ -177,6 +177,18 @@ export const terminalPagePhraseRows = [
     "10 monet o najwyższym średnim obrocie na minutę (USDT): obrót z 24 h / 1440."
   ],
   [
+    "Оновлюємо ринкові котирування для пресету…",
+    "Refreshing market quotes for the preset…",
+    "Обновляем рыночные котировки для пресета…",
+    "Odświeżamy notowania rynkowe dla presetu…"
+  ],
+  [
+    "Для вибраної біржі та ринку зараз немає доступних котирувань. Перевірте фільтри або повторіть.",
+    "No market quotes are currently available for the chosen exchange and market. Check filters or retry.",
+    "Для выбранной биржи и рынка сейчас нет доступных котировок. Проверьте фильтры или повторите.",
+    "Brak obecnie notowań dla wybranej giełdy i rynku. Sprawdź filtry lub spróbuj ponownie."
+  ],
+  [
     "Топ ріст 24г",
     "Top gainers (24h)",
     "Лидеры роста за 24 ч",
