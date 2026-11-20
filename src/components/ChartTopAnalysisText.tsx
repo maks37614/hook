@@ -4,8 +4,6 @@ import { formatCryptoPrice } from '../utils/formatters';
 import { reconcileChartOi } from '../utils/chartOiDisplay';
 import { useLanguage } from '../context/LanguageContext';
 import { translatePhrase } from '../locales';
-import { isValidExchangeSymbol, normalizeExchangeSymbol } from '../utils/marketSymbols';
-import { subscribeSharedHookChartFunding } from './hookchart/sharedFundingStream';
 
 interface ChartTopAnalysisTextProps {
   coin: ScannedCoin;
@@ -84,40 +82,6 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
   const { language } = useLanguage();
   const tr = (source: string) => translatePhrase(language, source);
   const timeframes: Timeframe[] = ['5m', '15m', '1h', '4h', '1d'];
-
-  // Read Binance and Bybit independently from the same exchange/symbol
-  // subscription registry as HookChart. Switching coins must not show a rate
-  // belonging to the previous symbol, including during in-flight requests.
-  const fundingSymbol = normalizeExchangeSymbol(coin.symbol);
-  const fundingScope = `${coin.marketType}:${fundingSymbol}`;
-  const [fundingReadings, setFundingReadings] = useState<{
-    binance: { scope: string; rate: number };
-    bybit: { scope: string; rate: number };
-  }>({
-    binance: { scope: '', rate: Number.NaN },
-    bybit: { scope: '', rate: Number.NaN },
-  });
-  const binanceFundingRate = fundingReadings.binance.scope === fundingScope
-    ? fundingReadings.binance.rate : Number.NaN;
-  const bybitFundingRate = fundingReadings.bybit.scope === fundingScope
-    ? fundingReadings.bybit.rate : Number.NaN;
-  useEffect(() => {
-    // Spot markets do not have perpetual-futures funding.
-    if (coin.marketType !== 'futures' || !isValidExchangeSymbol(fundingSymbol)) return;
-    const stopBinance = subscribeSharedHookChartFunding('binance', fundingSymbol, snapshot => {
-      setFundingReadings(previous => {
-        if (previous.binance.scope === fundingScope && Object.is(previous.binance.rate, snapshot.rate)) return previous;
-        return { ...previous, binance: { scope: fundingScope, rate: snapshot.rate } };
-      });
-    });
-    const stopBybit = subscribeSharedHookChartFunding('bybit', fundingSymbol, snapshot => {
-      setFundingReadings(previous => {
-        if (previous.bybit.scope === fundingScope && Object.is(previous.bybit.rate, snapshot.rate)) return previous;
-        return { ...previous, bybit: { scope: fundingScope, rate: snapshot.rate } };
-      });
-    });
-    return () => { stopBinance(); stopBybit(); };
-  }, [coin.marketType, fundingSymbol, fundingScope]);
 
   // Keep livePrice in ref to avoid recreation of fetchOI on every live price tick
   const livePriceRef = useRef<number>(livePrice);
@@ -438,26 +402,6 @@ export const ChartTopAnalysisText: React.FC<ChartTopAnalysisTextProps> = ({
             </span>
           </div>
 
-          {coin.marketType === 'futures' && (
-            <>
-              <div data-testid="chart-top-funding-binance">
-                <span className="text-slate-400">{tr("Фандинг Binance:")}{" "}</span>
-                <span className="font-mono font-bold text-amber-300">
-                  {Number.isFinite(binanceFundingRate)
-                    ? `${binanceFundingRate > 0 ? '+' : ''}${(binanceFundingRate * 100).toFixed(4)}%`
-                    : '—'}
-                </span>
-              </div>
-              <div data-testid="chart-top-funding-bybit">
-                <span className="text-slate-400">{tr("Фандинг Bybit:")}{" "}</span>
-                <span className="font-mono font-bold text-orange-300">
-                  {Number.isFinite(bybitFundingRate)
-                    ? `${bybitFundingRate > 0 ? '+' : ''}${(bybitFundingRate * 100).toFixed(4)}%`
-                    : '—'}
-                </span>
-              </div>
-            </>
-          )}
         </div>
 
         {/* Section 2: Сильні опорні рівні (Support / Resistance) */}

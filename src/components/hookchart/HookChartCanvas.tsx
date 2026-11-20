@@ -42,6 +42,7 @@ import { MarketRecurrenceTool } from './MarketRecurrenceTool';
 import { createMarketRecurrenceMarks, type MarketRecurrenceMark, type RecurrenceReport } from './marketRecurrence';
 import { chartMarketStatistics, memoizedAutoLevels, formatUsd, normalizeDensityDistance, type LevelTf } from './marketAnalytics';
 import { useOriginalHookChartLiveFeed } from './useOriginalHookChartLiveFeed';
+import { HookChartFooterFunding } from './HookChartFooterFunding';
 import { terminalEcoPreferences } from './terminalEcoPreferences';
 import { connectChartDiagnostics } from './chartDiagnostics';
 import { visibleChartDensities } from './reactionPotential';
@@ -2217,6 +2218,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
             Trades 24h: <b>{tradeCount24h?.scope === statsScope && tradeCount24h.count !== null
               ? tradeCount24h.count.toLocaleString() : '—'}</b>
           </span>}
+          <HookChartFooterFunding
+            key={`${exchange}:${marketType}:${normalizeExchangeSymbol(symbol)}`}
+            exchange={exchange}
+            marketType={marketType}
+            symbol={symbol}
+            language={chartLanguage}
+          />
         </>}
       </div>}
       <div className="hookchart-footer-controls" ref={setControlsContainer} />
