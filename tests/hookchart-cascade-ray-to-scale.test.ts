@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive, cascadeStrokeAppearance } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, scalperDiagonalIsActive, cascadeStrokeAppearance, visibleScalperLines } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -301,4 +301,39 @@ test('cascade is 0.1 CSS px thinner without modifying other Scalper lines',()=>{
   assert.match(engine,/q.lineWidth = scalperStrokeWidth/);
   assert.match(engine,/if \(setup.kind === 'cascade'\) q.lineWidth = cascadeStroke.width/);
   assert.match(engine,/setup.kind === 'cascade' \? cascadeStroke.coverage : 1/);
+});
+
+test('archived Scalper geometry excludes spent cascade tiers and broken diagonals',()=>{
+  const base=1_700_000_000_000;
+  const bar=(i:number,h:number,l:number):ScalperCandle=>({
+    t:base+i*60_000,o:100,c:100,h,l,
+  });
+  const used:ScalperLine={role:'cascade-step',
+    from:{t:base,p:101},to:{t:base+3*60_000,p:101}};
+  const intact:ScalperLine={role:'upper',
+    from:{t:base+60_000,p:102},to:{t:base+3*60_000,p:102}};
+  const rows=[bar(0,101,99),bar(1,102,99),bar(2,101.5,99),bar(3,101.6,99)];
+  const scene={closedAt:base+3*60_000,setups:[{
+    id:'test-cascade',kind:'cascade' as const,status:'forming' as const,
+    score:70,lines:[used,intact],touches:[used.from,intact.from],
+  }]};
+  assert.deepEqual(visibleScalperLines(scene,rows),[intact]);
+  assert.deepEqual(visibleScalperLines(null,rows),[]);
+  assert.deepEqual(visibleScalperLines(scene,[]),[]);
+  const canvas=readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx',import.meta.url),'utf8');
+  assert.match(canvas,/const savedScalperLines = visibleScalperLines\(scalperResult, candles\)/);
+  assert.match(canvas,/scalperEnabled:savedScalperLines\.length > 0/);
+  assert.doesNotMatch(canvas,/scalperResult\?\.setups\.flatMap\(setup => setup\.lines\)/);
+});
+
+test('cascade touch dots and labels use only the currently visible auto lines',()=>{
+  const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
+  const from=engine.indexOf('if (scalperResult?.setups.length) {');
+  const to=engine.indexOf('drawHookTimeMarkers(q,g,timeMarkers,mouse);',from);
+  const layer=engine.slice(from,to);
+  assert.match(layer,/const visibleLines = setup\.lines\.filter/);
+  assert.match(layer,/if \(!visibleLines\.length\) continue/);
+  assert.match(layer,/if \(setup\.kind === 'cascade' && !visibleLines\.some\(line =>/);
+  assert.match(layer,/const anchor = visibleLines\[0\]\?\.to/);
+  assert.doesNotMatch(layer,/const anchor = setup\.lines\[0\]\?\.to/);
 });
