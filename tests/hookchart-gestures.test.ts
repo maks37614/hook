@@ -374,6 +374,78 @@ test('canceling single-anchor placement does not create an accidental mark', () 
   }
 });
 
+test('mouse and pen share the same press-drag-release geometry as touch', () => {
+  for (const pointerType of ['mouse','pen'] as const) {
+    let drawings:any[]=[];
+    const t=setup({tool:'rect',setDrawings:(updater:(items:any[])=>any[])=>{drawings=updater(drawings)}});
+    const event=(x:number,y:number,type:string)=>({...t.event(x,y,1,type),pointerType});
+    t.handlers.handlePointerDown(event(100,200,'pointerdown'));
+    t.handlers.handlePointerMove(event(175,245,'pointermove'));
+    t.handlers.handleTouchEnd(event(175,245,'pointerup'));
+    assert.equal(drawings.length,1,pointerType);
+    assert.equal(drawings[0].type,'rect');
+    assert.deepEqual(drawings[0].pts,[{t:100000,p:110-200/35},{t:175000,p:110-245/35}]);
+  }
+});
+
+test('an unmoved tap arms the first anchor and a later tap completes the drawing', () => {
+  let first:any=null;
+  const one=setup({tool:'fib',setDraft:(value:any)=>{first=value}});
+  one.handlers.handlePointerDown(one.event(80,200));
+  one.handlers.handleTouchEnd(one.event(80,200,1,'pointerup'));
+  assert.deepEqual(first,{t:80000,p:110-200/35});
+  let drawings:any[]=[];
+  const two=setup({tool:'fib',draft:first,
+    setDrawings:(u:(items:any[])=>any[])=>{drawings=u(drawings)},
+    setDraft:()=>{}});
+  two.handlers.handlePointerDown(two.event(190,280));
+  two.handlers.handleTouchEnd(two.event(190,280,1,'pointerup'));
+  assert.equal(drawings.length,1);
+  assert.deepEqual(drawings[0].pts,[first,{t:190000,p:110-280/35}]);
+});
+
+test('price alert only commits on release and existing marker keeps delete confirmation', () => {
+  let created:number[]=[];
+  let selected:string[]=[];
+  const tap=setup({tool:'alert',onCreatePriceAlert:(price:number)=>created.push(price),
+    onSelectPriceAlert:(id:string,action:string)=>selected.push(id+':'+action),
+    hitAlertAt:()=>({id:'BTCUSDT:existing'})});
+  tap.handlers.handlePointerDown(tap.event(150,245));
+  assert.equal(created.length,0);
+  tap.handlers.handleTouchEnd(tap.event(150,245,1,'pointerup'));
+  assert.deepEqual(selected,['BTCUSDT:existing:delete']);
+  assert.equal(created.length,0);
+  const move=setup({tool:'alert',onCreatePriceAlert:(price:number)=>created.push(price),
+    onSelectPriceAlert:(id:string,action:string)=>selected.push(id+':'+action),
+    hitAlertAt:()=>({id:'BTCUSDT:existing'})});
+  move.handlers.handlePointerDown(move.event(150,245));
+  move.handlers.handlePointerMove(move.event(150,320));
+  move.handlers.handleTouchEnd(move.event(150,320,1,'pointerup'));
+  assert.deepEqual(created,[110-320/35]);
+  assert.deepEqual(selected,['BTCUSDT:existing:delete']);
+});
+
+test('no drawing is saved on canceled gestures; two-finger pinch wins over point tools', () => {
+  let saved=0;
+  for(const tool of ['level','text','alert']){
+    const t=setup({tool,setDrawings:()=>{saved++},setAlerts:()=>{saved++},
+      onCreatePriceAlert:()=>{saved++}});
+    t.handlers.handlePointerDown(t.event(100,200));
+    t.handlers.handlePointerMove(t.event(170,280));
+    t.handlers.handlePointerUp(t.event(170,280,1,'pointercancel'));
+    assert.equal(saved,0,tool);
+    const pinch=setup({tool,setDrawings:()=>{saved++},setAlerts:()=>{saved++},
+      onCreatePriceAlert:()=>{saved++}});
+    pinch.handlers.handlePointerDown(pinch.event(100,200));
+    pinch.handlers.handlePointerDown(pinch.event(200,200,2));
+    assert.equal(pinch.env.drag.current.kind,'pinch',tool);
+    pinch.handlers.handlePointerMove(pinch.event(235,200,2));
+    pinch.handlers.handleTouchEnd(pinch.event(235,200,2,'pointerup'));
+    pinch.handlers.handleTouchEnd(pinch.event(100,200,1,'pointerup'));
+    assert.equal(saved,0,tool);
+  }
+});
+
 test('fit-all button resets stale vertical zoom and belongs to the active coin/timeframe', () => {
   for(const tf of ['30s','1m','5m','15m','1h','4h','1d']){
     const key=`live:binance:futures:BTCUSDT:${tf}`;
