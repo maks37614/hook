@@ -349,10 +349,17 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     if (showCoinPresets || (presetAutoUpdate && activeMarketPreset)) requestMarketRefreshRef.current?.(true);
   }, [showCoinPresets, activeMarketPreset, presetAutoUpdate]);
 
-  const coinPresetSelection = useMemo(() => ({
-    exchange: config.coinPresetExchange ?? preferences.defaultExchange,
-    marketType: config.coinPresetMarketType ?? preferences.defaultMarketType,
-  }), [config.coinPresetExchange, config.coinPresetMarketType, preferences.defaultExchange, preferences.defaultMarketType]);
+  const coinPresetSelection = useMemo(() => {
+    // Old/imported cloud workspaces may contain an obsolete market value.
+    // Never send an unrecognized selection to the ranking filter: doing so
+    // would reject every valid coin and falsely show an empty market.
+    const exchange = config.coinPresetExchange ?? preferences.defaultExchange;
+    const marketType = config.coinPresetMarketType ?? preferences.defaultMarketType;
+    return {
+      exchange: exchange === 'binance' || exchange === 'bybit' ? exchange : 'all',
+      marketType: marketType === 'spot' || marketType === 'futures' ? marketType : 'all',
+    } as const;
+  }, [config.coinPresetExchange, config.coinPresetMarketType, preferences.defaultExchange, preferences.defaultMarketType]);
   const coinPresetLimit = resolveTerminalPresetPageSize(config.coinPresetLimit);
   // AV 1m is a fixed top-10 view, regardless of the page size used by other presets.
   const effectivePresetPageSize = avOneMinuteActive ? 10 : coinPresetLimit;
