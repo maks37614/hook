@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createScalperAnalyzer, type ScalperCandle, type ScalperKind, type ScalperLine } from '../src/components/hookchart/scalperMode';
-import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY } from '../src/components/hookchart/scalperLineProjection';
+import { normalizeScalperLineWidth, scalperRenderedLineEndX, scalperRasterStrokeWidth, scalperPixelCenteredHorizontalY, cascadeLineIsActive, cascadeFutureRayStartX } from '../src/components/hookchart/scalperLineProjection';
 
 const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   role,
@@ -10,7 +10,7 @@ const horizontal = (role:ScalperLine['role'],price=277.46):ScalperLine=>({
   to:{t:1_700_000_060_000,p:price},
 });
 
-test('every horizontal cascade shelf and breakout boundary reaches the price-scale edge',()=>{
+test('every surviving horizontal cascade shelf and breakout boundary reaches the price-scale edge',()=>{
   for(const role of ['cascade-step','upper','lower'] as const){
     const line=horizontal(role);
     for(const plotW of [80,180,400,900]){
@@ -57,7 +57,7 @@ test('Scalper draw uses the plot boundary, without changing stroke, labels or ca
   const layer=engine.slice(start,end);
   assert.match(layer,/scalperRenderedLineEndX\(setup\.kind, line, x1, g\.plotW\)/);
   assert.match(layer,/if \(cascadeRay && x0 > g\.plotW\) continue/);
-  assert.match(layer,/q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
+  assert.match(layer,/q\.moveTo\(cascadeRay \? cascadeRayStartX! : x0, y0\)/);
   assert.match(layer,/q\.lineTo\(renderedEndX, y1\)/);
   assert.match(layer,/if \(cascadeRay && y1 >= 0 && y1 <= g\.plotH\)/);
   assert.match(layer,/q\.moveTo\(Math\.max\(0, g\.plotW - 2\), y1\)/);
@@ -79,6 +79,7 @@ test('cascade outer boundary has a real scale price badge but tiers do not flood
   assert.match(overlay,/setup\.kind !== 'cascade'/);
   assert.match(overlay,/setup\.lines\.find\(line => line\.role === 'upper' \|\| line\.role === 'lower'\)/);
   assert.match(overlay,/g\.x\(boundary\.from\.t\) > g\.plotW/);
+  assert.match(overlay,/activeCascadeLines\.has\(boundary\)/);
   assert.match(overlay,/priceTag\(boundary\.from\.p, '', color/);
 });
 
@@ -124,6 +125,62 @@ test('horizontal Scalper strokes align their center without moving diagonal wick
   assert.match(layer, /const y0 = horizontalLine \? scalperPixelCenteredHorizontalY\(rawY0, scalperStrokeWidth, scaleY\) : rawY0/);
   assert.match(layer, /const y1 = horizontalLine \? y0 : rawY1/);
   assert.match(layer, /q\.lineWidth = scalperStrokeWidth/);
-  assert.match(layer, /q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
+  assert.match(layer, /q\.moveTo\(cascadeRay \? cascadeRayStartX! : x0, y0\)/);
   assert.match(layer, /q\.lineTo\(renderedEndX, y1\)/);
+});
+
+test('cascade tiers disappear after the first later wick reaches the price', () => {
+  const base = 1_700_000_000_000;
+  const make = (i:number,h:number,l:number):ScalperCandle => ({
+    t:base+i*60_000,o:100,c:100,h,l,
+  });
+  const upper:ScalperLine = {role:'cascade-step',
+    from:{t:base,p:101},to:{t:base+3*60_000,p:101}};
+  const lower:ScalperLine = {role:'cascade-step',
+    from:{t:base,p:99},to:{t:base+3*60_000,p:99}};
+  const safe = [make(0,101,99),make(1,100.5,99.5),make(2,100.4,99.6)];
+  assert.equal(cascadeLineIsActive(upper,[],safe,'upper'),true,
+    'the creating pivot candle cannot invalidate its own level');
+  assert.equal(cascadeLineIsActive(lower,[],safe,'lower'),true);
+  assert.equal(cascadeLineIsActive(upper,[],[...safe,make(3,101,99.5)],'upper'),false,
+    'a later wick touching upper tier immediately hides it');
+  assert.equal(cascadeLineIsActive(lower,[],[...safe,make(3,100.4,98.99)],'lower'),false,
+    'a later wick piercing lower tier immediately hides it');
+  assert.equal(cascadeLineIsActive(upper,[],[...safe,make(3,101.5,101.2)],'upper'),false,
+    'even a gap across the tier cannot leave a stale ray');
+});
+
+test('outer cascade boundary activates at its last matching wick pivot, not its first', () => {
+  const base = 1_700_000_000_000;
+  const boundary:ScalperLine={role:'upper',
+    from:{t:base,p:101.3},to:{t:base+4*60_000,p:101.3}};
+  const touches=[{t:base,p:101.1},{t:base+60_000,p:101.2},{t:base+2*60_000,p:101.3}];
+  const candle=(i:number,h:number):ScalperCandle=>({
+    t:base+i*60_000,o:100,c:100,h,l:99.5,
+  });
+  const initial=[candle(0,101.1),candle(1,101.2),candle(2,101.3),candle(3,100.8)];
+  assert.equal(cascadeLineIsActive(boundary,touches,initial,'upper'),true,
+    'the defining confirmed pivot is not falsely counted as a post-creation crossing');
+  assert.equal(cascadeLineIsActive(boundary,touches,[...initial,candle(4,101.31)],'upper'),false);
+  const inner:ScalperLine={role:'cascade-step',
+    from:{t:base,p:101.1},to:{t:base+60_000,p:101.1}};
+  assert.equal(cascadeLineIsActive(inner,touches,initial,'upper'),false,
+    'an old inner tier crossed by later pivots must not be projected');
+});
+
+test('cascade rays begin only after the last candle, leaving past candle geometry clear',()=>{
+  assert.equal(cascadeFutureRayStartX(100,10,2,200),105.5);
+  assert.equal(cascadeFutureRayStartX(100,10,1,200),106);
+  assert.equal(cascadeFutureRayStartX(198,10,2,200),null,
+    'nothing projects when no future chart space remains');
+  assert.equal(cascadeFutureRayStartX(-100,10,2,200),0,
+    'a chart panned into empty future space may start at the plot edge');
+  assert.equal(cascadeFutureRayStartX(100,10,0,200),null);
+  const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
+  assert.match(engine,/const activeCascadeLines = useMemo\(/);
+  assert.match(engine,/cascadeLineIsActive\(line, setup\.touches, candles, side\)/);
+  assert.match(engine,/\[scalperResult, candles\]/,
+    'pan and zoom must not recheck all recent price levels');
+  assert.match(engine,/if \(setup\.kind === 'cascade' && !activeCascadeLines\.has\(line\)\) continue/);
+  assert.match(engine,/cascadeFutureRayStartX\(g\.x\(candles\[candles\.length - 1\]\.t\), g\.step, scaleX, g\.plotW\)/);
 });
