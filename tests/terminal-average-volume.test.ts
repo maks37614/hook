@@ -54,7 +54,7 @@ test('HookChart AV footer uses only cached 24h quotes or a full day of existing 
   const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
   assert.match(chart, /data-testid="hookchart-footer-av"/);
   assert.match(chart, /AV 24h:/);
-  assert.match(chart, /volume24hUsd \/ 1440/);
+  assert.match(chart, /quotedVolume24hUsd \/ 1440/);
   assert.match(chart, /hasFullDayHistory/);
   assert.match(chart, /sharedPublicChartPolling\.subscribe/);
   assert.match(backend, /getCached24hVolumeUsd\(/);
