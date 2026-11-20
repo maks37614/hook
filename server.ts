@@ -53,6 +53,7 @@ import { ExchangeId, MarketType, Timeframe, type Kline } from './src/types';
 import { normalizeLanguage, telegramText } from './src/locales';
 import { isValidExchangeSymbol, normalizeExchangeSymbol, resolveSurveillanceSymbol, searchSurveillanceSymbols } from './src/utils/marketSymbols';
 import { marketTickerFeed } from './server/marketTickerFeed';
+import { minuteTurnoverService } from './server/minuteTurnoverService';
 import { cronManager } from './server/cronService';
 import { surveillanceManager } from './server/surveillance/surveillanceManager';
 import { surveillanceReplayEngine } from './server/surveillance/replayEngine';
@@ -409,6 +410,24 @@ async function startServer() {
       console.error('Error fetching klines:', err);
       res.status(500).json({ success: false, error: err.message || 'Failed to fetch klines' });
     }
+  });
+
+  // Exact completed 1-minute quote turnover. Shared cache and bounded lazy top-N
+  // sampling keep hundreds of Terminal/browser sessions from multiplying REST load.
+  app.get('/api/market/av1m/top', async (_req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=20');
+    try { res.json({ success: true, ...await minuteTurnoverService.top() }); }
+    catch { res.status(503).json({ success: false, rows: [], error: 'Minute candles unavailable' }); }
+  });
+  app.get('/api/market/av1m/coin', async (req, res) => {
+    const exchange = String(req.query.exchange || '');
+    const market = String(req.query.market || '');
+    const symbol = String(req.query.symbol || '').toUpperCase();
+    if (!['binance', 'bybit'].includes(exchange) || !['spot', 'futures'].includes(market) ||
+      !/^[A-Z0-9]{3,30}$/.test(symbol)) return res.status(400).json({ success: false, error: 'Invalid market/symbol' });
+    res.setHeader('Cache-Control', 'public, max-age=20');
+    const reading = await minuteTurnoverService.publicCoin(exchange as ExchangeId, market as MarketType, symbol);
+    res.json({ success: true, ...reading });
   });
 
   // Exact rolling trade count from Binance's 24h ticker (null if unsupported).

@@ -177,6 +177,12 @@ export const terminalPagePhraseRows = [
     "Średni wolumen obrotu na minutę (USDT) z ostatnich 24 h, od największego."
   ],
   [
+    "10 найбільших перевірених обсягів за останню завершену хвилину (USDT), лише від 200 000 USDT. Пошук обмежений вибіркою ліквідних монет, а не всіма ринками.",
+    "Top 10 measured USDT turnovers from the last completed 1-minute candle, minimum 200,000 USDT. Scans a limited liquid-market candidate set, not the entire exchange universe.",
+    "Топ-10 измеренных объёмов за последнюю закрытую минутную свечу (USDT), минимум 200 000 USDT. Проверяется ограниченная выборка ликвидных монет, а не все рынки.",
+    "Top 10 zmierzonych obrotów USDT z ostatniej zamkniętej świecy 1-minutowej, minimum 200 000 USDT. Skanowana jest ograniczona próbka płynnych rynków, a nie cała giełda."
+  ],
+  [
     "10 монет із найбільшим середнім обсягом торгів за хвилину (USDT): оборот за 24г / 1440.",
     "Top 10 coins by average trading turnover per minute (USDT): 24h turnover / 1440.",
     "Топ-10 монет по среднему объёму торгов в минуту (USDT): оборот за 24 ч / 1440.",

@@ -766,6 +766,8 @@ export interface MarketCoin {
   price: number;
   change24h: number;
   volumeUsd: number;
+  /** Exact USDT turnover of the latest completed one-minute candle, not 24h/1440. */
+  volume1mUsd?: number;
   high24h: number;
   low24h: number;
   distanceToHighPct: number;
