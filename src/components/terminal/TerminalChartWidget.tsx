@@ -34,6 +34,7 @@ import { normalizeChartProvider } from '../../utils/chartPreferences';
 import { formationChartMarkers } from '../../utils/hookchartData';
 import { subscribeTerminalWidgetVisibility } from '../../utils/terminalVisibilityScheduler';
 import { terminalChartMountQueue } from '../../utils/terminalChartMountQueue';
+import { isTerminalWidgetNearViewport } from '../../utils/terminalWidgetVisibility';
 
 interface TerminalChartWidgetProps {
   block: TerminalChartBlock;
@@ -152,8 +153,19 @@ export const TerminalChartWidget: React.FC<TerminalChartWidgetProps> = ({
     }
     // A fast swipe must not initialize 4-8 DPR canvases simultaneously.
     // Only tiles that remain visible receive a mount slot.
-    return terminalChartMountQueue.enqueue(() => setIsMountReady(true));
-  }, [isNearViewport, isSuspended]);
+    return terminalChartMountQueue.enqueue(() => {
+      const node = blockRootRef.current;
+      if (!node || document.visibilityState === 'hidden') return;
+      // A fast momentum swipe may move a tile out of view between the
+      // IntersectionObserver event and its assigned RAF mount slot.
+      const screen = { top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth };
+      const root = isMaximized || compactFullscreenMode ? null
+        : node.closest<HTMLElement>('[data-terminal-scroll-viewport]');
+      const bounds = root?.getBoundingClientRect() ?? screen;
+      if (isTerminalWidgetNearViewport(node.getBoundingClientRect(), bounds, screen))
+        setIsMountReady(true);
+    });
+  }, [isNearViewport, isSuspended, isMaximized, compactFullscreenMode]);
 
   // Measure all chart cards through the shared viewport scheduler. Do not
   // preload the next row; hidden cards do not allocate a high-DPR canvas,
