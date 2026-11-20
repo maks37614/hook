@@ -616,10 +616,16 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
  const jumpVersion=useRef(0);
  const [zoomPanelOpen,setZoomPanelOpen]=useState<boolean>(()=>false),[jumpOpen,setJumpOpen]=useState(false),[jumpMode,setJumpMode]=useState<'day'|'time'>('day'),[jumpDate,setJumpDate]=useState(()=>zoneDateKey(Date.now(),timezone)),[jumpTime,setJumpTime]=useState('12:00'),[jumpBusy,setJumpBusy]=useState(false),[jumpMessage,setJumpMessage]=useState(''),[pendingJump,setPendingJump]=useState<{t:number,fitDay:boolean}|null>(null);
  const liqHudKey=liquidationHudPreferenceKey(liquidationHudOwner);
- const [liqHudOpen,setLiqHudOpen]=useState<boolean>(()=>readLiquidationHudExpanded(liqHudKey));
- // Preserve the deliberate choice across market/timeframe remounts and
- // synchronize all HookCharts within the same account, including other tabs.
+ // Terminal cards must not share their Liq/cascade expanded state, even when
+ // they show the same market. Other HookCharts retain their account-wide choice.
+ const [liqHudOpen,setLiqHudOpen]=useState<boolean>(()=>terminalMode?false:readLiquidationHudExpanded(liqHudKey));
  useEffect(()=>{
+   if(terminalMode){
+     // Terminal: a local state per mounted chart, with no shared preference
+     // listener or storage updates. All other cards remain untouched.
+     setLiqHudOpen(false);
+     return;
+   }
    setLiqHudOpen(readLiquidationHudExpanded(liqHudKey));
    const onShared=(event:Event)=>{
      const detail=(event as CustomEvent<{key:string;expanded:boolean}>).detail;
@@ -634,8 +640,12 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      window.removeEventListener(LIQUIDATION_HUD_PREFERENCE_EVENT,onShared);
      window.removeEventListener('storage',onStorage);
    };
- },[liqHudKey]);
+ },[liqHudKey,terminalMode]);
  const toggleLiqHud=()=>{
+   if(terminalMode){
+     setLiqHudOpen(open=>!open);
+     return;
+   }
    const next=!liqHudOpen;
    setLiqHudOpen(next);
    saveLiquidationHudExpanded(liqHudKey,next);
