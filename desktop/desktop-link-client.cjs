@@ -114,7 +114,8 @@ class MetaScalpTickerSender {
         if (inventory.ok) linked=linkedTickerDocuments(inventory.body,Number(command.binding));
       } catch { /* Older MetaScalp: preserve existing group-linking behavior. */ }
       if (linked?.error) return {ok:false,reason:linked.error};
-      if (linked?.documents?.length === 0) return {ok:false,reason:'METASCALP_GROUP_NOT_FOUND'};
+      // Empty inventory might be a legacy binding representation; let the
+      // original MetaScalp endpoint validate the requested named group.
       const docs=linked?.documents || [];
       const hasMixedConnections=docs.length>1
         && new Set(docs.map(doc=>doc.connectionId)).size>1;
