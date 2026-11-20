@@ -174,15 +174,15 @@ test('surviving cascade rays start at historical wick pivots and reach the scale
   const end = engine.indexOf('drawHookTimeMarkers(q,g,timeMarkers,mouse);',start);
   const layer = engine.slice(start,end);
   assert.ok(start >= 0 && end > start);
-  assert.match(layer, /q\\.moveTo\\(cascadeRay \\? Math\\.max\\(0, x0\\) : x0, y0\\)/);
-  assert.match(layer, /q\\.lineTo\\(renderedEndX, y1\\)/);
+  assert.match(layer, /q\.moveTo\(cascadeRay \? Math\.max\(0, x0\) : x0, y0\)/);
+  assert.match(layer, /q\.lineTo\(renderedEndX, y1\)/);
   assert.doesNotMatch(layer, /cascadeRayStartX|cascadeFutureRayStartX/,
     'do not begin rays after the last candle; historical origins must remain visible');
-  assert.match(engine, /const activeCascadeLines = useMemo\\(/);
-  assert.match(engine, /cascadeLineIsActive\\(line, setup\\.touches, candles, side\\)/);
-  assert.match(engine, /\\[scalperResult, candles\\]/,
+  assert.match(engine, /const activeCascadeLines = useMemo\(/);
+  assert.match(engine, /cascadeLineIsActive\(line, setup\.touches, candles, side\)/);
+  assert.match(engine, /\[scalperResult, candles\]/,
     'viewport moves should not rescan price history');
-  assert.match(layer, /if \\(setup\\.kind === 'cascade' && !activeCascadeLines\\.has\\(line\\)\\) continue/);
+  assert.match(layer, /if \(setup\.kind === 'cascade' && !activeCascadeLines\.has\(line\)\) continue/);
 });
 
 test('scalper diagonal expires after a later wick crosses a downward resistance',()=>{
@@ -240,7 +240,7 @@ test('lower ascending scalper diagonal vanishes after a later wick crosses it',(
     ...safe.slice(0,4),bar(4,103.9),
   ],'lower'),false);
   const engine=readFileSync(new URL('../src/components/hookchart/engine.tsx',import.meta.url),'utf8');
-  assert.match(engine,/const activeDiagonalLines = useMemo\\(/);
-  assert.match(engine,/scalperDiagonalIsActive\\(line, setup\\.touches, candles, side, setup\\.kind === 'trend'\\)/);
-  assert.match(engine,/!activeDiagonalLines\\.has\\(line\\)\\) continue/);
+  assert.match(engine,/const activeDiagonalLines = useMemo\(/);
+  assert.match(engine,/scalperDiagonalIsActive\(line, setup\.touches, candles, side, setup\.kind === 'trend'\)/);
+  assert.match(engine,/!activeDiagonalLines\.has\(line\)\) continue/);
 });
