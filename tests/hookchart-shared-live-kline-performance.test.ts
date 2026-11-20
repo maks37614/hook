@@ -145,6 +145,22 @@ test('browser Kline subscribers receive revised taker volumes and trade counts a
   }
 });
 
+test('Bybit shared 1m Kline keeps exact quote turnover for AV footer without REST', () => {
+  const packet = {
+    topic: 'kline.1.ETHUSDT', ts: 1710000059000,
+    data: [{ start: 1710000000000, open:'100', high:'102', low:'99',
+      close:'101', volume:'250', turnover:'25_000', confirm:true }],
+  };
+  packet.data[0].turnover = '25000.125';
+  const result = parseSharedKlineMessage('bybit', packet, 'ETHUSDT', '1m');
+  assert.ok(result);
+  assert.equal(result.quoteVolume, 25000.125);
+  assert.equal(result.closed, true);
+  assert.equal(parseSharedKlineMessage('bybit', {
+    ...packet, data: [{ ...packet.data[0], turnover: 'not-available' }],
+  }, 'ETHUSDT', '1m')?.quoteVolume, undefined);
+});
+
 test('historical Replay does not subscribe to a live-market feed', () => {
   const replay = readFileSync(new URL('../src/components/replay/ReplayChart.tsx', import.meta.url), 'utf8');
   const hook = readFileSync(new URL('../src/components/hookchart/useOriginalHookChartLiveFeed.ts', import.meta.url), 'utf8');
