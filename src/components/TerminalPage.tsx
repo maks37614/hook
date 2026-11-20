@@ -178,7 +178,47 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   // No loading-state flash on 30s refreshes; only initial market fetch needs it.
   const marketSnapshotLoadedRef = useRef(false);
   const [marketError, setMarketError] = useState<string | null>(null);
-  const marketCoins = marketSnapshot.coins;
+  // AV is measured from real closed 1m candles, never inferred from 24h quotes.
+  // This background scan is idle unless the user actually requests AV 1m.
+  const [minuteRequested, setMinuteRequested] = useState(false);
+  const [minuteReady, setMinuteReady] = useState(false);
+  const [minuteError, setMinuteError] = useState<string | null>(null);
+  const [minuteRows, setMinuteRows] = useState<Array<{symbol:string;exchange:ExchangeId;marketType:MarketType;volume1mUsd:number;minuteStart:number}>>([]);
+  const minuteDemand = (showCoinPresets && minuteRequested) || (avOneMinuteActive && presetAutoUpdate);
+  useEffect(() => {
+    if (!minuteDemand) return;
+    const controller = new AbortController();
+    let busy = false;
+    const refresh = async () => {
+      if (busy || controller.signal.aborted || document.visibilityState === 'hidden') return;
+      busy = true;
+      try {
+        const response = await fetch('/api/market/av1m/top', { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error('AV 1m: хвилинні дані недоступні');
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.rows)) throw new Error('AV 1m: некоректна відповідь');
+        if (controller.signal.aborted) return;
+        setMinuteRows(result.rows);
+        setMinuteReady(true);
+        setMinuteError(null);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setMinuteRows([]);
+          setMinuteReady(true);
+          setMinuteError(error instanceof Error ? error.message : 'AV 1m: помилка отримання даних');
+        }
+      } finally { busy = false; }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 60_000);
+    return () => { controller.abort(); clearInterval(timer); };
+  }, [minuteDemand]);
+  const marketCoins = useMemo(() => {
+    if (!minuteReady) return marketSnapshot.coins;
+    const byMarket = new Map(minuteRows.map(coin => [coinMarketKey(coin), coin.volume1mUsd]));
+    return marketSnapshot.coins.map(coin => ({ ...coin, volume1mUsd: byMarket.get(coinMarketKey(coin)) }));
+  }, [marketSnapshot.coins, minuteRows, minuteReady]);
+  const presetMarketSnapshot = useMemo(() => ({ ...marketSnapshot, coins: marketCoins }), [marketSnapshot, marketCoins]);
   // Preset pagination must never hide a chart the trader added manually:
   // choosing 4 preset charts, then pressing +, shows five live chart blocks.
   // Removing any block immediately shows the remaining ones without refill.
@@ -1594,10 +1634,12 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
             formationCoins={formationPresetCoins}
             onRequestFormationScan={onRequestFormationScan}
             onRequestMarketRefresh={() => requestMarketRefreshRef.current?.(true)}
+            onRequestMinuteRefresh={() => { setMinuteReady(false); setMinuteRequested(true); }}
+            minuteReady={minuteReady} minuteError={minuteError}
             formationScanStatus={formationScanStatus}
             selection={coinPresetSelection} timeframe={timeframe} activePreset={activeMarketPreset} autoUpdate={presetAutoUpdate}
             menuOpen={showCoinPresets}
-            snapshot={marketSnapshot} loading={marketLoading} error={marketError}
+            snapshot={presetMarketSnapshot} loading={marketLoading} error={marketError}
             onActivePresetChange={handleActiveMarketPresetChange}
             onPresetChosen={() => setShowCoinPresets(false)}
             onApplyCoins={handleApplyMarketCoins} onSavePreset={handleSaveCoinPreset}
