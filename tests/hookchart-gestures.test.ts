@@ -58,6 +58,11 @@ function setup(overrides: Record<string, unknown> = {}) {
     vp:{barWidth:9,rightOffset:0,autoY:true,manualCenter:null,manualRange:null},candles:[{t:0}],rightPaddingBars:0,rightPadding:0,
     setVp:(update:any)=>viewportUpdates.push(update(env.vp)),
     setGestureVp:(update:any,_kind:string)=>viewportUpdates.push(update(env.vp)),
+    // The production Terminal coalescer calls these helpers; this isolated
+    // gesture test executes only extracted handlers in non-Terminal mode.
+    // Preserve the same immediate viewport semantics without a DOM RAF.
+    schedulePointerGestureVp:(update:any,_kind:string)=>viewportUpdates.push(update(env.vp)),
+    flushTerminalPointerGesture:()=>{},
     interactionRef:{current:{width:1,height:1}},interactionDrawRef:{current:()=>{}},
     lastCrosshair:{current:null},onCrosshairChange:()=>{},
     lastSentCrosshairPrice:{current:null},onCrosshairPriceChange:undefined,
