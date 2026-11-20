@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getUserTerminalLinkSettings } from '../src/utils/terminalLinkService';
+import { DEFAULT_TERMINAL_LINK_SETTINGS, getUserTerminalLinkSettings } from '../src/utils/terminalLinkService';
 import { getUserMetaScalpSettings } from '../src/utils/metaScalpService';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -40,7 +40,7 @@ test('notifications never auto-link but explicit manual notification actions sti
 test('legacy saved auto opt-ins are neutralized without losing manual MetaScalp', () => {
   const profile = {
     uid: 'owner',
-    terminalLinkSettings: { provider: 'metascalp' as const, enabled: true, switchOnChartOpen: true, autoSignals: true },
+    terminalLinkSettings: { ...DEFAULT_TERMINAL_LINK_SETTINGS, provider: 'metascalp' as const, enabled: true, switchOnChartOpen: true, autoSignals: true },
     metaScalpSettings: { enabled: true, port: 17845, binding: '002', autoSwitchOnClick: true },
   };
   const term = getUserTerminalLinkSettings(profile.uid, profile);
