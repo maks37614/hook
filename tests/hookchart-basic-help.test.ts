@@ -48,7 +48,7 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
   assert.match(html, /Пояснення: Прогнозні зони Liq · модель за історією/);
   assert.match(html, /Пояснення: Товщина горизонтальної лінії/);
   assert.match(html, /Пояснення: Товщина лінії тренду/);
-  assert.match(html, /Пояснення: Товщина трендової лінії \(Скальпер\)/);
+  assert.match(html, /Пояснення: Товщина ліній/);
   assert.match(html, /Пояснення: Режим Скальпера/);
   assert.match(html, /Пояснення: Авто позначення каскадних рівнів/);
   assert.match(html, /Пояснення: Показувати підписи Режиму Скальпера/);
