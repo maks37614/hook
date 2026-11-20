@@ -1,0 +1,50 @@
+name: Terminal Chart Smoothness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/terminal-chart-smoothness.yml'
+      - 'src/components/TerminalPage.tsx'
+      - 'src/components/terminal/TerminalChartWidget.tsx'
+      - 'src/components/terminal/TerminalGridItem.tsx'
+      - 'src/components/hookchart/engine.tsx'
+      - 'src/utils/terminalVisibilityScheduler.ts'
+      - 'src/utils/terminalWidgetVisibility.ts'
+      - 'tests/terminal-visibility-scheduler.test.ts'
+      - 'tests/hookchart-drag-frame-performance.test.ts'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/terminal-chart-smoothness.yml'
+      - 'src/components/TerminalPage.tsx'
+      - 'src/components/terminal/**'
+      - 'src/components/hookchart/engine.tsx'
+      - 'src/utils/terminalVisibilityScheduler.ts'
+      - 'tests/terminal-visibility-scheduler.test.ts'
+      - 'tests/hookchart-drag-frame-performance.test.ts'
+  workflow_dispatch:
+
+jobs:
+  terminal-gestures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck chart and Terminal
+        run: npm run typecheck
+      - name: Terminal scroll and chart pan regressions
+        run: >
+          node --import ./tests/fixtures/offline-network.mjs
+          --import tsx --test --test-concurrency=1
+          tests/terminal-visibility-scheduler.test.ts
+          tests/hookchart-drag-frame-performance.test.ts
+          tests/terminalWidgetVisibility.test.ts
+          tests/terminal-normal-render-budget.test.ts
+          tests/hookchart-viewport-raf-notifications.test.ts
