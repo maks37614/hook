@@ -33,7 +33,8 @@ test('Surveillance provider tears down and resumes Desktop UI stream on visibili
   assert.match(source, /const unsubscribe = subscribeUserSignalStream\(user\.uid/);
   assert.match(source, /unsubscribe\(\)/);
   assert.match(source, /streamEpochRef\.current !== epoch/);
-  assert.match(source, /if \(streamEpochRef\.current === epoch\) streamConnected\.current = false/);
+  assert.match(source, /const epochRef = streamEpochRef/);
+  assert.match(source, /if \(epochRef\.current === epoch\) streamConnected\.current = false/);
   assert.match(source, /\[user\?\.uid, fetchCoins, keepSurveillanceSSE\]/);
   // 24/7 monitoring must remain server-owned, with this provider only receiving
   // invalidations; do not add any foreground scan or exchange polling.

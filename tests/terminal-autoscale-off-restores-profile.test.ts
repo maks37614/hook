@@ -57,13 +57,13 @@ test('switching off auto-scale reapplies the saved Terminal profile, not a hardc
   assert.match(hook, /const selectedTerminalInitialView = appliedTerminalInitialView\?\.view \?\? terminalInitialView/);
   assert.match(engine, /profile\.visibleBars,profile\.verticalZoom,profile\.autoPriceScale,profile\.rightGapBars,terminalAutoScale/);
   assert.match(engine, /if\(visualAppliedRef\.current===signature\)return;/);
-  assert.match(engine, /const priceAuto=terminalAutoScale\|\|visualProfile\.autoPriceScale/);
+  assert.match(engine, /const priceAuto=terminalAutoScale\|\|profile\.autoPriceScale/);
   assert.match(engine, /const terminalManualProfile=!priceAuto&&\(terminalMode\|\|visualProfileKey\.startsWith\('terminal'\)\)/);
   assert.match(engine, /terminalSafeManualPriceViewport\(low,high,/);
-  assert.match(engine, /showVolumes,visualProfile\.verticalZoom\)/);
+  assert.match(engine, /showVolumes,profile\.verticalZoom\)/);
   assert.match(engine, /manualCenter:priceAuto\?null:\(manualPrice\?\.manualCenter\?\?center\)/);
   assert.match(engine, /manualRange:priceAuto\?null:\(manualPrice\?\.manualRange\?\?/);
-  assert.match(engine, /const visibleSlots=Math\.max\(1,visualProfile\.visibleBars\+Math\.max\(0,rightPaddingBars\)\)/);
+  assert.match(engine, /const visibleSlots=Math\.max\(1,profile\.visibleBars\+Math\.max\(0,rightPaddingBars\)\)/);
   assert.match(engine, /barWidth,rightOffset:0,autoY:priceAuto/);
 });
 
