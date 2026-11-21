@@ -45,7 +45,7 @@ import { useSurveillance } from '../context/SurveillanceContext';
 import { ManualDensityThresholdField } from './ManualDensityThresholdField';
 import { SurveillanceRemoveButton } from './SurveillanceRemoveButton';
 import { isLiveOrderBookView } from '../utils/orderBookValidation';
-import { densityEventAmountText, formatDensityUsdCompact, formatDensityUsdExact } from '../utils/densityNotional';
+import { densityEventAmountText, formatDensityLevelCompact, formatDensityLevelExact } from '../utils/densityNotional';
 import { countSurveillanceEventCategories, getSurveillanceEventCategory, matchesSurveillanceEventFilter } from '../utils/surveillanceEventCategories';
 import { getStoredPreferences, useAppPreferences } from '../utils/userPreferences';
 import {
@@ -912,11 +912,11 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                         {/* Title and Description */}
                         <div className="space-y-1">
                           <div className="font-bold text-white text-xs leading-snug">
-                            {densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language)}
+                            {densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}
                           </div>
                           {ev.description && (
                             <div className="text-[11px] text-slate-300 leading-relaxed font-mono">
-                              {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language)}
+                              {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}
                             </div>
                           )}
                         </div>
@@ -1221,9 +1221,9 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                         <span>{t('surveillance.ui.domDensities')}</span>
                       </div>
                       <div className="font-bold text-white truncate" title={coin.isActive && state?.engineStatus === 'LIVE' && state.topDensityUsd
-                        ? `${formatDensityUsdExact(state.topDensityUsd, language)} • ${state.topDensitySide} • ${state.topDensityPrice ?? '—'}` : undefined}>
+                        ? `${formatDensityLevelExact(state.topDensityUsd, coin.symbol, language)} • ${state.topDensitySide} • ${state.topDensityPrice ?? '—'}` : undefined}>
                         {coin.isActive && state?.engineStatus === 'LIVE' && state.topDensityUsd
-                          ? `${state.topDensitySide} ${formatDensityUsdCompact(state.topDensityUsd, language)}`
+                          ? `${state.topDensitySide} ${formatDensityLevelCompact(state.topDensityUsd, coin.symbol, language)}`
                           : coin.isActive ? state?.engineStatus === 'LIVE' ? t('surveillance.ui.waitDensity') : t('surveillance.ui.waitDom') : 'Пауза'}
                       </div>
                       <div className="text-[10px] text-cyan-300 truncate">
@@ -1345,7 +1345,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                                       : 'bg-cyan-400'
                                   }`}
                                 />
-                                <span className="truncate">{densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language)}</span>
+                                <span className="truncate">{densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}</span>
                               </span>
                               <span className="text-slate-400 whitespace-nowrap ml-1">
                                 {formatTimeAgo(ev.timestamp)}
@@ -1353,7 +1353,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                             </div>
                             {ev.description && (
                               <p className="text-[10px] text-slate-400 pt-1 leading-snug line-clamp-2">
-                                {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language)}
+                                {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}
                               </p>
                             )}
                           </div>
@@ -1481,7 +1481,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                       <span className="text-[10px] text-slate-400 font-normal">
                         {isWorkerBookLive ? <>
                           {workerData.orderBookState?.bidDepth || 0} BID / {workerData.orderBookState?.askDepth || 0} ASK •{' '}
-                          Спред: ${formatPrice(workerData.orderBookState?.spread)} ({workerData.orderBookState?.spreadPct}%)
+                          Спред: ${formatPrice(workerData.orderBookState?.spread)} USDT ({workerData.orderBookState?.spreadPct}%)
                         </> : 'Немає свіжих даних'}
                       </span>
                     </div>
@@ -1502,12 +1502,12 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                       <div className="space-y-1">
                         <div className="text-[10px] text-emerald-400 font-bold uppercase pb-1 border-b border-slate-800 flex justify-between">
                           <span>BID PRICE</span>
-                          <span>QTY (USD)</span>
+                          <span>VALUE (USDT)</span>
                         </div>
                         {(isWorkerBookLive ? workerData.orderBookState?.bids : [])?.slice(0, 7).map((b: any, idx: number) => (
                           <div key={idx} className="flex justify-between text-[11px] py-0.5">
-                            <span className="text-emerald-400 font-bold">${formatPrice(b.price)}</span>
-                            <span className="text-slate-300" title={`${formatDensityUsdExact(b.notionalUsd, language)} = ${b.price} × ${b.quantity}`}>{formatDensityUsdCompact(b.notionalUsd, language)}</span>
+                            <span className="text-emerald-400 font-bold">{formatPrice(b.price)} USDT</span>
+                            <span className="text-slate-300" title={`${formatDensityLevelExact(b.notionalUsd, detailedCoin.symbol, language)} = ${b.price} × ${b.quantity}`}>{formatDensityLevelCompact(b.notionalUsd, detailedCoin.symbol, language)}</span>
                           </div>
                         ))}
                       </div>
@@ -1516,12 +1516,12 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                       <div className="space-y-1">
                         <div className="text-[10px] text-rose-400 font-bold uppercase pb-1 border-b border-slate-800 flex justify-between">
                           <span>ASK PRICE</span>
-                          <span>QTY (USD)</span>
+                          <span>VALUE (USDT)</span>
                         </div>
                         {(isWorkerBookLive ? workerData.orderBookState?.asks : [])?.slice(0, 7).map((a: any, idx: number) => (
                           <div key={idx} className="flex justify-between text-[11px] py-0.5">
-                            <span className="text-rose-400 font-bold">${formatPrice(a.price)}</span>
-                            <span className="text-slate-300" title={`${formatDensityUsdExact(a.notionalUsd, language)} = ${a.price} × ${a.quantity}`}>{formatDensityUsdCompact(a.notionalUsd, language)}</span>
+                            <span className="text-rose-400 font-bold">{formatPrice(a.price)} USDT</span>
+                            <span className="text-slate-300" title={`${formatDensityLevelExact(a.notionalUsd, detailedCoin.symbol, language)} = ${a.price} × ${a.quantity}`}>{formatDensityLevelCompact(a.notionalUsd, detailedCoin.symbol, language)}</span>
                           </div>
                         ))}
                       </div>
@@ -1533,15 +1533,15 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                     <div className="text-xs font-bold text-white flex items-center gap-1.5">
                       <Target className="w-4 h-4 text-amber-400" />
                       <span>Виявлені щільності</span>
-                      <span className="text-slate-400 text-[10px]" title={isWorkerBookLive ? formatDensityUsdExact(workerData.densityThresholdUsd, language) : undefined}>{workerData.densityMode} • Поріг: {isWorkerBookLive && workerData.densityThresholdUsd > 0
-                          ? formatDensityUsdCompact(workerData.densityThresholdUsd, language) : '—'}</span>
+                      <span className="text-slate-400 text-[10px]" title={isWorkerBookLive ? formatDensityLevelExact(workerData.densityThresholdUsd, detailedCoin.symbol, language) : undefined}>{workerData.densityMode} • Поріг: {isWorkerBookLive && workerData.densityThresholdUsd > 0
+                          ? formatDensityLevelCompact(workerData.densityThresholdUsd, detailedCoin.symbol, language) : '—'}</span>
                     </div>
                     {workerData.densityMode !== 'MANUAL' && (
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-slate-400">
                         <span>BID ≥ {isWorkerBookLive && workerData.densityBidThresholdUsd > 0
-                          ? formatDensityUsdCompact(workerData.densityBidThresholdUsd, language) : '—'}</span>
+                          ? formatDensityLevelCompact(workerData.densityBidThresholdUsd, detailedCoin.symbol, language) : '—'}</span>
                         <span>ASK ≥ {isWorkerBookLive && workerData.densityAskThresholdUsd > 0
-                          ? formatDensityUsdCompact(workerData.densityAskThresholdUsd, language) : '—'}</span>
+                          ? formatDensityLevelCompact(workerData.densityAskThresholdUsd, detailedCoin.symbol, language) : '—'}</span>
                         {isWorkerBookLive && !(workerData.volume24hUsd > 0) && (
                           <span className="text-amber-300">{t('surveillance.ui.density.turnoverUnavailable')}</span>
                         )}
@@ -1583,7 +1583,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className={`font-bold ${d.side === 'BID' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                  {d.side} ${formatPrice(d.price)}
+                                  {d.side} {formatPrice(d.price)} USDT
                                 </span>
                                 <span className="text-[9px] px-1 rounded bg-slate-800 text-cyan-300">
                                   {d.confirmed ? t('surveillance.ui.density.confirmed') : t('surveillance.ui.density.observing')}
@@ -1594,8 +1594,8 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                                 <span title={t('surveillance.ui.density.observationHelp')}> {t('surveillance.ui.density.observed')}: {d.ageSeconds}с</span>
                               </div>
                             </div>
-                            <div className="font-extrabold text-white text-xs" title={`${formatDensityUsdExact(d.notionalUsd, language)} = ${d.price} × ${d.quantity}`}>
-                              {formatDensityUsdCompact(d.notionalUsd, language)}
+                            <div className="font-extrabold text-white text-xs" title={`${formatDensityLevelExact(d.notionalUsd, detailedCoin.symbol, language)} = ${d.price} × ${d.quantity}`}>
+                              {formatDensityLevelCompact(d.notionalUsd, detailedCoin.symbol, language)}
                             </div>
                           </div>
                         ))}
