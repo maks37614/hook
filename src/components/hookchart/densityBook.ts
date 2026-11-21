@@ -160,7 +160,7 @@ export class HookChartDensityBook {
     return true;
   }
 
-  read(settings: HookChartPreferences, atr: number, now = Date.now()) {
+  read(settings: HookChartPreferences, atr: number, now = Date.now(), tradeEvidenceReady = true) {
     if (!this.ready || now - this.receivedAt > ORDER_BOOK_MAX_AGE_MS || !isFreshDepthTime(this.sourceTime, now)) {
       this.clear();
       return { densities: [] as Density[], book: { b: [], a: [] }, densityCut: 0, depthReady: false, price: 0, autoStats: EMPTY_AUTO_STATS };
@@ -188,7 +188,7 @@ export class HookChartDensityBook {
     }
     const manual = settings.densityMode === 'manual' && Number.isFinite(settings.densityThreshold) && settings.densityThreshold! > 0;
     const baseCut = manual ? Math.max(1, settings.densityThreshold!) : this.autoThreshold;
-    const { buy, sell } = this.opposingFlow(now);
+    const { buy, sell } = tradeEvidenceReady ? this.opposingFlow(now) : {buy:0,sell:0};
     // BID absorbs aggressive sells; ASK absorbs aggressive buys.
     const bidCut = !baseCut ? 0 : manual ? baseCut : Math.max(baseCut, Math.ceil(sell * .5));
     const askCut = !baseCut ? 0 : manual ? baseCut : Math.max(baseCut, Math.ceil(buy * .5));
@@ -264,7 +264,7 @@ export class HookChartDensityBook {
           ageSeconds: age, distancePct: Math.abs(price - row.p) / price * 100,
           touches: density.touches, lastTouchAgeSeconds: density.lastTouch ? (now - density.lastTouch) / 1000 : Infinity,
           replenishments: density.replenishments, unexplainedReductions: density.unexplainedReductions || 0,
-          executedUsd90s,
+          executedUsd90s: tradeEvidenceReady ? executedUsd90s : 0,
         });
         density.executedUsd90s = executedUsd90s;
         density.reactionScore = assessed.score;

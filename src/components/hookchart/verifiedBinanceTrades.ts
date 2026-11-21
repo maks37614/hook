@@ -13,6 +13,9 @@ export function createVerifiedBinanceTrades(options: {
   onIntegrity?: (status: 'verified' | 'recovering' | 'incomplete') => void;
   maxBuffered?: number;
   maxPages?: number;
+  restartAfterMs?: number;
+  warmupMs?: number;
+  now?: () => number;
 }) {
   let previous: number | null = null;
   let status: 'verified' | 'recovering' | 'incomplete' = 'verified';
@@ -21,6 +24,10 @@ export function createVerifiedBinanceTrades(options: {
   let running = false;
   let recoveryWindow = 0;
   let recoveryCount = 0;
+  const clock = options.now ?? Date.now;
+  let failedAt = 0;
+  let warmupStart: number | null = null;
+  let restartFloor = -1;
   const abort = new AbortController();
   const maxBuffered = Math.max(100, Math.min(10_000, options.maxBuffered ?? 3_000));
   const emit = (next: typeof status) => {
@@ -31,7 +38,11 @@ export function createVerifiedBinanceTrades(options: {
   // Async recovery may finish after a buffer overflow marked the feed incomplete.
   const isIncomplete = () => status === 'incomplete';
   const fail = () => {
+    for (const row of queue) restartFloor = Math.max(restartFloor, Number(row.id));
+    restartFloor = Math.max(restartFloor, previous ?? -1);
     queue = [];
+    failedAt = clock();
+    warmupStart = null;
     emit('incomplete');
   };
   const consume = (trade: BinanceTradePacket) => {
@@ -39,6 +50,7 @@ export function createVerifiedBinanceTrades(options: {
     if (previous !== null && id <= previous) return;
     previous = id;
     options.accept(trade);
+    if (warmupStart !== null && trade.t >= warmupStart + (options.warmupMs ?? 300_000)) warmupStart = null;
   };
   const drain = async () => {
     if (running) return;
@@ -50,20 +62,20 @@ export function createVerifiedBinanceTrades(options: {
         const id = Number(next.id);
         if (previous !== null && id <= previous) continue;
         if (previous !== null && id > previous + 1) {
-          const now = Date.now();
+          const now = clock();
           if (!recoveryWindow || now - recoveryWindow >= 60_000) {
             recoveryWindow = now; recoveryCount = 0;
           }
           // Binance Futures aggTrades can cost 20 IP-weight per page.
           // Allow two gap recoveries per minute; otherwise fail closed.
-          if (++recoveryCount > 2) { fail(); break; }
+          if (++recoveryCount > 2) { restartFloor = Math.max(restartFloor,id); fail(); break; }
           const result = await recoverBinanceTradeGap({
             previousId: previous, currentId: id,
             load: (fromId, limit, signal) => options.load(fromId, limit, signal ?? abort.signal),
             signal: abort.signal, maxPages: options.maxPages,
           });
           if (closed || isIncomplete()) break;
-          if (result.status !== 'complete') { fail(); break; }
+          if (result.status !== 'complete') { restartFloor = Math.max(restartFloor,id); fail(); break; }
           for (const missing of result.rows) consume(missing);
         }
         if (!closed) consume(next);
@@ -72,16 +84,25 @@ export function createVerifiedBinanceTrades(options: {
       if (!closed) fail();
     } finally {
       running = false;
-      if (!closed && status !== 'incomplete') emit('verified');
+      if (!closed && status !== 'incomplete' && warmupStart === null) emit('verified');
     }
   };
   const push = (trade: BinanceTradePacket) => {
-    if (closed || status === 'incomplete') return;
+    if (closed) return;
     const id = Number(trade.id);
     if (!Number.isSafeInteger(id) || id < 0 || !Number.isFinite(trade.p) || trade.p <= 0 ||
-      !Number.isFinite(trade.q) || trade.q <= 0) return;
+      !Number.isFinite(trade.q) || trade.q <= 0 || !Number.isFinite(trade.t) || trade.t <= 0 ||
+      (trade.side !== 'BUY' && trade.side !== 'SELL')) return;
+    if (status === 'incomplete') {
+      if (options.restartAfterMs === undefined || running || clock() - failedAt < options.restartAfterMs || id <= restartFloor || Math.abs(clock() - trade.t) > 5000) return;
+      // Start a new provable interval; the old hole is never filled with made-up trades.
+      previous = null;
+      warmupStart = trade.t;
+      emit('recovering');
+    }
     if (!running && queue.length === 0 && (previous === null || id <= previous + 1)) {
       consume(trade);
+      if (status === 'recovering' && warmupStart === null) emit('verified');
       return;
     }
     queue.push(trade);
@@ -94,5 +115,5 @@ export function createVerifiedBinanceTrades(options: {
     previous = previous === null ? id : Math.max(previous, id);
   };
   const close = () => { closed = true; abort.abort(); queue = []; };
-  return { push, prime, close, getIntegrity: () => status, getLastId: () => previous };
+  return { push, prime, close, invalidate: fail, getIntegrity: () => status, getLastId: () => previous };
 }

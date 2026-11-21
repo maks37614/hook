@@ -1742,6 +1742,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 : liveFeed.depthStatus === 'reconnecting' ? 'Відновлення стакана'
                 : liveFeed.depthStatus === 'syncing' ? 'Синхронізація стакана' : 'Підключення стакана'}
             </div>
+            {liveFeed.tradeIntegrity === 'recovering' && <div className="densityQuickStatus" role="status" data-live={false}>{siteLanguage === 'en' ? 'Verifying trade continuity…' : siteLanguage === 'pl' ? 'Weryfikacja ciągłości transakcji…' : siteLanguage === 'ru' ? 'Проверка непрерывности потока сделок…' : 'Перевірка безперервності потоку угод…'}</div>}
             {liveFeed.tradeIntegrity === 'incomplete' && <div className="densityQuickStatus" role="alert" data-live={false}>
               {siteLanguage === 'en' ? 'Incomplete trade feed — buy/sell analytics paused to prevent inaccurate volume'
                 : siteLanguage === 'pl' ? 'Niepełne dane transakcji — wstrzymano statystyki kupna/sprzedaży'
