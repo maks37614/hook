@@ -26,7 +26,7 @@ test('every Basic HookChart control has its own contextual explanation', () => {
     const explanation = mainSettingHelpText(section, item[2]) || line.match(/desc="([^"]+)"/)?.[1];
     assert.ok(explanation && explanation.length >= 35, `Missing explanation: ${section} / ${item[2]}`);
   }
-  assert.equal(controls, 87, 'all Basic and Levels settings, including Optimization, must have explanatory help');
+  assert.equal(controls, 89, 'all Basic and Levels settings, including Optimization, must have explanatory help');
   assert.notEqual(mainSettingHelpText('Відносний об’єм (колонка VR)', 'Кількість свічок'),
     mainSettingHelpText('Кількість угод (лише Binance)', 'Кількість свічок'),
     'the same label must explain a different function depending on its section');
@@ -40,7 +40,9 @@ test('each visible Basic setting renders a contextual question-mark trigger', ()
   // Includes two newly exposed Scalper styling controls; every Basic
   // setting still has exactly one contextual question-mark help trigger.
   const count = (html.match(/aria-label="Пояснення: /g) || []).length;
-  assert.equal(count, 76);
+  assert.equal(count, 78);
+  assert.match(html, /Пояснення: Показувати щільності з RPI/);
+  assert.match(html, /Пояснення: Точні суми щільностей/);
   assert.equal((html.match(/class="visualSettingHelp mainSettingHelp"/g) || []).length, count);
   assert.match(html, /Пояснення: Вигляд ліній Режиму Скальпера/);
   assert.match(html, /Пояснення: Показувати точки Режиму Скальпера/);

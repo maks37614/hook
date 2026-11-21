@@ -30,9 +30,9 @@ async function until(condition: () => boolean) {
 }
 async function fixture(t: any) {
   const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
-  const sources: Array<{ symbol: string; exchange: string; market: string; source: FakeSource }> = [];
-  const feed = installHookChartDepthStream(server, (symbol, exchange, market) => {
-    const source = new FakeSource(); sources.push({ symbol, exchange, market, source }); return source;
+  const sources: Array<{ symbol: string; exchange: string; market: string; includeRpi?:boolean; source: FakeSource }> = [];
+  const feed = installHookChartDepthStream(server, (symbol, exchange, market, includeRpi) => {
+    const source = new FakeSource(); sources.push({ symbol, exchange, market, includeRpi, source }); return source;
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -384,4 +384,24 @@ test('server no longer enumerates every best BID/ASK on ordinary deltas', () => 
   assert.match(source, /applyDepthSide\(current\.asks, asks, current\.bestAsk, false\)/);
   assert.doesNotMatch(source, /Math\.max\(\.\.\.current\.bids\.keys\(\)\)/);
   assert.doesNotMatch(source, /Math\.min\(\.\.\.current\.asks\.keys\(\)\)/);
+});
+
+test('RPI and ordinary sources are distinct, shared by viewers, and transport exact amounts',async t=>{
+  const f=await fixture(t);
+  const ordinary=await f.open();
+  const one=await f.open('exchange=binance&market=futures&symbol=BTCUSDT&rpi=1');
+  const two=await f.open('exchange=binance&market=futures&symbol=BTCUSDT&rpi=1');
+  await until(()=>f.sources.length===2);
+  const regular=f.sources.find(x=>!x.includeRpi)!; const inclusive=f.sources.find(x=>x.includeRpi)!;
+  regular.source.emit('depth',snapshot());
+  inclusive.source.emit('depth',{...snapshot(),bids:[[99.9,1],[99,5000]]});
+  await until(()=>[ordinary,one,two].every(c=>c.packets.some(p=>p.update?.isSnapshot)));
+  assert.equal(ordinary.packets.find(p=>p.update)?.update?.bids[1][1],2000);
+  for(const c of [one,two]) { const packet=c.packets.find(p=>p.update)!; assert.equal(packet.scope,'binance:futures:BTCUSDT:rpi'); assert.equal(packet.update?.bids[1][1],5000); }
+  inclusive.source.emit('status','STALE'); await until(()=>one.packets.some(p=>p.status==='STALE'));
+  assert.ok(!ordinary.packets.some(p=>p.status==='STALE'));
+});
+test('Binance spot rejects unsupported RPI source without opening exchange socket',async t=>{
+  const f=await fixture(t); const client=new NodeWebSocket(f.origin.replace('http:','ws:')+'/api/hookchart/depth?exchange=binance&market=spot&symbol=BTCUSDT&rpi=1');
+  const [code]=await once(client,'close'); assert.equal(code,1008); assert.equal(f.sources.length,0);
 });

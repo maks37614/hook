@@ -9,17 +9,19 @@ type Options = {
   onBook: (update: BookUpdate) => boolean;
   onStatus: (status: ChartDepthStatus) => void;
   origin?: string;
+  includeRpi?: boolean;
   createSocket?: (url: string) => WebSocket;
 };
 
 /** Use the site's own origin so exchange CORS, ports and browser regions do not block depth. */
-export function connectHookChartDepth({ exchange, marketType, symbol, onBook, onStatus,
+export function connectHookChartDepth({ exchange, marketType, symbol, onBook, onStatus, includeRpi = false,
   origin = window.location.origin, createSocket = url => new WebSocket(url) }: Options) {
   const cleanSymbol = normalizeExchangeSymbol(symbol);
-  const scope = chartDepthScope(exchange, marketType, cleanSymbol);
+  const scope = chartDepthScope(exchange, marketType, cleanSymbol, includeRpi);
   const url = new URL('/api/hookchart/depth', origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.search = new URLSearchParams({ exchange, market: marketType, symbol: cleanSymbol }).toString();
+  if (includeRpi) url.searchParams.set('rpi', '1');
   let stopped = false, socket: WebSocket | null = null;
   let retry: ReturnType<typeof setTimeout> | null = null;
   let retryMs = 1000, connectedAt = 0, lastMessage = 0, lastBook = 0;

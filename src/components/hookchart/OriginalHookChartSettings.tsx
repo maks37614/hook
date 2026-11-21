@@ -133,6 +133,8 @@ export const ORIGINAL_HOOKCHART_DEFAULTS: HookChartPreferences = {
   trendIntervals: ['1h', '4h', '1d'],
   trendHistory: 300,
   densityAnalysis: true,
+  densityIncludeRpi: false,
+  densityExactAmounts: false,
   densityTop: true,
   densityBaseVolume: false,
   densityImbalance: false,
@@ -796,6 +798,7 @@ export function OriginalHookChartSettings({
   prefs,
   language: selectedLanguage,
   densityCut = 0,
+  densityQuote = 'USDT',
   loadedCandles = 0,
   historyStatus = 'idle',
   onRetryHistory,
@@ -819,6 +822,7 @@ export function OriginalHookChartSettings({
   /** Language of this chart, which may differ from the site language. */
   language?: SupportedLanguage;
   densityCut?: number;
+  densityQuote?: 'USDT' | null;
   /** Number of unique candles actually held by this chart for the current symbol/timeframe. */
   loadedCandles?: number;
   historyStatus?: 'idle' | 'loading' | 'limited' | 'error';
@@ -1135,6 +1139,8 @@ export function OriginalHookChartSettings({
 
           <Section title="Щільності">
             <SwitchRow label="Аналіз великих лімітних заявок (щільностей)" value={prefs.densityAnalysis !== false} onChange={value => set('densityAnalysis', value)} />
+            <SwitchRow label="Показувати щільності з RPI" desc="Золоті мітки Σ+RPI — загальна сума на рівні, не додаткова заявка. Binance Futures: 1000 рівнів, Bybit: 50. Binance Spot не підтримується. За втрати потоку залишаються звичайні щільності. У AUTO додаткові мітки проходять поріг і не означають підтверджену реакцію." value={prefs.densityIncludeRpi === true} onChange={value => set('densityIncludeRpi', value)} />
+            <SwitchRow label="Точні суми щільностей" desc="Показує суму до копійок замість компактного округлення." value={prefs.densityExactAmounts === true} onChange={value => set('densityExactAmounts', value)} />
             <SwitchRow label="Показувати дисбаланс" desc="Сума лімітних ордерів у межах вибраної різниці від ціни для кожної сторони." value={!!prefs.densityImbalance} onChange={value => set('densityImbalance', value)} />
             <Setting label="Щільності на графіку" desc="Незалежно керуйте лініями, мітками та відображенням суми всередині мітки."><div className="densityVisibilityRow">
               {([['showDensityLines', 'Лінії'], ['showDensityLabels', 'Мітки'], ['showDensityAmounts', 'Суми']] as const).map(([key, label]) => <label key={key}><span>{label}</span><input type="checkbox" checked={!!prefs[key]} onChange={event => set(key, event.target.checked)} /></label>)}
@@ -1152,7 +1158,7 @@ export function OriginalHookChartSettings({
                 densityMode: 'manual', densityThreshold: prefs.densityMode === 'manual' && (prefs.densityThreshold || 0) > 0
                   ? prefs.densityThreshold : Math.max(1, Math.ceil(densityCut || prefs.densityThreshold || 50_000)),
               })}>Значення</button>
-              <span>$</span><Num value={prefs.densityMode === 'manual' ? prefs.densityThreshold ?? 0 : densityCut} min={0} step={1} disabled={prefs.densityMode !== 'manual'} set={value => set('densityThreshold', value)} />
+              <span>{densityQuote ?? "—"}</span><Num value={prefs.densityMode === 'manual' ? prefs.densityThreshold ?? 0 : densityCut} min={0} step={1} disabled={prefs.densityMode !== 'manual'} set={value => set('densityThreshold', value)} />
             </div></Setting>
             <Setting label="Що показувати в AUTO" desc="Усі сильні — аномально великі заявки. Потенціал реакції — тільки щільності з контактом ціни та свіжими виконаними угодами або поповненням заявки. Це не гарантія відскоку.">
               <div className="settingsChips">
@@ -1162,7 +1168,7 @@ export function OriginalHookChartSettings({
                     onClick={() => set('densityAutoDisplay', value)}>{label}</button>)}
               </div>
             </Setting>
-            <Setting label="Множник порогу AUTO" desc="Автоматично для вибраної монети: 4× типова заявка, ≥25% локальної ліквідності та ≥50% зустрічного потоку за 5 хвилин. Множник змінює базовий поріг; без угод розрахунок використовує стакан."><Num value={prefs.densityAutoMultiplier ?? 1} min={0.1} max={10} step={0.1} set={value => set('densityAutoMultiplier', value)} /><b className="valueBadge">×</b></Setting>
+            <Setting label="Множник порогу AUTO" desc="Автоматичний поріг для вибраної монети: 4× типова заявка; за наявності 24-годинного обсягу враховує його з обмеженням до 5× бази, а також спред. Зустрічні угоди підвищують поріг не більше 2,5×. Надзвичайно великі сусідні заявки не приховуються. Без повної статистики використовується лише стакан."><Num value={prefs.densityAutoMultiplier ?? 1} min={0.1} max={10} step={0.1} set={value => set('densityAutoMultiplier', value)} /><b className="valueBadge">×</b></Setting>
             <SwitchRow label="Показувати великі ордери лише поруч із рівнями" desc="Впливає на список; на графіку та у стакані показуються всі знайдені щільності." value={!!prefs.densityNearLevelsOnly} onChange={value => set('densityNearLevelsOnly', value)} />
           </Section>
 

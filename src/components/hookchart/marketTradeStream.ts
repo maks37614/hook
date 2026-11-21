@@ -214,7 +214,7 @@ const scopeKey = ({ exchange, marketType, symbol }: FeedScope) =>
   exchange + ':' + marketType + ':' + symbol.toUpperCase();
 
 class SharedMarketTradeStream {
-  readonly tracker = new LargeMarketTradeTracker();
+  tracker = new LargeMarketTradeTracker();
   readonly listeners = new Set<Listener>();
   started = false;
   private recent: AggressiveMarketTrade[] = [];
@@ -313,7 +313,7 @@ class SharedMarketTradeStream {
       this.recentHead = 0;
     }
     for (const listener of [...this.listeners]) {
-      if (fromHistory && listener.liveOnly) continue;
+      if (listener.liveOnly && (fromHistory || (this.betaVerifier && this.directRecoveryPending))) continue;
       try { listener.onTrade(accepted); } catch { /* isolate faulty chart */ }
     }
     if (revision !== this.tracker.revision) this.publish();
@@ -360,16 +360,28 @@ class SharedMarketTradeStream {
           },
           maxPages: 2,
           maxBuffered: 3000,
+          restartAfterMs: 60_000,
+          warmupMs: 300_000,
           onIntegrity: status => {
             this.integrity = status;
             // Relay's verifier owns its subscription health. The direct
             // exchange sockets use onopen/Bybit subscribe acknowledgements.
             this.setTransportConnected(status === 'verified' && this.betaTransportConnected);
             if (status === 'incomplete') {
+              this.tracker = new LargeMarketTradeTracker();
+              this.recent = []; this.recentHead = 0;
+              this.directRecoveryPending = true;
+              this.lastDirectGapAt = Date.now();
+              for (const listener of [...this.listeners]) { try { listener.onStreamInterrupted?.(); } catch {} }
               // Never advertise unverified large-trade prints as trustworthy.
               for (const listener of [...this.listeners]) {
                 try { listener.onPrints([]); } catch {}
               }
+            }
+            if (status === 'verified' && this.directRecoveryPending) {
+              this.directRecoveryPending = false;
+              for (const listener of [...this.listeners]) { try { listener.onStreamResumed?.(); } catch {} }
+              this.publish();
             }
             for (const listener of [...this.listeners]) {
               try { listener.onIntegrity?.(status); } catch {}
@@ -384,11 +396,10 @@ class SharedMarketTradeStream {
               // First confirm the REST seed, then replay queued WS/peer IDs
               // through the exact-gap validator before any derived statistics.
               if (this.betaPreseed.length >= 20000) {
-                this.betaVerifier?.close();
-                this.integrity = 'incomplete';
-                for (const listener of [...this.listeners]) {
-                  try { listener.onIntegrity?.('incomplete'); listener.onPrints([]); } catch {}
-                }
+                this.betaPreseed = [];
+                this.liveWithoutSeed = true;
+                this.buffering = false;
+                this.betaVerifier?.invalidate();
                 return;
               }
               this.betaPreseed.push(trade);

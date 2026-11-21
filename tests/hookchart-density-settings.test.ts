@@ -52,6 +52,8 @@ test('Basic settings group supported density controls, including line appearance
       .map(node => node.textContent!.replace(/\?/g, '').trim());
     const expected = [
       'Аналіз великих лімітних заявок (щільностей)',
+      'Показувати щільності з RPI',
+      'Точні суми щільностей',
       'Таблиця ТОП ордерів',
       'Показувати об’єм у базовій монеті',
       'Показувати дисбаланс',
@@ -116,4 +118,14 @@ test('moving density settings preserves handlers and global palette behaviour', 
   assert.match(section, /showDensityAmounts/);
   assert.match(appearance, /densityLineColor/,'full chart palette still sets density line color');
   assert.match(appearance, /densityLabelColor/,'full chart palette still sets density label color');
+});
+
+test('density settings explicitly display USDT without changing the saved cutoff', () => {
+  const html = renderToStaticMarkup(React.createElement(OriginalHookChartSettings, {
+    open:true, densityCut:100000, densityQuote:'USDT', prefs:normalizeOriginalHookChartPreferences({}),
+    onChange:noop,onApplyStrategy:noop,onClose:noop,
+  }));
+  const dom = new JSDOM(html);
+  try { assert.ok(dom.window.document.querySelector('.densityModeRow')?.textContent?.includes('USDT')); }
+  finally {dom.window.close();}
 });

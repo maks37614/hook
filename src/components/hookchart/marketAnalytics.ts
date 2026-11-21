@@ -7,13 +7,14 @@ export type AutoLevel={
 };
 export type LevelSettings={count:number;allowedDiffPct:number;historyDepth:number;breakPct:number;minSeparationBars:number;pivotBars:number;allowWickPenetration:boolean};
 export type MarketPrint={id:string,side:'BUY'|'SELL',t:number,p:number,usd:number,count:number,touches:number,lastTouch:number,score:number,segments?:{t:number,usd:number}[]};
+/** usd is a historical field name; on the supported charts the raw value is USDT, not USD. */
 export type OrderBookDensityLevel={p:number;q:number;usd:number;side:'BID'|'ASK'};
 export type RawOrderBookLevel=readonly [number|string,number|string];
 
 export const normalizeDensityDistance = (value?: number) =>
   Math.max(.1, Math.min(20, Number.isFinite(value) ? value! : 5));
 
-/** Convert public exchange depth rows into USD-sized price levels near the current price. */
+/** Convert public exchange depth rows into quote-asset notionals near the current price. */
 export function getOrderBookDensityLevels(
   bids: readonly RawOrderBookLevel[],
   asks: readonly RawOrderBookLevel[],
@@ -36,7 +37,7 @@ export function getOrderBookDensityLevels(
   ];
 }
 
-/** Keep price levels whose exchange-reported quantity has the requested USD notional. */
+/** Keep price levels whose exchange-reported quantity has the requested quote-asset notional. */
 export function filterOrderBookDensities(levels: readonly OrderBookDensityLevel[], thresholdUsd: number): OrderBookDensityLevel[] {
   const threshold = Math.max(1, Number.isFinite(thresholdUsd) ? thresholdUsd : 1);
   return levels.filter(level => level.usd >= threshold);

@@ -8,7 +8,8 @@ import { useAlerts } from '../../context/AlertsContext';
 import { useTelegram } from '../../context/TelegramContext';
 import { alertConditionForPrice, chartTelegramAlerts, telegramIdFromChartMarker } from '../../utils/hookChartPriceAlerts';
 import { useLanguage } from '../../context/LanguageContext';
-import { resolveHookChartLanguage } from '../../locales/hookchartLanguage';
+import { resolveHookChartLanguage, translateHookChartPhrase } from '../../locales/hookchartLanguage';
+import { hookChartDensityQuote } from '../../utils/densityNotional';
 import { toHookCandles } from '../../utils/hookchartData';
 import { convertLiveHookChartCandles, type LiveHookChartConversion } from '../../utils/hookChartLiveConversion';
 import { replayHistoryChange } from '../../utils/replayHistoryChange';
@@ -318,6 +319,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [settings, ecoActive, archiveMode]);
   const scalperAnalyzer = useMemo(createScalperAnalyzer, []);
   const chartLanguage = resolveHookChartLanguage(settings, siteLanguage);
+  const densityQuote = hookChartDensityQuote(symbol);
   const [drawings, setDrawingsState] = useState<Drawing[]>(() => archiveMode ? archiveDrawings(archiveSnapshot, symbol) : replay ? [] :
     (preferences?.sharedDrawings !== false ? preferences?.drawings?.[sharedScope] : undefined) || preferences?.drawings?.[scope] || []);
   const [alerts, setAlertsState] = useState<Alert[]>(() => (replay || archiveMode) ? [] :
@@ -654,9 +656,11 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [replay, archiveMode, hasExternalData, terminalMode, historyScope, exchange, marketType, symbol, timeframe, maxChartCandles, hasInitialKlines, historyRetry]);
 
   const activeStrategy = useMemo(() => archiveMode ? null : strategyPreset(runtimeSettings.strategyId || ''), [runtimeSettings.strategyId, archiveMode]);
+  const density24hQuoteRef = useRef<number | null>(null);
   const liveFeed = useOriginalHookChartLiveFeed({
     exchange, marketType, symbol, settings: runtimeSettings, candles, replay,
-    lightweight: ecoActive || archiveMode, needsFunding: activeStrategy?.config.kind === 'overheat',
+    lightweight: ecoActive || archiveMode,
+    volume24hQuoteRef: density24hQuoteRef, needsFunding: activeStrategy?.config.kind === 'overheat',
     // Presets using order-book imbalance keep their evidence when the density overlay is off.
     needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
       activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
@@ -668,10 +672,24 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     [liveFeed.densities],
   );
   // Only filter the chart. Strategy evaluation and density lists retain the full live book.
-  const chartDensities = useMemo(
+  const baseChartDensities = useMemo(
     () => visibleChartDensities(liveFeed.densities, settings.densityMode, settings.densityAutoDisplay),
     [liveFeed.densities, settings.densityMode, settings.densityAutoDisplay],
   );
+  const chartDensities = useMemo(() => {
+    // An RPI-only feed must not make stale regular depth look like a live book.
+    if (!liveFeed.depthReady) return [] as Density[];
+    if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return baseChartDensities;
+    const byLevel = new Map(baseChartDensities.map(row => [row.id, row]));
+    // Replace, never add inclusive totals at the same exact level.
+    for (const row of liveFeed.rpiDensities) {
+      // In AUTO also respect the ordinary opposing-flow cutoff. A shallow RPI
+      // snapshot must not lower the normal instrument's liquidity threshold.
+      const cutoff = row.side === 'BID' ? liveFeed.densityAutoStats.bidCut : liveFeed.densityAutoStats.askCut;
+      if (runtimeSettings.densityMode === 'manual' || row.usd >= cutoff) byLevel.set(row.id, row);
+    }
+    return [...byLevel.values()].map(row => runtimeSettings.densityExactAmounts ? {...row, displayExact:true} : row);
+  }, [liveFeed.depthReady, baseChartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
   // Passive reader only: never enables an indicator or changes chart state,
   // subscriptions, polling, Canvas or DPR. No work when the monitor is off.
   const terminalEvidence = useRef<() => ChartEvidence>(() => ({ manualLevels: [], densityEnabled: false, densities: [], oi: [] }));
@@ -683,7 +701,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     return {
       manualLevels: drawings.filter(d => d.type === 'level').map(d => d.pts[0]?.p).filter(p => p > 0),
       densityEnabled,
-      densities: densityEnabled ? chartDensities.filter(d => d.active).slice(0, 24)
+      densities: densityEnabled ? baseChartDensities.filter(d => d.active).slice(0, 24)
         .map(d => ({ price: d.p, side: d.side, at: d.last, firstAt: d.first, usd: d.usd })) : [],
       oi: marketType === 'futures' && !oiError && oiEvidenceScope.current === normalizeExchangeSymbol(symbol) + ':' + timeframe
         ? (exchange === 'bybit' ? oi.bybit : oi.binance).slice(-24) : [],
@@ -848,6 +866,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const [btcReference, setBtcReference] = useState<{ scope: string; rows: Kline[] } | null>(null);
   const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null; volume24hUsd: number | null } | null>(null);
 
+  density24hQuoteRef.current = showMarketStats && tradeCount24h?.scope === statsScope
+    ? tradeCount24h.volume24hUsd : null;
   useEffect(() => {
     if (!showMarketStats) return;
     const cleanedSymbol = normalizeExchangeSymbol(symbol);
@@ -1732,7 +1752,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           {densityQuickOpen && !ecoActive && toolbarPopup(<div className="densityQuickPopup" style={!integratedToolbar ? { left: densityPopupLeft, top: 32 } : undefined}>
             <div className="densityQuickHead">
               <span>Поріг щільностей</span>
-              <b>{liveFeed.densityCut > 0 ? <>≥ &#36;{liveFeed.densityCut.toLocaleString()}</> : '—'} · {chartDensities.length}/{liveFeed.densities.length}</b>
+              <b>{liveFeed.densityCut > 0 ? <>≥ {liveFeed.densityCut.toLocaleString()} {densityQuote}</> : '—'} · {baseChartDensities.length}/{liveFeed.densities.length}</b>
             </div>
             <div className="densityQuickStatus" role="status" data-live={liveFeed.depthReady && liveFeed.densityCut > 0}>
               {liveFeed.depthReady
@@ -1742,6 +1762,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 : liveFeed.depthStatus === 'reconnecting' ? 'Відновлення стакана'
                 : liveFeed.depthStatus === 'syncing' ? 'Синхронізація стакана' : 'Підключення стакана'}
             </div>
+            {liveFeed.snapshotCoverage && <div className="densityQuickStatus" title={translateHookChartPhrase(chartLanguage,'Діапазон початкового знімка від поточної середини стакана. За межами немає гарантії повноти.')}>BID −{liveFeed.snapshotCoverage.bidPct}% · ASK +{liveFeed.snapshotCoverage.askPct}%</div>}
+            {liveFeed.rpiEnabled && <div className="densityQuickStatus" data-live={liveFeed.rpiReady}>Σ+RPI: {liveFeed.rpiReady ? 'LIVE' : '—'} · {liveFeed.rpiDensities.length}</div>}
+            {liveFeed.tradeIntegrity === 'recovering' && <div className="densityQuickStatus" role="status" data-live={false}>{siteLanguage === 'en' ? 'Verifying trade continuity…' : siteLanguage === 'pl' ? 'Weryfikacja ciągłości transakcji…' : siteLanguage === 'ru' ? 'Проверка непрерывности потока сделок…' : 'Перевірка безперервності потоку угод…'}</div>}
             {liveFeed.tradeIntegrity === 'incomplete' && <div className="densityQuickStatus" role="alert" data-live={false}>
               {siteLanguage === 'en' ? 'Incomplete trade feed — buy/sell analytics paused to prevent inaccurate volume'
                 : siteLanguage === 'pl' ? 'Niepełne dane transakcji — wstrzymano statystyki kupna/sprzedaży'
@@ -1749,9 +1772,9 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 : 'Дані угод неповні — аналітику покупок і продажів призупинено'}
             </div>}
             {settings.densityMode !== 'manual' && liveFeed.depthReady && liveFeed.densityAutoStats.baseline > 0 && <div className="densityQuickAutoStats">
-              <div><span>BID (проти продажів)</span><b>${liveFeed.densityAutoStats.bidCut.toLocaleString()}</b></div>
-              <div><span>ASK (проти покупок)</span><b>${liveFeed.densityAutoStats.askCut.toLocaleString()}</b></div>
-              <small>4× медіана · частка локального стакана ≥25% · зустрічні угоди 5 хв ×0,5</small>
+              <div><span>BID (проти продажів)</span><b>{liveFeed.densityAutoStats.bidCut.toLocaleString()} {densityQuote}</b></div>
+              <div><span>ASK (проти покупок)</span><b>{liveFeed.densityAutoStats.askCut.toLocaleString()} {densityQuote}</b></div>
+              <small>4× медіана · Vol 24h (за наявності) · зустрічний потік до 2,5× · сильні сусідні щільності збережено</small>
             </div>}
             <div className="densityQuickModes">
               <button type="button" className={settings.densityMode !== 'manual' ? 'sel' : ''} onClick={() => {
@@ -1781,7 +1804,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 <small>Поки немає підтверджень. Перемкни «Усі сильні», щоб бачити заявки до контакту з ціною.</small>}
             </div>}
             <label className="densityQuickInput">
-              <span>$</span>
+              <span>{densityQuote ?? "—"}</span>
               <input
                 type="number"
                 min="1"
@@ -1963,6 +1986,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           open
           language={chartLanguage}
           densityCut={liveFeed.densityCut}
+          densityQuote={densityQuote}
           loadedCandles={candles.length}
           historyStatus={historyStatus}
           onRetryHistory={() => setHistoryRetry(previous => previous + 1)}
