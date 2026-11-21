@@ -5,8 +5,8 @@ import type { VisualChartProfile } from './components/hookchart/visualProfiles';
 export type ExchangeId = 'binance' | 'bybit';
 export type MarketType = 'futures' | 'spot';
 export type ChartProvider = 'tradingview' | 'hookchart';
-/** 30s is a Terminal-only display option; exchange candle APIs still start at 1m. */
-export type Timeframe = '30s' | '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+/** Sub-minute display timeframes are Terminal-only; native 1m exchange data stays unchanged. */
+export type Timeframe = '5s' | '30s' | '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 export type ActivePageType = 'patterns' | 'screener' | 'terminal' | 'surveillance' | 'replay' | 'pc';
 
 export interface TerminalChartBlock {

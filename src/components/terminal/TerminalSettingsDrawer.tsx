@@ -494,7 +494,7 @@ export const TerminalSettingsDrawer: React.FC<TerminalSettingsDrawerProps> = ({
               <span>{t('terminal.drawer.globalTimeframe')}</span>
             </label>
             <div className="grid grid-cols-7 gap-1 font-mono">
-              {(['30s', '1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
+              {(['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
                 <button
                   key={tf}
                   type="button"

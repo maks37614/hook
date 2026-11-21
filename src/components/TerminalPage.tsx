@@ -136,10 +136,10 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
     setTerminalArchiveFeedback('');
   }, [user?.uid]);
   const terminalArchiveCopy = useMemo(() => ({
-    uk: { signIn: 'Увійдіть у профіль, щоб зберігати монети.', unavailable: 'Знімок графіка ще не готовий. Дочекайтеся завантаження свічок.', price: 'Ціна монети ще недоступна. Дочекайтеся котирування.', thirty: 'Збереження графіка 30s поки недоступне. Оберіть 1m або старший таймфрейм.', saved: 'Монету додано до Збережених формацій.' },
-    en: { signIn: 'Sign in to save coins.', unavailable: 'Chart snapshot is not ready. Wait until candles load.', price: 'No coin price yet. Wait for a quote.', thirty: 'Saving 30s charts is not supported yet. Choose 1m or higher.', saved: 'Coin added to Saved Formations.' },
-    pl: { signIn: 'Zaloguj się, aby zapisywać monety.', unavailable: 'Zrzut wykresu nie jest gotowy. Poczekaj na świece.', price: 'Brak ceny monety. Poczekaj na notowanie.', thirty: 'Zapisywanie wykresów 30s nie jest jeszcze dostępne. Wybierz 1m lub więcej.', saved: 'Moneta dodana do Zapisanych formacji.' },
-    ru: { signIn: 'Войдите в профиль, чтобы сохранять монеты.', unavailable: 'Снимок графика ещё не готов. Дождитесь свечей.', price: 'Цена монеты пока недоступна. Дождитесь котировки.', thirty: 'Сохранение графиков 30s пока недоступно. Выберите 1m или выше.', saved: 'Монета добавлена в Сохранённые формации.' },
+    uk: { signIn: 'Увійдіть у профіль, щоб зберігати монети.', unavailable: 'Знімок графіка ще не готовий. Дочекайтеся завантаження свічок.', price: 'Ціна монети ще недоступна. Дочекайтеся котирування.', thirty: 'Збереження графіків 5s/30s поки недоступне. Оберіть 1m або старший таймфрейм.', saved: 'Монету додано до Збережених формацій.' },
+    en: { signIn: 'Sign in to save coins.', unavailable: 'Chart snapshot is not ready. Wait until candles load.', price: 'No coin price yet. Wait for a quote.', thirty: 'Saving 5s/30s charts is not supported yet. Choose 1m or higher.', saved: 'Coin added to Saved Formations.' },
+    pl: { signIn: 'Zaloguj się, aby zapisywać monety.', unavailable: 'Zrzut wykresu nie jest gotowy. Poczekaj na świece.', price: 'Brak ceny monety. Poczekaj na notowanie.', thirty: 'Zapisywanie wykresów 5s/30s nie jest jeszcze dostępne. Wybierz 1m lub więcej.', saved: 'Moneta dodana do Zapisanych formacji.' },
+    ru: { signIn: 'Войдите в профиль, чтобы сохранять монеты.', unavailable: 'Снимок графика ещё не готов. Дождитесь свечей.', price: 'Цена монеты пока недоступна. Дождитесь котировки.', thirty: 'Сохранение графиков 5s/30s пока недоступно. Выберите 1m или выше.', saved: 'Монета добавлена в Сохранённые формации.' },
   } as const)[language], [language]);
   const { blocks, config, customPresets, setBlocks: updateBlocks, setConfig, setCustomPresets,
     syncError, retrySync, downloadLocalBackup, importWorkspaceBackup,
@@ -1028,7 +1028,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
   ) => {
     if (savingTerminalArchive || pendingTerminalArchive) return;
     if (!user?.uid) { setTerminalArchiveFeedback(terminalArchiveCopy.signIn); return; }
-    if (block.timeframe === '30s') { setTerminalArchiveFeedback(terminalArchiveCopy.thirty); return; }
+    if ((block.timeframe === '30s' || block.timeframe === '5s')) { setTerminalArchiveFeedback(terminalArchiveCopy.thirty); return; }
     const snapshot = capture.chartSnapshot;
     if (!snapshot?.image || snapshot.marketKey !== archiveVisualMarketKey(
       block.exchange, block.marketType, block.symbol, block.timeframe
@@ -1187,7 +1187,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           node?.querySelector<HTMLElement>('canvas[tabindex="0"]')?.focus({ preventScroll: true });
         }
       } else if (detail.action === 'prevTfAll' || detail.action === 'nextTfAll') {
-        const frames: Timeframe[] = ['30s','1m','5m','15m','1h','4h','1d'];
+        const frames: Timeframe[] = ['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'];
         const index = Math.max(0, frames.indexOf(activeTimeframe));
         const next = Math.max(0, Math.min(frames.length - 1,
           index + (detail.action === 'nextTfAll' ? 1 : -1)));
@@ -1268,7 +1268,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           break;
         }
         case 'previousTimeframe': case 'nextTimeframe': {
-          const frames: Timeframe[] = ['30s', '1m', '5m', '15m', '1h', '4h', '1d'];
+          const frames: Timeframe[] = ['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'];
           const index = Math.max(0, frames.indexOf(activeTimeframe));
           const next = Math.max(0, Math.min(frames.length - 1, index + (action === 'nextTimeframe' ? 1 : -1)));
           if (next !== index) terminalShortcutHandlersRef.current.handleApplyGlobalTimeframe(frames[next]);
@@ -1556,7 +1556,7 @@ export const TerminalPage: React.FC<TerminalPageProps> = ({
           <div className="contents min-[1280px]:col-start-3 min-[1280px]:row-start-1 min-[1280px]:flex min-[1280px]:items-center min-[1280px]:justify-self-start min-[1280px]:gap-1">
           {/* Timeframe Selector */}
           <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-self-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono min-[720px]:col-start-3 min-[720px]:row-start-1">
-            {(['30s', '1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
+            {(['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
               <button
                 key={tf}
                 type="button"
