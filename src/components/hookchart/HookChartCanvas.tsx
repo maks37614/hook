@@ -676,9 +676,14 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return chartDensities;
     const byLevel = new Map(chartDensities.map(row => [row.id, row]));
     // Replace, never add inclusive totals at the same exact level.
-    for (const row of liveFeed.rpiDensities) byLevel.set(row.id, row);
+    for (const row of liveFeed.rpiDensities) {
+      // In AUTO also respect the ordinary opposing-flow cutoff. A shallow RPI
+      // snapshot must not lower the normal instrument's liquidity threshold.
+      const cutoff = row.side === 'BID' ? liveFeed.densityAutoStats.bidCut : liveFeed.densityAutoStats.askCut;
+      if (runtimeSettings.densityMode === 'manual' || row.usd >= cutoff) byLevel.set(row.id, row);
+    }
     return [...byLevel.values()].map(row => runtimeSettings.densityExactAmounts ? {...row, displayExact:true} : row);
-  }, [chartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts]);
+  }, [chartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
   // Passive reader only: never enables an indicator or changes chart state,
   // subscriptions, polling, Canvas or DPR. No work when the monitor is off.
   const terminalEvidence = useRef<() => ChartEvidence>(() => ({ manualLevels: [], densityEnabled: false, densities: [], oi: [] }));

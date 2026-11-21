@@ -240,7 +240,7 @@ export function useOriginalHookChartLiveFeed({
       if (!view.depthReady) { stopClock?.(); stopClock = null; }
       else if (!stopClock) stopClock = sharedChartClock.subscribe(publish);
       setRpiView(previous => view.depthReady
-        ? {scope:rpiScope, rows:view.densities.map(row => ({...row, rpiInclusive:true}))}
+        ? (!view.densities.length && previous?.scope === rpiScope && !previous.rows.length ? previous : {scope:rpiScope, rows:view.densities.map(row => ({...row, rpiInclusive:true}))})
         : previous === null ? previous : null);
     };
     const stop = connectSharedHookChartDepth({exchange, marketType, symbol, includeRpi:true,

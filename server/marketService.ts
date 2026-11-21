@@ -879,7 +879,7 @@ export async function fetchOrderBook(
         bids,
         asks,
         lastUpdateId: data.lastUpdateId,
-        timestamp: Date.now(),
+        timestamp: includeRpi && Number.isFinite(data.E) ? data.E : Date.now(),
       };
     } catch {
       // Try next
