@@ -20,3 +20,8 @@ test('one wall is not hidden by another, but ordinary small amounts remain filte
  assert.equal(passesAutoLocalLiquidity(6_000,4_000,5_000),true);
  assert.equal(passesAutoLocalLiquidity(3_999,4_000,0),false);
 });
+
+test('large adjacent walls can bypass local-share rejection without bypassing their side cut',()=>{
+ assert.equal(passesAutoLocalLiquidity(50_000,32_000,80_000,20_000),true);
+ assert.equal(passesAutoLocalLiquidity(30_000,32_000,80_000,20_000),false);
+});

@@ -148,3 +148,13 @@ test('a cancelled wall returning between 200ms visual frames gets a new age',()=
  assert.equal(book.read(hold,0,now+2300).densities.length,0);
  assert.equal(book.read(hold,0,now+4300).densities.length,1);
 });
+
+
+test('AUTO preserves multiple large adjacent walls even when strong sell flow and 24h turnover raise the cut',()=>{
+  const book=new HookChartDensityBook();
+  book.apply(makeBook(100,1000,Object.fromEntries([3,4,5,6,7,8].map(i=>[i,50_000]))),now);
+  book.recordAggressiveTrade({id:'sell-impulse',t:now,p:99.9,usd:400_000,side:'SELL'},now);
+  const result=book.read(auto,0,now,1_000_000_000);
+  assert.ok(result.autoStats.bidCut>result.autoStats.baseline);
+  assert.equal(result.densities.filter(d=>d.side==='BID').length,6);
+});

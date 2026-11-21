@@ -34,7 +34,11 @@ export function autoDensitySideCuts(base: number, buy5m: number, sell5m: number)
 /** A genuine exceptional wall must not disappear solely because several
  * other, independently priced large walls stand in the same nearby cluster.
  */
-export function passesAutoLocalLiquidity(usd: number, sideCut: number, localFloor: number): boolean {
+export function passesAutoLocalLiquidity(usd: number, sideCut: number, localFloor: number, bookCut = sideCut): boolean {
   if (!(finitePositive(sideCut) > 0) || !(finitePositive(usd) >= sideCut)) return false;
-  return usd >= Math.max(0,localFloor) || usd >= sideCut * 2.5;
+  // The flow-adjusted side cut may be higher after an impulse. Test an
+  // exceptional nearby wall against the book/turnover anchor, not that spike.
+  const anchor = finitePositive(bookCut) || sideCut;
+  const exceptional = anchor * 2.5;
+  return usd >= Math.max(0, localFloor) || usd >= exceptional - Math.max(1e-7, exceptional * 1e-12);
 }

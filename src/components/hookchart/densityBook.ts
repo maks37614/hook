@@ -227,7 +227,7 @@ export class HookChartDensityBook {
       );
       for (const row of filterOrderBookDensities(levels, cut)) {
         if (localShareFloor && !passesAutoLocalLiquidity(row.usd,
-          row.side === 'BID' ? bidCut : askCut, localShareFloor(row))) continue;
+          row.side === 'BID' ? bidCut : askCut, localShareFloor(row), baseCut)) continue;
         const id = `${row.side}:${row.p}`;
         seen.add(id);
         let density = this.tracked.get(id);
