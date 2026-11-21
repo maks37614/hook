@@ -56,7 +56,14 @@ export function densityEventAmountText(
   // Symbol metadata determines quote units; the '$293.51' price remains intact.
   const amountText = symbol ? formatDensityLevelCompact(amount, symbol, language) : formatDensityUsdCompact(amount, language);
   if (amountText === '—') return text;
-  return text.replace(/\$\d+(?:\.\d+)?M\b|\d+(?:[.,]\d+)?(?:к|k|млн|mln|m)\$/gi, amountText);
+  const compactCorrected = text.replace(/\$\d+(?:\.\d+)?M\b|\d+(?:[.,]\d+)?(?:к|k|млн|mln|m)\$/gi, amountText);
+  if (!symbol || !hookChartDensityQuote(symbol)) return compactCorrected;
+  const exact = formatDensityLevelExact(amount, symbol, language);
+  // Only replace the old exact figure in the two known density-event templates.
+  // Never rewrite a '$293.51' quote price or infer a number from historical text.
+  return compactCorrected
+    .replace(/\(точно\s+[\d\s\u00a0\u202f.,]+\$\)/u, `(точно ${exact})`)
+    .replace(/^(Ліквідність\s+)[\d\s\u00a0\u202f.,]+\$(?=\s+за\s+ціною)/u, (_whole, prefix: string) => prefix + exact);
 }
 
 /** Chart catalogue currently contains USDT-quoted spot and linear perpetual instruments.

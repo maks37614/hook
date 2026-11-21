@@ -36,6 +36,14 @@ test('verified numeric density evidence corrects an existing rounded event, with
   assert.equal(densityEventAmountText(old, 'DENSITY_APPEARED', evidence, 'uk', 'GOOGLUSDT'), '⚡ Нова щільність BID 12,33k USDT');
   assert.equal(densityEventAmountText(description, 'DENSITY_APPEARED', evidence, 'uk', 'GOOGLUSDT'), 'Ліквідність рівня 12,33k USDT за ціною $293.51.');
   assert.equal(densityEventAmountText(old, 'DENSITY_APPEARED', evidence, 'uk', 'GOOGLUSDC'), old);
+  const legacyExact = formatDensityUsdExact(evidence.notionalUsd);
+  const correctedExact = formatDensityLevelExact(evidence.notionalUsd, 'GOOGLUSDT');
+  const oldDetail = `Ліквідність 12,33к$ (точно ${legacyExact}) за ціною $293.51.`;
+  assert.equal(densityEventAmountText(oldDetail, 'DENSITY_APPEARED', evidence, 'uk', 'GOOGLUSDT'),
+    `Ліквідність 12,33k USDT (точно ${correctedExact}) за ціною $293.51.`);
+  assert.equal(densityEventAmountText(`Ліквідність ${legacyExact} за ціною 293.51`,
+    'DENSITY_PERSISTENT', evidence, 'uk', 'GOOGLUSDT'),
+    `Ліквідність ${correctedExact} за ціною 293.51`);
   assert.equal(densityEventAmountText(old, 'DENSITY_APPEARED', null), old);
   assert.equal(densityEventAmountText(old, 'DENSITY_APPEARED', { notionalUsd: '12000' }), old);
   assert.equal(densityEventAmountText(old, 'THIRD_TOUCH', evidence), old);
