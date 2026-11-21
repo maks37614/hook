@@ -125,7 +125,7 @@ test('Terminal keeps live feeds separate from optional polls and history', () =>
   const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
   const sharedKlines = readFileSync(new URL('../src/components/hookchart/sharedKlineStream.ts', import.meta.url), 'utf8');
   const chart = readFileSync(new URL('../src/components/TradingViewChart.tsx', import.meta.url), 'utf8');
-  assert.match(hook, /timeframe === '30s' \|\| \(terminalMode && historyRetry === 0\)/);
+  assert.match(hook, /\(timeframe === '5s' \|\| timeframe === '30s'\) \|\| \(terminalMode && historyRetry === 0\)/);
   assert.match(hook, /fetchSharedHistoricalKlines/);
   assert.match(hook, /sharedPublicChartPolling\.subscribe/);
   assert.match(terminal, /marketRefreshDemandRef/);
