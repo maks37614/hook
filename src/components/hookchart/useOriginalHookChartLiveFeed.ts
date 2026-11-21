@@ -231,14 +231,11 @@ export function useOriginalHookChartLiveFeed({
     const inclusiveBook = new HookChartDensityBook();
     let dead = false;
     let lastPublish = 0;
-    let stopClock: (()=>void) | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const publish = () => {
       if (dead) return;
       lastPublish = Date.now();
       const view = inclusiveBook.read(settingsRef.current, atrRef.current);
-      if (!view.depthReady) { stopClock?.(); stopClock = null; }
-      else if (!stopClock) stopClock = sharedChartClock.subscribe(publish);
       setRpiView(previous => view.depthReady
         ? (!view.densities.length && previous?.scope === rpiScope && !previous.rows.length ? previous : {scope:rpiScope, rows:view.densities.map(row => ({...row, rpiInclusive:true}))})
         : previous === null ? previous : null);
@@ -256,13 +253,12 @@ export function useOriginalHookChartLiveFeed({
       onStatus: status => {
         if (!dead && status !== 'live') {
           inclusiveBook.clear();
-          stopClock?.(); stopClock = null;
           if (timer !== null) { clearTimeout(timer); timer = null; }
           setRpiView(null);
         }
       },
     });
-    return () => { dead = true; stop(); stopClock?.(); if (timer !== null) clearTimeout(timer); inclusiveBook.clear(); };
+    return () => { dead = true; stop(); if (timer !== null) clearTimeout(timer); inclusiveBook.clear(); };
   }, [rpiEnabled, rpiScope, exchange, marketType, symbol]);
 
   // Market prints can run without the depth engine. A market-trade stream is

@@ -668,13 +668,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     [liveFeed.densities],
   );
   // Only filter the chart. Strategy evaluation and density lists retain the full live book.
-  const chartDensities = useMemo(
+  const baseChartDensities = useMemo(
     () => visibleChartDensities(liveFeed.densities, settings.densityMode, settings.densityAutoDisplay),
     [liveFeed.densities, settings.densityMode, settings.densityAutoDisplay],
   );
-  const renderedDensities = useMemo(() => {
-    if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return chartDensities;
-    const byLevel = new Map(chartDensities.map(row => [row.id, row]));
+  const chartDensities = useMemo(() => {
+    if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return baseChartDensities;
+    const byLevel = new Map(baseChartDensities.map(row => [row.id, row]));
     // Replace, never add inclusive totals at the same exact level.
     for (const row of liveFeed.rpiDensities) {
       // In AUTO also respect the ordinary opposing-flow cutoff. A shallow RPI
@@ -683,7 +683,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       if (runtimeSettings.densityMode === 'manual' || row.usd >= cutoff) byLevel.set(row.id, row);
     }
     return [...byLevel.values()].map(row => runtimeSettings.densityExactAmounts ? {...row, displayExact:true} : row);
-  }, [chartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
+  }, [baseChartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
   // Passive reader only: never enables an indicator or changes chart state,
   // subscriptions, polling, Canvas or DPR. No work when the monitor is off.
   const terminalEvidence = useRef<() => ChartEvidence>(() => ({ manualLevels: [], densityEnabled: false, densities: [], oi: [] }));
@@ -695,7 +695,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     return {
       manualLevels: drawings.filter(d => d.type === 'level').map(d => d.pts[0]?.p).filter(p => p > 0),
       densityEnabled,
-      densities: densityEnabled ? chartDensities.filter(d => d.active).slice(0, 24)
+      densities: densityEnabled ? baseChartDensities.filter(d => d.active).slice(0, 24)
         .map(d => ({ price: d.p, side: d.side, at: d.last, firstAt: d.first, usd: d.usd })) : [],
       oi: marketType === 'futures' && !oiError && oiEvidenceScope.current === normalizeExchangeSymbol(symbol) + ':' + timeframe
         ? (exchange === 'bybit' ? oi.bybit : oi.binance).slice(-24) : [],
@@ -1744,7 +1744,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           {densityQuickOpen && !ecoActive && toolbarPopup(<div className="densityQuickPopup" style={!integratedToolbar ? { left: densityPopupLeft, top: 32 } : undefined}>
             <div className="densityQuickHead">
               <span>Поріг щільностей</span>
-              <b>{liveFeed.densityCut > 0 ? <>≥ &#36;{liveFeed.densityCut.toLocaleString()}</> : '—'} · {chartDensities.length}/{liveFeed.densities.length}</b>
+              <b>{liveFeed.densityCut > 0 ? <>≥ &#36;{liveFeed.densityCut.toLocaleString()}</> : '—'} · {baseChartDensities.length}/{liveFeed.densities.length}</b>
             </div>
             <div className="densityQuickStatus" role="status" data-live={liveFeed.depthReady && liveFeed.densityCut > 0}>
               {liveFeed.depthReady
@@ -2141,7 +2141,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         onSelectPriceAlert={archiveMode ? undefined : choosePriceMarker}
         onCreatePriceAlert={(price) => { if (!replay && !archiveMode) void createTelegramPriceAlert(price); }}
         setAlerts={setAlerts}
-        densities={archiveMode ? archivedDensities : replay ? [] : renderedDensities}
+        densities={archiveMode ? archivedDensities : replay ? [] : chartDensities}
         marketPrints={replay ? [] : liveFeed.marketPrints}
         liquidations={replay ? [] : liveFeed.liquidations}
         liquidationHeatmap={mapChartData}

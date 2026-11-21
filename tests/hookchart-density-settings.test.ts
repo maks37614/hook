@@ -52,6 +52,8 @@ test('Basic settings group supported density controls, including line appearance
       .map(node => node.textContent!.replace(/\?/g, '').trim());
     const expected = [
       'Аналіз великих лімітних заявок (щільностей)',
+      'Показувати щільності з RPI',
+      'Точні суми щільностей',
       'Таблиця ТОП ордерів',
       'Показувати об’єм у базовій монеті',
       'Показувати дисбаланс',
