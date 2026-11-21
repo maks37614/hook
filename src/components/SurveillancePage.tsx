@@ -1345,7 +1345,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                                       : 'bg-cyan-400'
                                   }`}
                                 />
-                                <span className="truncate">{densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}</span>
+                                <span className="truncate">{densityEventAmountText(ev.title, ev.details?.notificationType, ev.details?.evidence, language, coin.symbol)}</span>
                               </span>
                               <span className="text-slate-400 whitespace-nowrap ml-1">
                                 {formatTimeAgo(ev.timestamp)}
@@ -1353,7 +1353,7 @@ export const SurveillancePage: React.FC<SurveillancePageProps> = ({
                             </div>
                             {ev.description && (
                               <p className="text-[10px] text-slate-400 pt-1 leading-snug line-clamp-2">
-                                {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language, ev.symbol)}
+                                {densityEventAmountText(ev.description, ev.details?.notificationType, ev.details?.evidence, language, coin.symbol)}
                               </p>
                             )}
                           </div>
