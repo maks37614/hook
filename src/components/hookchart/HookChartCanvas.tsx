@@ -656,9 +656,11 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [replay, archiveMode, hasExternalData, terminalMode, historyScope, exchange, marketType, symbol, timeframe, maxChartCandles, hasInitialKlines, historyRetry]);
 
   const activeStrategy = useMemo(() => archiveMode ? null : strategyPreset(runtimeSettings.strategyId || ''), [runtimeSettings.strategyId, archiveMode]);
+  const density24hQuoteRef = useRef<number | null>(null);
   const liveFeed = useOriginalHookChartLiveFeed({
     exchange, marketType, symbol, settings: runtimeSettings, candles, replay,
-    lightweight: ecoActive || archiveMode, needsFunding: activeStrategy?.config.kind === 'overheat',
+    lightweight: ecoActive || archiveMode,
+    volume24hQuoteRef: density24hQuoteRef, needsFunding: activeStrategy?.config.kind === 'overheat',
     // Presets using order-book imbalance keep their evidence when the density overlay is off.
     needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
       activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
@@ -862,6 +864,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const [btcReference, setBtcReference] = useState<{ scope: string; rows: Kline[] } | null>(null);
   const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null; volume24hUsd: number | null } | null>(null);
 
+  density24hQuoteRef.current = showMarketStats && tradeCount24h?.scope === statsScope
+    ? tradeCount24h.volume24hUsd : null;
   useEffect(() => {
     if (!showMarketStats) return;
     const cleanedSymbol = normalizeExchangeSymbol(symbol);
@@ -1768,7 +1772,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
             {settings.densityMode !== 'manual' && liveFeed.depthReady && liveFeed.densityAutoStats.baseline > 0 && <div className="densityQuickAutoStats">
               <div><span>BID (проти продажів)</span><b>{liveFeed.densityAutoStats.bidCut.toLocaleString()} {densityQuote}</b></div>
               <div><span>ASK (проти покупок)</span><b>{liveFeed.densityAutoStats.askCut.toLocaleString()} {densityQuote}</b></div>
-              <small>4× медіана · частка локального стакана ≥25% · зустрічні угоди 5 хв ×0,5</small>
+              <small>4× медіана · Vol 24h (за наявності) · зустрічний потік до 2,5× · сильні сусідні щільності збережено</small>
             </div>}
             <div className="densityQuickModes">
               <button type="button" className={settings.densityMode !== 'manual' ? 'sel' : ''} onClick={() => {

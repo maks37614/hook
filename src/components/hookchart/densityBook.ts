@@ -3,6 +3,7 @@ import type { BookUpdate } from '../../utils/binanceOrderBook';
 import { isFreshDepthTime, ORDER_BOOK_MAX_AGE_MS, parseDepthLevels } from '../../utils/orderBookValidation';
 import type { Density } from './engine';
 import { assessDensityReaction } from './reactionPotential';
+import { autoDensityBaseCut, autoDensitySideCuts, passesAutoLocalLiquidity } from './densityAutoPolicy';
 import { orderBookAutoThreshold, createOrderBookLocalShareFloorLookup, filterOrderBookDensities, getOrderBookDensityLevels, normalizeDensityDistance } from './marketAnalytics';
 
 export type DensityAutoStats = {
@@ -29,6 +30,8 @@ export class HookChartDensityBook {
   private thresholdAt = 0;
   private thresholdKey = '';
   private autoThreshold = 0;
+  private lastBidCut = 0;
+  private lastAskCut = 0;
   // The hold-time refresh needs new scores, not a full re-sort of unchanged
   // exchange depth. Invalidate implicitly on any new sequence or distance.
   private levelView: {
@@ -109,6 +112,7 @@ export class HookChartDensityBook {
     this.ready = false;
     this.receivedAt = this.sourceTime = this.sequence = this.thresholdAt = this.autoThreshold = 0;
     this.thresholdKey = '';
+    this.lastBidCut = this.lastAskCut = 0;
     this.levelView = null;
     this.snapshotLow = this.snapshotHigh = 0;
     this.tradeSeconds.clear();
@@ -133,10 +137,20 @@ export class HookChartDensityBook {
       for (const [price, quantity] of rows) {
         if (quantity > 0) {
           target.set(price, quantity);
+          const id = `${bid ? 'BID' : 'ASK'}:${price}`;
+          const sideCut = bid ? this.lastBidCut : this.lastAskCut;
+          if (sideCut > 0 && price * quantity < sideCut) {
+            this.tracked.delete(id);
+            this.executions.delete(id);
+          }
           if (bid && price > this.bestBid) this.bestBid = price;
           if (!bid && price < this.bestAsk) this.bestAsk = price;
         } else if (target.delete(price)) {
           // Reset age even if the wall returns between two visual frames.
+          const id = `${bid ? 'BID' : 'ASK'}:${price}`;
+          this.tracked.delete(id);
+          this.executions.delete(id);
+          // Preserve true wall age even when cancel/re-add happens between chart paints.
           const id = `${bid ? 'BID' : 'ASK'}:${price}`;
           this.tracked.delete(id);
           this.executions.delete(id);
@@ -173,7 +187,7 @@ export class HookChartDensityBook {
     return true;
   }
 
-  read(settings: HookChartPreferences, atr: number, now = Date.now(), tradeEvidenceReady = true) {
+  read(settings: HookChartPreferences, atr: number, now = Date.now(), tradeEvidenceReady = true, volume24hQuote?: number | null) {
     if (!this.ready || now - this.receivedAt > ORDER_BOOK_MAX_AGE_MS || !isFreshDepthTime(this.sourceTime, now)) {
       this.clear();
       return { densities: [] as Density[], book: { b: [], a: [] }, densityCut: 0, depthReady: false, price: 0, autoStats: EMPTY_AUTO_STATS, snapshotCoverage: null };
@@ -191,11 +205,13 @@ export class HookChartDensityBook {
     const { levels, book } = this.levelView;
     const multiplier = Number.isFinite(settings.densityAutoMultiplier)
       ? Math.max(.1, Math.min(10, settings.densityAutoMultiplier!)) : 1;
-    const key = `${distance}:${multiplier}`;
+    const dailyBucket = volume24hQuote && volume24hQuote > 0 && Number.isFinite(volume24hQuote)
+      ? Math.floor(Math.log2(volume24hQuote) * 8) : 0;
+    const key = `${distance}:${multiplier}:${dailyBucket}`;
     if (!this.autoThreshold || this.thresholdKey !== key || now - this.thresholdAt >= 5000) {
       const baseline = orderBookAutoThreshold(levels.map(row => row.usd));
-      const adjusted = baseline * multiplier;
-      this.autoThreshold = Number.isFinite(adjusted) && adjusted > 0 ? Math.max(1, Math.ceil(adjusted)) : 0;
+      const spreadPct = (this.bestAsk - this.bestBid) / price * 100;
+      this.autoThreshold = autoDensityBaseCut(baseline, multiplier, volume24hQuote, spreadPct);
       this.thresholdKey = key;
       this.thresholdAt = now;
     }
@@ -204,8 +220,10 @@ export class HookChartDensityBook {
     // Both depth and aggressive executions use the same symbol's USDT quote units.
     const { buy, sell } = tradeEvidenceReady ? this.opposingFlow(now) : {buy:0,sell:0};
     // BID absorbs aggressive sells; ASK absorbs aggressive buys.
-    const bidCut = !baseCut ? 0 : manual ? baseCut : Math.max(baseCut, Math.ceil(sell * .5));
-    const askCut = !baseCut ? 0 : manual ? baseCut : Math.max(baseCut, Math.ceil(buy * .5));
+    const { bidCut, askCut } = manual ? { bidCut: baseCut, askCut: baseCut }
+      : autoDensitySideCuts(baseCut, buy, sell);
+    this.lastBidCut = bidCut;
+    this.lastAskCut = askCut;
     const cut = baseCut ? Math.min(bidCut, askCut) : 0;
     const autoStats: DensityAutoStats = {
       baseline: this.autoThreshold, bidCut, askCut, buy5m: buy, sell5m: sell,
@@ -222,10 +240,8 @@ export class HookChartDensityBook {
           createOrderBookLocalShareFloorLookup(levels)
       );
       for (const row of filterOrderBookDensities(levels, cut)) {
-        if (localShareFloor && row.usd < Math.max(
-          row.side === 'BID' ? bidCut : askCut,
-          localShareFloor(row),
-        )) continue;
+        if (localShareFloor && !passesAutoLocalLiquidity(row.usd,
+          row.side === 'BID' ? bidCut : askCut, localShareFloor(row), baseCut)) continue;
         const id = `${row.side}:${row.p}`;
         seen.add(id);
         let density = this.tracked.get(id);
