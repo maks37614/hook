@@ -85,6 +85,7 @@ export function useOriginalHookChartLiveFeed({
   const rpiEnabled = depthEnabled && settings.densityIncludeRpi === true && settings.densityAnalysis !== false && (settings.showDensityLines !== false || settings.showDensityLabels !== false) && supportsChartRpi(exchange, marketType);
   const rpiScope = `${exchange}:${marketType}:${symbol}`;
   const [rpiView, setRpiView] = useState<{scope:string; rows:Density[]}|null>(null);
+  const [snapshotCoverage, setSnapshotCoverage] = useState<{bidPct:number;askPct:number}|null>(null);
   const depthScope = `${exchange}:${marketType}:${symbol}:${replay}`;
   const priceRef = useRef(0);
   const atrRef = useRef(0);
@@ -135,6 +136,7 @@ export function useOriginalHookChartLiveFeed({
       depthScopeRef.current = '';
       depthBook.clear();
       setDepthReady(false);
+      setSnapshotCoverage(null);
       setDensities([]);
       setBook(EMPTY_DEPTH_BOOK);
       setDensityCut(0);
@@ -168,6 +170,7 @@ export function useOriginalHookChartLiveFeed({
       setBook(current => current === next.book ? current : next.book);
       setDensityCut(next.densityCut);
       setDensityAutoStats(current => equalDepthAutoStats(current, next.autoStats) ? current : next.autoStats);
+      setSnapshotCoverage(previous => previous?.bidPct === next.snapshotCoverage?.bidPct && previous?.askPct === next.snapshotCoverage?.askPct ? previous : next.snapshotCoverage);
       setDepthReady(next.depthReady);
       if (!next.depthReady) setDepthStatus(current => current === 'live' ? 'reconnecting' : current);
       return next.depthReady;
@@ -228,12 +231,15 @@ export function useOriginalHookChartLiveFeed({
     const inclusiveBook = new HookChartDensityBook();
     let dead = false;
     let lastPublish = 0;
+    let stopClock: (()=>void) | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const publish = () => {
       if (dead) return;
       lastPublish = Date.now();
       const view = inclusiveBook.read(settingsRef.current, atrRef.current);
-      setRpiView(previous => view.depthReady && view.densities.length
+      if (!view.depthReady) { stopClock?.(); stopClock = null; }
+      else if (!stopClock) stopClock = sharedChartClock.subscribe(publish);
+      setRpiView(previous => view.depthReady
         ? {scope:rpiScope, rows:view.densities.map(row => ({...row, rpiInclusive:true}))}
         : previous === null ? previous : null);
     };
@@ -250,13 +256,13 @@ export function useOriginalHookChartLiveFeed({
       onStatus: status => {
         if (!dead && status !== 'live') {
           inclusiveBook.clear();
+          stopClock?.(); stopClock = null;
           if (timer !== null) { clearTimeout(timer); timer = null; }
           setRpiView(null);
         }
       },
     });
-    const stopClock = sharedChartClock.subscribe(publish);
-    return () => { dead = true; stop(); stopClock(); if (timer !== null) clearTimeout(timer); inclusiveBook.clear(); };
+    return () => { dead = true; stop(); stopClock?.(); if (timer !== null) clearTimeout(timer); inclusiveBook.clear(); };
   }, [rpiEnabled, rpiScope, exchange, marketType, symbol]);
 
   // Market prints can run without the depth engine. A market-trade stream is
@@ -380,6 +386,9 @@ export function useOriginalHookChartLiveFeed({
   return {
     densities: !lightweight && currentDepth ? densities : EMPTY_DENSITIES,
     rpiDensities: rpiEnabled && rpiView?.scope === rpiScope ? rpiView.rows : EMPTY_DENSITIES,
+    rpiReady: rpiEnabled && rpiView?.scope === rpiScope,
+    rpiEnabled,
+    snapshotCoverage: currentDepth ? snapshotCoverage : null,
     marketPrints: lightweight || tradeIntegrity !== 'verified' ? EMPTY_MARKET_PRINTS : marketPrints,
     tradeIntegrity: lightweight ? 'verified' as const : tradeIntegrity,
     liquidations: visibleLiquidations,

@@ -42,7 +42,7 @@ function validUpdate(value: unknown, now: number): value is BookUpdate {
  * Scope keys contain only public exchange symbols; no account information.
  */
 export function isBridgeableDepthScope(
-  options: Pick<DesktopDepthOptions, 'exchange' | 'marketType' | 'symbol' | 'origin'>,
+  options: Pick<DesktopDepthOptions, 'exchange' | 'marketType' | 'symbol' | 'origin' | 'includeRpi'>,
   activeScopes = 0,
   alreadyActive = false,
 ): boolean {
@@ -80,7 +80,7 @@ export function createDesktopDepthBridge(config: {
   const active = new Map<string, { stop: () => void }>();
 
   function subscribe(options: DesktopDepthOptions): () => void {
-    const instrument = chartDepthScope(options.exchange, options.marketType, options.symbol);
+    const instrument = chartDepthScope(options.exchange, options.marketType, options.symbol, options.includeRpi);
     const key = (options.origin || '') + '|' + instrument;
     // Unsupported markets still use the original local WebSocket. Unicode
     // instruments are valid when the exchange accepts the same symbol.

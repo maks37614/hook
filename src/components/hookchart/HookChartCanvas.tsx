@@ -8,7 +8,7 @@ import { useAlerts } from '../../context/AlertsContext';
 import { useTelegram } from '../../context/TelegramContext';
 import { alertConditionForPrice, chartTelegramAlerts, telegramIdFromChartMarker } from '../../utils/hookChartPriceAlerts';
 import { useLanguage } from '../../context/LanguageContext';
-import { resolveHookChartLanguage } from '../../locales/hookchartLanguage';
+import { resolveHookChartLanguage, translateHookChartPhrase } from '../../locales/hookchartLanguage';
 import { toHookCandles } from '../../utils/hookchartData';
 import { convertLiveHookChartCandles, type LiveHookChartConversion } from '../../utils/hookChartLiveConversion';
 import { replayHistoryChange } from '../../utils/replayHistoryChange';
@@ -1749,6 +1749,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 : liveFeed.depthStatus === 'reconnecting' ? 'Відновлення стакана'
                 : liveFeed.depthStatus === 'syncing' ? 'Синхронізація стакана' : 'Підключення стакана'}
             </div>
+            {liveFeed.snapshotCoverage && <div className="densityQuickStatus" title={translateHookChartPhrase(chartLanguage,'Діапазон початкового знімка від поточної середини стакана. За межами немає гарантії повноти.')}>BID −{liveFeed.snapshotCoverage.bidPct}% · ASK +{liveFeed.snapshotCoverage.askPct}%</div>}
+            {liveFeed.rpiEnabled && <div className="densityQuickStatus" data-live={liveFeed.rpiReady}>Σ+RPI: {liveFeed.rpiReady ? 'LIVE' : '—'} · {liveFeed.rpiDensities.length}</div>}
             {liveFeed.tradeIntegrity === 'incomplete' && <div className="densityQuickStatus" role="alert" data-live={false}>
               {siteLanguage === 'en' ? 'Incomplete trade feed — buy/sell analytics paused to prevent inaccurate volume'
                 : siteLanguage === 'pl' ? 'Niepełne dane transakcji — wstrzymano statystyki kupna/sprzedaży'

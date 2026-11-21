@@ -24,6 +24,8 @@ export class HookChartDensityBook {
   private receivedAt = 0;
   private sourceTime = 0;
   private sequence = 0;
+  private snapshotLow = 0;
+  private snapshotHigh = 0;
   private thresholdAt = 0;
   private thresholdKey = '';
   private autoThreshold = 0;
@@ -108,6 +110,7 @@ export class HookChartDensityBook {
     this.receivedAt = this.sourceTime = this.sequence = this.thresholdAt = this.autoThreshold = 0;
     this.thresholdKey = '';
     this.levelView = null;
+    this.snapshotLow = this.snapshotHigh = 0;
     this.tradeSeconds.clear();
     this.executions.clear();
     this.seenTradeIds.clear();
@@ -157,6 +160,12 @@ export class HookChartDensityBook {
       this.clear();
       return false;
     }
+    if (update.isSnapshot) {
+      this.snapshotLow = Infinity;
+      for (const p of this.bids.keys()) this.snapshotLow = Math.min(this.snapshotLow,p);
+      this.snapshotHigh = 0;
+      for (const p of this.asks.keys()) this.snapshotHigh = Math.max(this.snapshotHigh,p);
+    }
     this.sequence = update.sequence;
     this.receivedAt = now;
     this.sourceTime = update.eventTime ?? now;
@@ -167,7 +176,7 @@ export class HookChartDensityBook {
   read(settings: HookChartPreferences, atr: number, now = Date.now()) {
     if (!this.ready || now - this.receivedAt > ORDER_BOOK_MAX_AGE_MS || !isFreshDepthTime(this.sourceTime, now)) {
       this.clear();
-      return { densities: [] as Density[], book: { b: [], a: [] }, densityCut: 0, depthReady: false, price: 0, autoStats: EMPTY_AUTO_STATS };
+      return { densities: [] as Density[], book: { b: [], a: [] }, densityCut: 0, depthReady: false, price: 0, autoStats: EMPTY_AUTO_STATS, snapshotCoverage: null };
     }
     const price = (this.bestBid + this.bestAsk) / 2;
     const distance = normalizeDensityDistance(settings.densityDiffPct);
@@ -283,6 +292,9 @@ export class HookChartDensityBook {
     const minAge = Math.max(0, settings.densityTimeoutMin || 0) * 60_000;
     const densities = [...this.tracked.values()].filter(row => now - row.first >= minAge)
       .sort((a, b) => b.score - a.score).map(row => ({ ...row }));
-    return { densities, book, densityCut: cut, depthReady: true, price, autoStats };
+    // Initial snapshot bounds relative to current midpoint, not a guarantee of current full depth.
+    const snapshotCoverage = this.snapshotLow > 0 && this.snapshotHigh > 0
+      ? {bidPct: Math.max(0, Math.floor((price-this.snapshotLow)/price*10000)/100), askPct: Math.max(0, Math.floor((this.snapshotHigh-price)/price*10000)/100)} : null;
+    return { densities, book, densityCut: cut, depthReady: true, price, autoStats, snapshotCoverage };
   }
 }

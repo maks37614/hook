@@ -189,3 +189,12 @@ test('zero and reinsertion between visual refreshes resets wall age', () => {
   assert.ok(!book.read(settings,0,now+1300).densities.some(d=>d.p===99));
   assert.equal(book.read(settings,0,now+2350).densities.find(d=>d.p===99)?.usd,198000);
 });
+
+test('initial snapshot range is disclosed and changes with midpoint',()=>{
+ const book=new HookChartDensityBook(); book.apply(snapshot(),now);
+ assert.deepEqual(book.read(manual,0,now).snapshotCoverage,{bidPct:5,askPct:5});
+ book.apply({sequence:101,bids:[[99.9,0],[100,1]],asks:[]},now+1);
+ const coverage=book.read(manual,0,now+1).snapshotCoverage!;
+ assert.ok(coverage.bidPct>5 && coverage.askPct<5);
+ book.clear(); assert.equal(book.read(manual,0,now+1).snapshotCoverage,null);
+});

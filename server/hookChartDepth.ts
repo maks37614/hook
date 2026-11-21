@@ -36,6 +36,7 @@ export function installHookChartDepthStream(server: Server, createSource: Source
   };
   const maxDepthClients = boundedLimit('H00K_MAX_DEPTH_CLIENTS', 256, 10_000);
   const maxDepthMarkets = boundedLimit('H00K_MAX_DEPTH_MARKETS', 64, 512);
+  const maxRpiMarkets = Math.min(maxDepthMarkets, boundedLimit('H00K_MAX_RPI_DEPTH_MARKETS', 8, 64));
   // Route upgrades explicitly: other site WebSocket endpoints share this server.
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   // Aggregates only: count actual VPS-to-client payloads, never retain books,
@@ -97,6 +98,9 @@ export function installHookChartDepthStream(server: Server, createSource: Source
     const scope = chartDepthScope(exchange as ExchangeId, market as MarketType, symbol, includeRpi);
     if (sockets.clients.size > maxDepthClients || (!entries.has(scope) && entries.size >= maxDepthMarkets)) {
       client.close(1013, 'Depth capacity reached'); return;
+    }
+    if (includeRpi && !entries.has(scope) && [...entries.keys()].filter(key => key.endsWith(':rpi')).length >= maxRpiMarkets) {
+      client.close(1013, 'RPI depth capacity reached'); return;
     }
     // Send the server clock immediately, before any exchange connection or snapshot request.
     send(client, { scope, sampledAt: Date.now(), status: 'CONNECTING' });

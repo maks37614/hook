@@ -44,6 +44,9 @@ jobs:
         run: >
           node --import ./tests/fixtures/offline-network.mjs
           --import tsx --test --test-concurrency=1
+          tests/hookchart-density.test.ts
+          tests/hookchart-rpi-depth.test.ts
+          tests/hookchart-depth-stream.test.ts
           tests/hookchart-cascade-ray-to-scale.test.ts
           tests/hookchart-scalper-cascade-levels.test.ts
           tests/hookchart-scalper-mode.test.ts
