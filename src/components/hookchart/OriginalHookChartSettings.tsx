@@ -1162,7 +1162,7 @@ export function OriginalHookChartSettings({
                     onClick={() => set('densityAutoDisplay', value)}>{label}</button>)}
               </div>
             </Setting>
-            <Setting label="Множник порогу AUTO" desc="Автоматично для вибраної монети: 4× типова заявка, ≥25% локальної ліквідності та ≥50% зустрічного потоку за 5 хвилин. Множник змінює базовий поріг; без угод розрахунок використовує стакан."><Num value={prefs.densityAutoMultiplier ?? 1} min={0.1} max={10} step={0.1} set={value => set('densityAutoMultiplier', value)} /><b className="valueBadge">×</b></Setting>
+            <Setting label="Множник порогу AUTO" desc="Автоматичний поріг для вибраної монети: 4× типова заявка; за наявності 24-годинного обсягу враховує його з обмеженням до 5× бази, а також спред. Зустрічні угоди підвищують поріг не більше 2,5×. Надзвичайно великі сусідні заявки не приховуються. Без повної статистики використовується лише стакан."><Num value={prefs.densityAutoMultiplier ?? 1} min={0.1} max={10} step={0.1} set={value => set('densityAutoMultiplier', value)} /><b className="valueBadge">×</b></Setting>
             <SwitchRow label="Показувати великі ордери лише поруч із рівнями" desc="Впливає на список; на графіку та у стакані показуються всі знайдені щільності." value={!!prefs.densityNearLevelsOnly} onChange={value => set('densityNearLevelsOnly', value)} />
           </Section>
 

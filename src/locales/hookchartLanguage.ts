@@ -10,6 +10,8 @@ export const hookChartLanguagePacks: Record<SupportedLanguage, Record<string, st
 
 // These controls were added after the supplied packs. Keep the original JSON files intact.
 const additions = [
+  ['Автоматичний поріг для вибраної монети: 4× типова заявка; за наявності 24-годинного обсягу враховує його з обмеженням до 5× бази, а також спред. Зустрічні угоди підвищують поріг не більше 2,5×. Надзвичайно великі сусідні заявки не приховуються. Без повної статистики використовується лише стакан.', 'Per-symbol AUTO threshold: 4× the ordinary wall; when available, 24h turnover is capped to 5× the book floor and spread is considered. Opposing trades increase the threshold by at most 2.5×. Separate exceptional nearby walls remain visible. Without complete stats, only the order book is used.', 'Порог AUTO для монеты: 4× типичная заявка; при наличии учитывается объем за 24 ч с ограничением до 5× базы, а также спред. Встречные сделки повышают порог максимум в 2,5×. Крупные соседние заявки не скрываются. Без полной статистики используется стакан.', 'Próg AUTO dla danej monety: 4× typowe zlecenie; jeśli dostępny, obrót 24h (maks. 5× progu arkusza) i spread. Transakcje przeciwne podwyższają próg maksymalnie 2,5×. Sąsiednie wyjątkowo duże zlecenia nie są ukrywane. Bez pełnych statystyk używany jest arkusz.'],
+
   // Shared canvas controls and strategy status: never hardcode one language in JSX.
   ['Керування масштабом графіка', 'Chart zoom controls', 'Управление масштабом графика', 'Sterowanie skalą wykresu'],
   ['Збільшити масштаб', 'Zoom in', 'Увеличить масштаб', 'Powiększ wykres'],

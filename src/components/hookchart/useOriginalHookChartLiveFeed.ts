@@ -14,6 +14,7 @@ import { EMPTY_SESSION_LIQUIDATIONS, getSessionLiquidationTotals, sessionLiquida
 import { filterVisibleLiquidations } from './liquidationDisplay';
 import { equalDepthAutoStats, shouldPublishDepthView } from './feedPublishPolicy';
 import { hookChartAuxFeedPolicy } from './hookChartAuxFeedPolicy';
+import { estimateDensity24hQuoteVolume } from './densityAutoVolume';
 
 type BookLevel = { p: number; q: number };
 
@@ -23,6 +24,8 @@ type LiveFeedArgs = {
   symbol: string;
   settings: HookChartPreferences;
   candles: Candle[];
+  /** Reuses the existing, scoped 24h public quote-volume widget when available. */
+  volume24hQuoteRef?: { current: number | null };
   replay?: boolean;
   needsFunding: boolean;
   /** Some selected strategies require the best BID/ASK even with density overlays off. */
@@ -46,6 +49,7 @@ export function useOriginalHookChartLiveFeed({
   symbol: rawSymbol,
   settings,
   candles,
+  volume24hQuoteRef,
   replay = false,
   needsFunding,
   needsStrategyBook = false,
@@ -85,7 +89,9 @@ export function useOriginalHookChartLiveFeed({
   const depthScope = `${exchange}:${marketType}:${symbol}:${replay}`;
   const priceRef = useRef(0);
   const atrRef = useRef(0);
+  const volumeEstimateRef = useRef<{scope:string; at:number; volume:number|null}>({scope:'',at:0,volume:null});
   const settingsRef = useRef(settings);
+  const volumeScope = `${exchange}:${marketType}:${symbol}`;
   settingsRef.current = settings;
   const applyBookRef = useRef<(() => void) | null>(null);
   const depthBookRef = useRef<HookChartDensityBook | null>(null);
@@ -96,7 +102,13 @@ export function useOriginalHookChartLiveFeed({
     const last = candles.at(-1);
     if (last?.c) priceRef.current = last.c;
     atrRef.current = atr(candles, 50);
-  }, [candles, depthEnabled]);
+    // Run a bounded candle-only fallback at most once a minute. A partial
+    // history cannot be extrapolated to 24h (that would inflate thin coins).
+    const now = Date.now();
+    if (volumeEstimateRef.current.scope !== volumeScope || now - volumeEstimateRef.current.at >= 60_000) {
+      volumeEstimateRef.current = {scope:volumeScope,at:now,volume:estimateDensity24hQuoteVolume(candles,now)};
+    }
+  }, [candles, depthEnabled, volumeScope]);
 
   useEffect(() => {
     const exchangeSymbol = /^[\p{L}\p{M}\p{N}]+$/u.test(symbol);
@@ -139,7 +151,10 @@ export function useOriginalHookChartLiveFeed({
     };
     const applyBook = () => {
       if (dead) return false;
-      const next = depthBook.read(settingsRef.current, atrRef.current);
+      const verified24h = volume24hQuoteRef?.current;
+      const estimated24h = volumeEstimateRef.current.scope === volumeScope ? volumeEstimateRef.current.volume : null;
+      const next = depthBook.read(settingsRef.current, atrRef.current, Date.now(),
+        verified24h && verified24h > 0 ? verified24h : estimated24h);
       // Holding-time and reaction scores need a periodic refresh only while
       // a complete, fresh book exists. Otherwise an empty Terminal chart
       // would run an unnecessary per-second JS timer indefinitely.
