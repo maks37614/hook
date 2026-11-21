@@ -192,7 +192,9 @@ export class HookChartDensityBook {
     const { levels, book } = this.levelView;
     const multiplier = Number.isFinite(settings.densityAutoMultiplier)
       ? Math.max(.1, Math.min(10, settings.densityAutoMultiplier!)) : 1;
-    const key = `${distance}:${multiplier}`;
+    const dailyBucket = volume24hQuote && volume24hQuote > 0 && Number.isFinite(volume24hQuote)
+      ? Math.floor(Math.log2(volume24hQuote) * 8) : 0;
+    const key = `${distance}:${multiplier}:${dailyBucket}`;
     if (!this.autoThreshold || this.thresholdKey !== key || now - this.thresholdAt >= 5000) {
       const baseline = orderBookAutoThreshold(levels.map(row => row.usd));
       const spreadPct = (this.bestAsk - this.bestBid) / price * 100;

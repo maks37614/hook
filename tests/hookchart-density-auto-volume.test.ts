@@ -9,11 +9,16 @@ test('fallback requires near-full 24h history and no additional data',()=>{
  const full=estimateDensity24hQuoteVolume(candles(300),now);
  assert.ok(full!==null && full>280_000 && full<290_000);
  assert.equal(estimateDensity24hQuoteVolume(candles(100),now),null);
- assert.equal(estimateDensity24hQuoteVolume(candles(24,3_600_000),now),null);
+ assert.equal(estimateDensity24hQuoteVolume(candles(24,4*3_600_000),now),null);
  assert.equal(estimateDensity24hQuoteVolume(candles(300).map(c=>({...c,t:c.t-86_400_000})),now),null);
 });
 test('fallback fails closed if a candle is corrupted',()=>{
  const data=candles(300);
  data[50].v=NaN;
  assert.equal(estimateDensity24hQuoteVolume(data,now),null);
+});
+
+test('fallback rejects sparse 24h history even with enough timestamp span',()=>{
+ const sparse=candles(300).filter((_,i)=>i%3!==0);
+ assert.equal(estimateDensity24hQuoteVolume(sparse,now),null);
 });

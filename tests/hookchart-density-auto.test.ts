@@ -128,6 +128,7 @@ test('existing 24h turnover raises a noisy threshold without suppressing the cle
   const book=new HookChartDensityBook();
   book.apply(makeBook(100,1000,{4:50_000,6:10_000}),now);
   const first=book.read(auto,0,now);
+  book.apply({sequence:2,bids:[[99.95,1000/99.95]],asks:[]},now+5000);
   const daily=book.read(auto,0,now+5001,1_000_000_000);
   assert.ok(daily.densityCut>first.densityCut);
   assert.ok(daily.densityCut<=first.densityCut*5);

@@ -13,13 +13,19 @@ export function estimateDensity24hQuoteVolume(candles: readonly Candle[], now = 
   if (period <= 0 || period > 3_600_000 || !Number.isFinite(period)) return null;
   const start = now - 86_400_000;
   if (first.t > start + Math.min(period * 2, 900_000) || last.t < now - Math.max(period * 2, 900_000)) return null;
-  let sum = 0;
+  let sum = 0, observed = 0;
+  let newerTime = last.t + period;
   for (let i = candles.length - 1; i >= 0; i--) {
     const c = candles[i];
     if (c.t < start) break;
+    if (newerTime - c.t > period * 3 || c.t > newerTime) return null;
+    newerTime = c.t;
     if (!Number.isFinite(c.v) || c.v < 0 || !Number.isFinite(c.c) || c.c <= 0) return null;
     sum += c.v * c.c;
     if (!Number.isFinite(sum)) return null;
+    observed++;
   }
-  return sum > 0 ? sum : null;
+  const expected = Math.max(1, Math.floor((last.t - start) / period) + 1);
+  // Sparse histories must not masquerade as low daily volume.
+  return observed >= expected * .9 && sum > 0 ? sum : null;
 }
