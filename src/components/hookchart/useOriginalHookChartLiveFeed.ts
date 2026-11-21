@@ -5,6 +5,7 @@ import { getSharedMarketPrints, subscribeMarketTrades } from './marketTradeStrea
 import { EMPTY_FUNDING, subscribeSharedHookChartFunding, type FundingSnapshot } from './sharedFundingStream';
 import { calcCascadeRisk, type Candle, type Density, type Liquidation } from './engine';
 import { normalizeExchangeSymbol } from '../../utils/marketSymbols';
+import { hookChartDensityQuote } from '../../utils/densityNotional';
 import { supportsChartRpi, type ChartDepthStatus } from '../../utils/hookChartDepthProtocol';
 import { connectSharedHookChartDepth } from './sharedDepthStream';
 import { sharedChartClock } from './sharedChartClock';
@@ -52,7 +53,11 @@ export function useOriginalHookChartLiveFeed({
   lightweight = false,
 }: LiveFeedArgs) {
   const symbol = normalizeExchangeSymbol(rawSymbol);
-  const { depth: depthEnabled, trades: tradesEnabled } = hookChartAuxFeedPolicy(settings, needsStrategyBook, replay, lightweight);
+  const policy = hookChartAuxFeedPolicy(settings, needsStrategyBook, replay, lightweight);
+  // Existing catalogue is USDT only; fail closed for unknown quote/contract units.
+  const supportedDensityQuote = hookChartDensityQuote(symbol) !== null;
+  const depthEnabled = policy.depth && supportedDensityQuote;
+  const tradesEnabled = policy.trades;
   // Key deliberately excludes candle timeframe and display threshold.
   const liquidationScope = sessionLiquidationScope(exchange, marketType, symbol);
   const sessionSubscription = useMemo(() => (replay || lightweight)
@@ -406,6 +411,6 @@ export function useOriginalHookChartLiveFeed({
     fundingRate: lightweight ? EMPTY_FUNDING.rate : funding.rate,
     fundingHistory: lightweight ? EMPTY_FUNDING.history : funding.history,
     depthReady: !lightweight && currentDepth,
-    depthStatus: !depthEnabled ? 'disabled' as ChartDepthStatus : depthStatus,
+    depthStatus: policy.depth && !supportedDensityQuote ? 'unavailable' as ChartDepthStatus : !depthEnabled ? 'disabled' as ChartDepthStatus : depthStatus,
   };
 }

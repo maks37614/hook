@@ -24,7 +24,7 @@ import { createChartTouchHold, isChartControlTarget } from './touchHold';
 import { CrosshairTimeLabel } from './CrosshairTimeLabel';
 import type { ChartCrosshairStore, CrosshairPosition } from './crosshairState';
 import { quantile, atr, formatUsd, type AutoLevel, type MarketPrint } from './marketAnalytics';
-import { formatDensityUsdCompact, formatDensityUsdExact } from '../../utils/densityNotional';
+import { hookChartDensityQuote, formatHookChartDensityNotional, formatHookChartDensityNotionalExact } from '../../utils/densityNotional';
 import { aggregateMarketPrintsByCandle, filterMarketPrintCandleBuckets } from './marketPrintBuckets';
 import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
@@ -1273,7 +1273,10 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
       q.fillText(txt,lx+pad,top+labelH/2);q.restore();
     }
   });
+   const densityQuote = densities.length ? hookChartDensityQuote(symbol) : null;
    if(showDensityLines||showDensityLabels)for(const d of densities){
+     // Unsupported quote/contract units must not be mislabeled as USDT.
+     if(!densityQuote)continue;
      // Same inclusive price gate and original order, without a temporary
      // visible-depth array on every full DPR Canvas paint.
      if(!(d.p>=g.lo&&d.p<=g.hi))continue;
@@ -1296,7 +1299,7 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        q.font=`${potential?'700':'600'} ${Math.max(8,densityLabelSize)}px system-ui`;
        const ageTxt=age<60?`${age}s`:age<3600?`${Math.floor(age/60)}m`:`${Math.floor(age/3600)}h`;
        const core=potential?`★ ${d.side} ${d.reactionScore ?? 0}/100`:d.touches>0?`x${d.touches}`:d.side;
-       const details=showDensityAmounts?` · ${d.displayExact ? formatDensityUsdExact(d.usd,language) : formatDensityUsdCompact(d.usd,language)} · ${ageTxt}`:'';
+       const details=showDensityAmounts?` · ${d.displayExact ? formatHookChartDensityNotionalExact(d.usd,densityQuote,language) : formatHookChartDensityNotional(d.usd,densityQuote,language)} · ${ageTxt}`:'';
        const txt=`${d.rpiInclusive ? 'Σ+RPI '+d.side : core}${details}`;
        const tw=q.measureText(txt).width;
        const lx=Math.max(5,Math.min(g.plotW-tw-5,origin<0?6:origin+4));

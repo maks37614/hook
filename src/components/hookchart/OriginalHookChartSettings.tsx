@@ -798,6 +798,7 @@ export function OriginalHookChartSettings({
   prefs,
   language: selectedLanguage,
   densityCut = 0,
+  densityQuote = 'USDT',
   loadedCandles = 0,
   historyStatus = 'idle',
   onRetryHistory,
@@ -821,6 +822,7 @@ export function OriginalHookChartSettings({
   /** Language of this chart, which may differ from the site language. */
   language?: SupportedLanguage;
   densityCut?: number;
+  densityQuote?: 'USDT' | null;
   /** Number of unique candles actually held by this chart for the current symbol/timeframe. */
   loadedCandles?: number;
   historyStatus?: 'idle' | 'loading' | 'limited' | 'error';
@@ -1156,7 +1158,7 @@ export function OriginalHookChartSettings({
                 densityMode: 'manual', densityThreshold: prefs.densityMode === 'manual' && (prefs.densityThreshold || 0) > 0
                   ? prefs.densityThreshold : Math.max(1, Math.ceil(densityCut || prefs.densityThreshold || 50_000)),
               })}>Значення</button>
-              <span>$</span><Num value={prefs.densityMode === 'manual' ? prefs.densityThreshold ?? 0 : densityCut} min={0} step={1} disabled={prefs.densityMode !== 'manual'} set={value => set('densityThreshold', value)} />
+              <span>{densityQuote ?? "—"}</span><Num value={prefs.densityMode === 'manual' ? prefs.densityThreshold ?? 0 : densityCut} min={0} step={1} disabled={prefs.densityMode !== 'manual'} set={value => set('densityThreshold', value)} />
             </div></Setting>
             <Setting label="Що показувати в AUTO" desc="Усі сильні — аномально великі заявки. Потенціал реакції — тільки щільності з контактом ціни та свіжими виконаними угодами або поповненням заявки. Це не гарантія відскоку.">
               <div className="settingsChips">

@@ -9,6 +9,7 @@ import { useTelegram } from '../../context/TelegramContext';
 import { alertConditionForPrice, chartTelegramAlerts, telegramIdFromChartMarker } from '../../utils/hookChartPriceAlerts';
 import { useLanguage } from '../../context/LanguageContext';
 import { resolveHookChartLanguage, translateHookChartPhrase } from '../../locales/hookchartLanguage';
+import { hookChartDensityQuote } from '../../utils/densityNotional';
 import { toHookCandles } from '../../utils/hookchartData';
 import { convertLiveHookChartCandles, type LiveHookChartConversion } from '../../utils/hookChartLiveConversion';
 import { replayHistoryChange } from '../../utils/replayHistoryChange';
@@ -318,6 +319,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [settings, ecoActive, archiveMode]);
   const scalperAnalyzer = useMemo(createScalperAnalyzer, []);
   const chartLanguage = resolveHookChartLanguage(settings, siteLanguage);
+  const densityQuote = hookChartDensityQuote(symbol);
   const [drawings, setDrawingsState] = useState<Drawing[]>(() => archiveMode ? archiveDrawings(archiveSnapshot, symbol) : replay ? [] :
     (preferences?.sharedDrawings !== false ? preferences?.drawings?.[sharedScope] : undefined) || preferences?.drawings?.[scope] || []);
   const [alerts, setAlertsState] = useState<Alert[]>(() => (replay || archiveMode) ? [] :
@@ -1744,7 +1746,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           {densityQuickOpen && !ecoActive && toolbarPopup(<div className="densityQuickPopup" style={!integratedToolbar ? { left: densityPopupLeft, top: 32 } : undefined}>
             <div className="densityQuickHead">
               <span>Поріг щільностей</span>
-              <b>{liveFeed.densityCut > 0 ? <>≥ &#36;{liveFeed.densityCut.toLocaleString()}</> : '—'} · {baseChartDensities.length}/{liveFeed.densities.length}</b>
+              <b>{liveFeed.densityCut > 0 ? <>≥ {liveFeed.densityCut.toLocaleString()} {densityQuote}</> : '—'} · {baseChartDensities.length}/{liveFeed.densities.length}</b>
             </div>
             <div className="densityQuickStatus" role="status" data-live={liveFeed.depthReady && liveFeed.densityCut > 0}>
               {liveFeed.depthReady
@@ -1764,8 +1766,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 : 'Дані угод неповні — аналітику покупок і продажів призупинено'}
             </div>}
             {settings.densityMode !== 'manual' && liveFeed.depthReady && liveFeed.densityAutoStats.baseline > 0 && <div className="densityQuickAutoStats">
-              <div><span>BID (проти продажів)</span><b>${liveFeed.densityAutoStats.bidCut.toLocaleString()}</b></div>
-              <div><span>ASK (проти покупок)</span><b>${liveFeed.densityAutoStats.askCut.toLocaleString()}</b></div>
+              <div><span>BID (проти продажів)</span><b>{liveFeed.densityAutoStats.bidCut.toLocaleString()} {densityQuote}</b></div>
+              <div><span>ASK (проти покупок)</span><b>{liveFeed.densityAutoStats.askCut.toLocaleString()} {densityQuote}</b></div>
               <small>4× медіана · частка локального стакана ≥25% · зустрічні угоди 5 хв ×0,5</small>
             </div>}
             <div className="densityQuickModes">
@@ -1796,7 +1798,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
                 <small>Поки немає підтверджень. Перемкни «Усі сильні», щоб бачити заявки до контакту з ціною.</small>}
             </div>}
             <label className="densityQuickInput">
-              <span>$</span>
+              <span>{densityQuote ?? "—"}</span>
               <input
                 type="number"
                 min="1"
@@ -1978,6 +1980,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
           open
           language={chartLanguage}
           densityCut={liveFeed.densityCut}
+          densityQuote={densityQuote}
           loadedCandles={candles.length}
           historyStatus={historyStatus}
           onRetryHistory={() => setHistoryRetry(previous => previous + 1)}
