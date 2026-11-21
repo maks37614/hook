@@ -55,44 +55,9 @@ test('actual Binance USDT-marked level uses price times current quantity, never 
   assert.equal(density.quantity, size);
   assert.ok(Math.abs(density.notionalUsd - price * size) < 1e-7);
   assert.equal(formatDensityUsdCompact(density.notionalUsd), '12,33к$');
-  assert.notEqual(formatDensityUsdCompact(density.notionalUsd), '100к
-  book.applyDepth({ sequence: 2, eventTime: Date.now(), bids: [[price, 25]], asks: [] });
-  assert.equal(book.getDensities().find(d => d.price === price)?.notionalUsd, price * 25,
-    'WebSocket replaces a level quantity; it must not accumulate previous amounts');
-  book.setStatus('STALE');
-  assert.deepEqual(book.getDensities(), [], 'stale book cannot confirm real-time amounts');
-});
-
-test('four-language Telegram templates use the numeric density amount without extra million rounding', () => {
-  const amount = 293.51 * 42;
-  const source = readFileSync(new URL('../server/surveillance/stateMachineAndAlerts.ts',import.meta.url), 'utf8');
-  assert.match(source, /volume: formatDensityLevelCompact\(density\.notionalUsd/);
-  for (const lang of ['uk', 'en', 'ru', 'pl'] as const) {
-    const variables = {
-      symbol: 'GOOGLUSDT', exchange: 'BINANCE', side: 'ASK', price: '293.51',
-      volume: formatDensityLevelCompact(amount, 'GOOGLUSDT', lang),
-      distance: '0.3', quality: '72',
-      classification: 'PERSISTENT_LIQUIDITY', duration: '1m 5s',
-    };
-    const appeared = telegramText(lang, 'densityAppeared', variables);
-    const persistent = telegramText(lang, 'densityPersistent', variables);
-    assert.ok(appeared.includes(formatDensityLevelCompact(amount, 'GOOGLUSDT', lang)), lang);
-    assert.ok(persistent.includes(formatDensityLevelCompact(amount, 'GOOGLUSDT', lang)), lang);
-    assert.doesNotMatch(appeared, /\$0\.01M/);
-    assert.doesNotMatch(persistent, /\$0\.01M/);
-    assert.ok(locales[lang].telegram.densityAppeared.includes('{{volume}}'));
-    assert.ok(!locales[lang].telegram.densityAppeared.includes('{{volume}}M'));
-    assert.ok(!locales[lang].telegram.densityPersistent.includes('{{volume}}M'));
-  }
-  const worker = readFileSync(new URL('../server/surveillance/coinWorker.ts',import.meta.url),'utf8');
-  assert.match(worker,/formatDensityLevelCompact\(d\.notionalUsd, this\.coin\.symbol\)/);
-  assert.match(worker,/formatDensityLevelExact\(d\.notionalUsd, this\.coin\.symbol\)/);
-  const ui = readFileSync(new URL('../src/components/SurveillancePage.tsx',import.meta.url),'utf8');
-  assert.match(ui,/formatDensityLevelCompact\(state\.topDensityUsd, coin\.symbol, language\)/);
-  assert.match(ui,/formatDensityLevelCompact\(d\.notionalUsd, detailedCoin\.symbol, language\)/);
-});
-);
+  assert.notEqual(formatDensityUsdCompact(density.notionalUsd), '100к$');
   assert.equal(formatDensityLevelCompact(density.notionalUsd, 'GOOGLUSDT'), '12,33k USDT');
+  assert.equal(formatDensityLevelExact(density.notionalUsd, 'GOOGLUSDT').includes('USDT'),true);
   book.applyDepth({ sequence: 2, eventTime: Date.now(), bids: [[price, 25]], asks: [] });
   assert.equal(book.getDensities().find(d => d.price === price)?.notionalUsd, price * 25,
     'WebSocket replaces a level quantity; it must not accumulate previous amounts');
