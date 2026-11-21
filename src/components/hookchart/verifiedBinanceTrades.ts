@@ -34,7 +34,6 @@ export function createVerifiedBinanceTrades(options: {
     if (status === next) return;
     status = next;
     options.onIntegrity?.(next);
-    if (warmupStart !== null && trade.t >= warmupStart + (options.warmupMs ?? 300_000)) warmupStart = null;
   };
   // Async recovery may finish after a buffer overflow marked the feed incomplete.
   const isIncomplete = () => status === 'incomplete';
@@ -51,6 +50,8 @@ export function createVerifiedBinanceTrades(options: {
     if (previous !== null && id <= previous) return;
     previous = id;
     options.accept(trade);
+    // Only a five-minute uninterrupted verified interval makes derived flow safe.
+    if (warmupStart !== null && trade.t >= warmupStart + (options.warmupMs ?? 300_000)) warmupStart = null;
   };
   const drain = async () => {
     if (running) return;

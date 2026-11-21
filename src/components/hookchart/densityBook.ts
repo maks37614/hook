@@ -150,10 +150,6 @@ export class HookChartDensityBook {
           const id = `${bid ? 'BID' : 'ASK'}:${price}`;
           this.tracked.delete(id);
           this.executions.delete(id);
-          // Preserve true wall age even when cancel/re-add happens between chart paints.
-          const id = `${bid ? 'BID' : 'ASK'}:${price}`;
-          this.tracked.delete(id);
-          this.executions.delete(id);
           if (price === (bid ? this.bestBid : this.bestAsk)) removedBest = true;
         }
       }
