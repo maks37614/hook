@@ -301,7 +301,7 @@ async function calculateSmartAnalysis(params: SmartAnalysisParams): Promise<Smar
     [c.time, c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite) &&
     c.close > 0 && c.open > 0 && c.high >= Math.max(c.open, c.close) &&
     c.low <= Math.min(c.open, c.close) && c.low > 0 && c.volume >= 0;
-  const secondsPerBar: Record<Timeframe, number> = { '30s': 30,
+  const secondsPerBar: Record<Timeframe, number> = { '5s': 5, '30s': 30,
     '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400,
   };
   const seconds = secondsPerBar[tf] ?? 3600;
