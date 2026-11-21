@@ -177,9 +177,13 @@ export class MarketTickerFeed {
   /** A valid recent 24h quote from the existing shared ticker cache; never fetch the exchange here. */
   getCached24hVolumeUsd(exchange: ExchangeId, market: MarketType, symbol: string): number | null {
     const entry = this.entries.get(`${exchange}:${market}`);
-    if (!entry || entry.updatedAt === null) return null;
-    const age = this.now() - entry.updatedAt;
-    if (age < 0 || age >= 120_000) return null;
+    if (!entry) return null;
+    // Global updatedAt may be refreshed by an unrelated coin's ticker delta.
+    // A 24h quote is usable only when THIS symbol was observed recently,
+    // either in a verified REST snapshot or its own validated WS update.
+    const seenAt = Math.max(entry.snapshotAt ?? 0, entry.lastWsSymbolAt?.get(symbol) ?? 0);
+    const age = this.now() - seenAt;
+    if (!seenAt || age < 0 || age >= 120_000) return null;
     const position = entry.symbolPositions?.get(symbol);
     const volume = position === undefined ? undefined : entry.data[position]?.volumeUsd;
     return typeof volume === 'number' && Number.isFinite(volume) && volume >= 0 ? volume : null;
