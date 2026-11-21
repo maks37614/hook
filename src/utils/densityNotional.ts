@@ -8,6 +8,11 @@ export type DensityAmountLanguage = 'uk' | 'en' | 'ru' | 'pl';
 const locales: Record<DensityAmountLanguage, string> = {
   uk: 'uk-UA', en: 'en-US', ru: 'ru-RU', pl: 'pl-PL',
 };
+// Reuse one exact locale formatter per language across Canvas paints.
+const exactFormatters = Object.fromEntries(
+  Object.entries(locales).map(([language, locale]) => [language,
+    new Intl.NumberFormat(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2})]),
+) as Record<DensityAmountLanguage, Intl.NumberFormat>;
 const formatters = Object.fromEntries(
   Object.entries(locales).map(([key, locale]) =>
     [key, new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })]),
@@ -32,8 +37,7 @@ export function formatDensityUsdExact(
   language: DensityAmountLanguage = 'uk',
 ): string {
   if (amount === undefined || amount === null || !Number.isFinite(amount) || amount < 0) return '—';
-  const locale = locales[language] || locales.uk;
-  return `${new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}$`;
+  return `${(exactFormatters[language] || exactFormatters.uk).format(amount)}$`;
 }
 
 /** Display historic events using the saved numeric order-book evidence, never
@@ -42,12 +46,24 @@ export function formatDensityUsdExact(
 export function densityEventAmountText(
   text: string, type: string | undefined, evidence: unknown,
   language: DensityAmountLanguage = 'uk',
+  symbol?: string,
 ): string {
   if (type !== 'DENSITY_APPEARED' && type !== 'DENSITY_PERSISTENT') return text;
   if (!evidence || typeof evidence !== 'object') return text;
   const amount = (evidence as { notionalUsd?: unknown }).notionalUsd;
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return text;
-  return text.replace(/\$\d+(?:\.\d+)?M\b/gi, formatDensityUsdCompact(amount, language));
+  // Only correct legacy abbreviated amounts when verified evidence exists.
+  // Symbol metadata determines quote units; the '$293.51' price remains intact.
+  const amountText = symbol ? formatDensityLevelCompact(amount, symbol, language) : formatDensityUsdCompact(amount, language);
+  if (amountText === '—') return text;
+  const compactCorrected = text.replace(/\$\d+(?:\.\d+)?M\b|\d+(?:[.,]\d+)?(?:к|k|млн|mln|m)\$/gi, amountText);
+  if (!symbol || !hookChartDensityQuote(symbol)) return compactCorrected;
+  const exact = formatDensityLevelExact(amount, symbol, language);
+  // Only replace the old exact figure in the two known density-event templates.
+  // Never rewrite a '$293.51' quote price or infer a number from historical text.
+  return compactCorrected
+    .replace(/\(точно\s+[\d\s\u00a0\u202f.,]+\$\)/u, `(точно ${exact})`)
+    .replace(/^(Ліквідність\s+)[\d\s\u00a0\u202f.,]+\$(?=\s+за\s+ціною)/u, (_whole, prefix: string) => prefix + exact);
 }
 
 /** Chart catalogue currently contains USDT-quoted spot and linear perpetual instruments.
@@ -71,6 +87,13 @@ export function formatHookChartDensityNotional(amount: number, quote: 'USDT' | n
 /** Exact quote notional, rounded for display only. */
 export function formatHookChartDensityNotionalExact(amount: number, quote: 'USDT' | null, language: DensityAmountLanguage = 'uk'): string {
   if (!quote || !Number.isFinite(amount) || amount < 0) return '—';
-  return new Intl.NumberFormat(locales[language] || locales.uk,
-    {minimumFractionDigits:2,maximumFractionDigits:2}).format(amount) + ' ' + quote;
+  return (exactFormatters[language] || exactFormatters.uk).format(amount) + ' ' + quote;
+}
+
+/** Exchange-level notional with the quote unit derived from the actual instrument. */
+export function formatDensityLevelCompact(amount: number, symbol: string, language: DensityAmountLanguage = 'uk'): string {
+  return formatHookChartDensityNotional(amount, hookChartDensityQuote(symbol), language);
+}
+export function formatDensityLevelExact(amount: number, symbol: string, language: DensityAmountLanguage = 'uk'): string {
+  return formatHookChartDensityNotionalExact(amount, hookChartDensityQuote(symbol), language);
 }

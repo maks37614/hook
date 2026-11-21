@@ -1,6 +1,6 @@
 import { ExchangeId, MarketType, SurveillanceCoin, Timeframe } from '../../src/types';
 import { normalizeExchangeSymbol } from '../../src/utils/marketSymbols';
-import { formatDensityUsdCompact, formatDensityUsdExact } from '../../src/utils/densityNotional';
+import { formatDensityLevelCompact, formatDensityLevelExact } from '../../src/utils/densityNotional';
 import { sharedOiPoller } from './sharedOiPoller';
 import { notificationRouter } from '../notificationRouter';
 import { createSetupAlertsGroup, getUserLanguage } from '../alertService';
@@ -294,8 +294,8 @@ export class CoinWorker {
         exchange: this.coin.exchange,
         marketType: this.coin.marketType,
         type: 'DENSITY_APPEARED',
-        title: `⚡ Нова щільність ${d.side} ${formatDensityUsdCompact(d.notionalUsd)}`,
-        description: `Видима сукупна ліквідність рівня ${formatDensityUsdCompact(d.notionalUsd)} (точно ${formatDensityUsdExact(d.notionalUsd)}) за ціною ${d.price}. Дистанція: ${d.distancePct}%. Спостерігається: ${d.ageSeconds}с (від першого виявлення сервером).`,
+        title: `⚡ Нова щільність ${d.side} ${formatDensityLevelCompact(d.notionalUsd, this.coin.symbol)}`,
+        description: `Видима сукупна ліквідність рівня ${formatDensityLevelCompact(d.notionalUsd, this.coin.symbol)} (точно ${formatDensityLevelExact(d.notionalUsd, this.coin.symbol)}) за ціною ${d.price}. Дистанція: ${d.distancePct}%. Спостерігається: ${d.ageSeconds}с (від першого виявлення сервером).`,
         price: d.price,
         timeframe: '5m',
         severity: 'IMPORTANT',
@@ -328,8 +328,8 @@ export class CoinWorker {
             exchange: this.coin.exchange,
             marketType: this.coin.marketType,
             type: 'DENSITY_PERSISTENT',
-            title: '✅ Підтверджена щільність ' + d.side + ' ' + formatDensityUsdCompact(d.notionalUsd),
-            description: 'Ліквідність ' + formatDensityUsdExact(d.notionalUsd) + ' за ціною ' + d.price +
+            title: '✅ Підтверджена щільність ' + d.side + ' ' + formatDensityLevelCompact(d.notionalUsd, this.coin.symbol),
+            description: 'Ліквідність ' + formatDensityLevelExact(d.notionalUsd, this.coin.symbol) + ' за ціною ' + d.price +
               ' утримується ' + d.ageSeconds + 'с від першого спостереження сервером. Дистанція: ' + d.distancePct + '%.',
             price: d.price,
             timeframe: '5m',

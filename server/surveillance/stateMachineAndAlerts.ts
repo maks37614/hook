@@ -3,7 +3,7 @@ import { sendUserTelegramMessage } from '../telegramDelivery';
 import { getUserTelegram } from '../alertService';
 import { notificationRouter, NotificationSource } from '../notificationRouter';
 import { normalizeLanguage, telegramText, type SupportedLanguage } from '../../src/locales';
-import { formatDensityUsdCompact } from '../../src/utils/densityNotional';
+import { formatDensityLevelCompact } from '../../src/utils/densityNotional';
 
 function formatCryptoPrice(val: number): string {
   if (!val && val !== 0) return '0.00';
@@ -268,8 +268,8 @@ export class StateMachineAndAlerts {
       speed: item.approachSpeed,
       touches: item.touchCount,
       compression: telegramText(selectedLanguage, item.compression ? 'compressionYes' : 'compressionNo'),
-      askLine: item.askDensityUsd ? `\n<b>Ask Density:</b> ${formatDensityUsdCompact(item.askDensityUsd, selectedLanguage)}` : '',
-      bidLine: item.bidDensityUsd ? `\n<b>Bid Density:</b> ${formatDensityUsdCompact(item.bidDensityUsd, selectedLanguage)}` : '',
+      askLine: item.askDensityUsd ? `\n<b>Ask Density:</b> ${formatDensityLevelCompact(item.askDensityUsd, symbol, selectedLanguage)}` : '',
+      bidLine: item.bidDensityUsd ? `\n<b>Bid Density:</b> ${formatDensityLevelCompact(item.bidDensityUsd, symbol, selectedLanguage)}` : '',
     });
   }
 
@@ -285,7 +285,7 @@ export class StateMachineAndAlerts {
       exchange: exchange.toUpperCase(),
       side: density.side,
       price: formatCryptoPrice(density.price),
-      volume: formatDensityUsdCompact(density.notionalUsd, normalizeLanguage(language)),
+      volume: formatDensityLevelCompact(density.notionalUsd, symbol, normalizeLanguage(language)),
       distance: density.distancePct,
       duration: `${density.ageSeconds}${telegramText(normalizeLanguage(language), 'secondsShort')}`,
       quality: density.qualityScore,
@@ -305,7 +305,7 @@ export class StateMachineAndAlerts {
       exchange: exchange.toUpperCase(),
       side: density.side,
       price: formatCryptoPrice(density.price),
-      volume: formatDensityUsdCompact(density.notionalUsd, normalizeLanguage(language)),
+      volume: formatDensityLevelCompact(density.notionalUsd, symbol, normalizeLanguage(language)),
       distance: density.distancePct,
       duration: `${Math.floor(density.ageSeconds / 60)}${telegramText(selectedLanguage, 'minutesShort')} ${density.ageSeconds % 60}${telegramText(selectedLanguage, 'secondsShort')}`,
       classification: density.classification,

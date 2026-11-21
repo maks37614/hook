@@ -22,7 +22,7 @@ export function ManualDensityThresholdField({ value, onChange }: ManualDensityTh
   return (
     <div className="space-y-3 rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
       <label htmlFor={inputId} className="block text-[11px] font-semibold text-slate-200">
-        Ручний поріг щільності ($ USDT)
+        Ручний поріг щільності (USDT)
       </label>
       <div className="flex items-center rounded-xl border border-slate-700 bg-slate-950 px-3 transition-colors focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400/15">
         <input

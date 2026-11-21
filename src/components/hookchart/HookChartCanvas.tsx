@@ -19,6 +19,7 @@ import { isValidExchangeSymbol, normalizeExchangeSymbol } from '../../utils/mark
 import { fetchSharedAnalysisKlines } from '../../utils/sharedAnalysisKlines';
 import { fetchSharedHistoricalKlines } from '../../utils/sharedHistoricalKlines';
 import { sharedPublicChartPolling } from '../../utils/sharedPublicChartPolling';
+import { shouldSubscribeDensityTurnover } from './densityTurnoverPolicy';
 import { sharedAnalysisHookCandles } from '../../utils/sharedAnalysisCandles';
 import { aggregateHookChartCandles, updateHookChartAggregation, type AggregationCache } from './aggregationCache';
 import { visibleScopedRemoteSeries, type ScopedRemoteSeries } from './scopedRemoteSeries';
@@ -863,19 +864,25 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // Both values now use verified exchange data and are scoped to this instrument.
   const statsScope = [exchange, marketType, normalizeExchangeSymbol(symbol), timeframe].join(':');
   const showMarketStats = !replay && !archiveMode && !externalData && runtimeSettings.showMarketStatsBar !== false;
+  // The AUTO algorithm must not change when the user hides the statistics bar.
+  // Reuse the pre-existing shared 60s public ticker endpoint; never add an exchange socket.
+  const autoTurnoverEnabled = densityQuote !== null && shouldSubscribeDensityTurnover({
+    replay, archiveMode, externalData: Boolean(externalData), lightweight: ecoActive,
+    densityAnalysis: runtimeSettings.densityAnalysis, densityMode: runtimeSettings.densityMode,
+  });
   const [btcReference, setBtcReference] = useState<{ scope: string; rows: Kline[] } | null>(null);
   const [tradeCount24h, setTradeCount24h] = useState<{ scope: string; count: number | null; volume24hUsd: number | null } | null>(null);
 
-  density24hQuoteRef.current = showMarketStats && tradeCount24h?.scope === statsScope
+  density24hQuoteRef.current = (showMarketStats || autoTurnoverEnabled) && tradeCount24h?.scope === statsScope
     ? tradeCount24h.volume24hUsd : null;
   useEffect(() => {
-    if (!showMarketStats) return;
+    if (!showMarketStats && !autoTurnoverEnabled) return;
     const cleanedSymbol = normalizeExchangeSymbol(symbol);
     const benchmark = btcBenchmarkSymbol(cleanedSymbol);
     if (!/^[A-Z0-9]{3,30}$/.test(cleanedSymbol)) return;
     const stops: Array<() => void> = [];
     // A single BTC benchmark fetch serves every chart of this market/TF.
-    if (benchmark && benchmark !== cleanedSymbol && timeframe !== '30s') {
+    if (showMarketStats && benchmark && benchmark !== cleanedSymbol && timeframe !== '30s') {
       const params = new URLSearchParams({
         exchange, market: marketType, symbol: benchmark, timeframe, limit: '250',
       });
@@ -890,12 +897,14 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         },
       ));
     }
-    // A single memoized 60s public quote endpoint serves AV on both exchanges
-    // and the pre-existing Binance trade count; no extra exchange REST for AV.
+    // AUTO needs only the server's existing ticker cache; avoid Binance REST
+    // trade-count fallback when the stats footer is not displayed.
     {
+      const volumeOnly = !showMarketStats;
       const params = new URLSearchParams({ exchange, market: marketType, symbol: cleanedSymbol });
+      if (volumeOnly) params.set('volumeOnly', '1');
       stops.push(sharedPublicChartPolling.subscribe(
-        ['trades24h', exchange, marketType, cleanedSymbol].join(':'),
+        ['trades24h', exchange, marketType, cleanedSymbol, volumeOnly ? 'volume-only' : 'with-count'].join(':'),
         () => fetchSharedChartJson('/api/chart/trades24h?' + params),
         {
           onData: data => {
@@ -911,7 +920,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       ));
     }
     return () => stops.forEach(stop => stop());
-  }, [statsScope, exchange, marketType, symbol, timeframe, showMarketStats]);
+  }, [statsScope, exchange, marketType, symbol, timeframe, showMarketStats, autoTurnoverEnabled]);
 
   const btcCorrelation = useMemo(() => {
     if (!showMarketStats || ecoActive || timeframe === '30s' || !TF_MS[timeframe]) return null;
