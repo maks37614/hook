@@ -10,6 +10,7 @@ export const hookChartLanguagePacks: Record<SupportedLanguage, Record<string, st
 
 // These controls were added after the supplied packs. Keep the original JSON files intact.
 const additions = [
+  ['Визначає мінімальний розмір заявки: автоматично за ринковими даними або вручну в USDT.','Sets the minimum order value automatically from market data or manually in USDT.','Определяет минимальный размер заявки автоматически по рыночным данным или вручную в USDT.','Określa minimalną wartość zlecenia automatycznie z danych rynkowych lub ręcznie w USDT.'],
   // Shared canvas controls and strategy status: never hardcode one language in JSX.
   ['Керування масштабом графіка', 'Chart zoom controls', 'Управление масштабом графика', 'Sterowanie skalą wykresu'],
   ['Збільшити масштаб', 'Zoom in', 'Увеличить масштаб', 'Powiększ wykres'],

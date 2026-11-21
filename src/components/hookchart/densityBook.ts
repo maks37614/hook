@@ -188,6 +188,7 @@ export class HookChartDensityBook {
     }
     const manual = settings.densityMode === 'manual' && Number.isFinite(settings.densityThreshold) && settings.densityThreshold! > 0;
     const baseCut = manual ? Math.max(1, settings.densityThreshold!) : this.autoThreshold;
+    // Both depth and aggressive executions use the same symbol's USDT quote units.
     const { buy, sell } = this.opposingFlow(now);
     // BID absorbs aggressive sells; ASK absorbs aggressive buys.
     const bidCut = !baseCut ? 0 : manual ? baseCut : Math.max(baseCut, Math.ceil(sell * .5));

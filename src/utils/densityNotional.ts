@@ -1,6 +1,6 @@
 /** Visible USDT order-book level value, not a fill, margin or single trader's order.
  * Exchange depth quantity is in the base asset for supported spot/linear USDT pairs.
- * USD notional is calculated upstream as price × quantity. Formatting never alters
+ * USDT quote notional is calculated upstream as price × quantity. Formatting never alters
  * that raw value, threshold decisions or the data saved with the event.
  */
 export type DensityAmountLanguage = 'uk' | 'en' | 'ru' | 'pl';
@@ -48,4 +48,22 @@ export function densityEventAmountText(
   const amount = (evidence as { notionalUsd?: unknown }).notionalUsd;
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return text;
   return text.replace(/\$\d+(?:\.\d+)?M\b/gi, formatDensityUsdCompact(amount, language));
+}
+
+/** Chart catalogue currently contains USDT-quoted spot and linear perpetual instruments.
+ * Do not infer an inverse contract multiplier or an arbitrary currency from an unknown symbol.
+ * A future expanded catalogue must pass verified contract metadata before enabling densities.
+ */
+export function hookChartDensityQuote(symbol: string): 'USDT' | null {
+  const clean = symbol.replace(/[^\p{L}\p{M}\p{N}]/gu, '').toUpperCase();
+  return clean.length > 4 && clean.endsWith('USDT') ? 'USDT' : null;
+}
+
+/** Explicit quote units, independent of display language; no fiat conversion. */
+export function formatHookChartDensityNotional(amount: number, quote: 'USDT' | null, language: DensityAmountLanguage = 'uk'): string {
+  if (!quote || !Number.isFinite(amount) || amount < 0) return '—';
+  const format = formatters[language] || formatters.uk;
+  const scale = amount >= 1e9 ? 1e9 : amount >= 1e6 ? 1e6 : amount >= 1e3 ? 1e3 : 1;
+  const suffix = scale === 1e9 ? 'B' : scale === 1e6 ? 'M' : scale === 1e3 ? 'k' : '';
+  return format.format(amount / scale) + suffix + ' ' + quote;
 }
