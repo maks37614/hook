@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {hookChartDensityQuote,formatHookChartDensityNotional} from '../src/utils/densityNotional';
+import {hookChartDensityQuote,formatHookChartDensityNotional,formatHookChartDensityNotionalExact} from '../src/utils/densityNotional';
 import {getOrderBookDensityLevels} from '../src/components/hookchart/marketAnalytics';
 test('both exchanges use explicit USDT value for the supported spot and linear chart universe',()=>{
   for(const symbol of ['BTCUSDT','ETH/USDT','1000PEPEUSDT','币安人生USDT']) assert.equal(hookChartDensityQuote(symbol),'USDT');
@@ -11,6 +11,8 @@ test('both exchanges use explicit USDT value for the supported spot and linear c
   assert.equal(formatHookChartDensityNotional(109650,'USDT','en'),'109.65k USDT');
   assert.equal(formatHookChartDensityNotional(1250000,'USDT','en'),'1.25M USDT');
   assert.equal(formatHookChartDensityNotional(1e9,'USDT','en'),'1B USDT');
+  assert.equal(formatHookChartDensityNotionalExact(109650.23,'USDT','en'),'109,650.23 USDT');
+  assert.equal(formatHookChartDensityNotionalExact(109650.23,null,'en'),'—');
   assert.equal(formatHookChartDensityNotional(5,null,'en'),'—');
   assert.equal(formatHookChartDensityNotional(NaN,'USDT','en'),'—');
 });

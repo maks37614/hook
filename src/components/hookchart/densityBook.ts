@@ -296,7 +296,8 @@ export class HookChartDensityBook {
           replenishments: density.replenishments, unexplainedReductions: density.unexplainedReductions || 0,
           executedUsd90s: tradeEvidenceReady ? executedUsd90s : 0,
         });
-        density.executedUsd90s = executedUsd90s;
+        // Recovery warmup must not leak partial trade-derived figures into alerts.
+        density.executedUsd90s = tradeEvidenceReady ? executedUsd90s : 0;
         density.reactionScore = assessed.score;
         density.reactionTier = assessed.tier;
       }

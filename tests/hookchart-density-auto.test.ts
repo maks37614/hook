@@ -129,7 +129,7 @@ test('existing 24h turnover raises a noisy threshold without suppressing the cle
   book.apply(makeBook(100,1000,{4:50_000,6:10_000}),now);
   const first=book.read(auto,0,now);
   book.apply({sequence:2,bids:[[99.95,1000/99.95]],asks:[]},now+5000);
-  const daily=book.read(auto,0,now+5001,1_000_000_000);
+  const daily=book.read(auto,0,now+5001,true,1_000_000_000);
   assert.ok(daily.densityCut>first.densityCut);
   assert.ok(daily.densityCut<=first.densityCut*5);
   assert.equal(daily.densities.some(d=>Math.abs(d.usd-50_000)<.001),true);
@@ -154,7 +154,7 @@ test('AUTO preserves multiple large adjacent walls even when strong sell flow an
   const book=new HookChartDensityBook();
   book.apply(makeBook(100,1000,Object.fromEntries([3,4,5,6,7,8].map(i=>[i,50_000]))),now);
   book.recordAggressiveTrade({id:'sell-impulse',t:now,p:99.9,usd:400_000,side:'SELL'},now);
-  const result=book.read(auto,0,now,1_000_000_000);
+  const result=book.read(auto,0,now,true,1_000_000_000);
   assert.ok(result.autoStats.bidCut>result.autoStats.baseline);
   assert.equal(result.densities.filter(d=>d.side==='BID').length,6);
 });

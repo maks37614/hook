@@ -677,6 +677,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     [liveFeed.densities, settings.densityMode, settings.densityAutoDisplay],
   );
   const chartDensities = useMemo(() => {
+    // An RPI-only feed must not make stale regular depth look like a live book.
+    if (!liveFeed.depthReady) return [] as Density[];
     if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return baseChartDensities;
     const byLevel = new Map(baseChartDensities.map(row => [row.id, row]));
     // Replace, never add inclusive totals at the same exact level.
@@ -687,7 +689,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       if (runtimeSettings.densityMode === 'manual' || row.usd >= cutoff) byLevel.set(row.id, row);
     }
     return [...byLevel.values()].map(row => runtimeSettings.densityExactAmounts ? {...row, displayExact:true} : row);
-  }, [baseChartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
+  }, [liveFeed.depthReady, baseChartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts, runtimeSettings.densityMode, liveFeed.densityAutoStats.bidCut, liveFeed.densityAutoStats.askCut]);
   // Passive reader only: never enables an indicator or changes chart state,
   // subscriptions, polling, Canvas or DPR. No work when the monitor is off.
   const terminalEvidence = useRef<() => ChartEvidence>(() => ({ manualLevels: [], densityEnabled: false, densities: [], oi: [] }));
