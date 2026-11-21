@@ -866,7 +866,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const showMarketStats = !replay && !archiveMode && !externalData && runtimeSettings.showMarketStatsBar !== false;
   // The AUTO algorithm must not change when the user hides the statistics bar.
   // Reuse the pre-existing shared 60s public ticker endpoint; never add an exchange socket.
-  const autoTurnoverEnabled = shouldSubscribeDensityTurnover({
+  const autoTurnoverEnabled = densityQuote !== null && shouldSubscribeDensityTurnover({
     replay, archiveMode, externalData: Boolean(externalData), lightweight: ecoActive,
     densityAnalysis: runtimeSettings.densityAnalysis, densityMode: runtimeSettings.densityMode,
   });

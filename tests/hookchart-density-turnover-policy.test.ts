@@ -10,6 +10,7 @@ test('AUTO ticker input is independent of the statistics footer',()=>{
    assert.equal(shouldSubscribeDensityTurnover({...base,[key]:true}),false,key);
  assert.equal(shouldSubscribeDensityTurnover({...base,densityAnalysis:false}),false);
  const ui=readFileSync(new URL('../src/components/hookchart/HookChartCanvas.tsx', import.meta.url),'utf8');
+ assert.match(ui,/const autoTurnoverEnabled = densityQuote !== null && shouldSubscribeDensityTurnover/);
  assert.match(ui,/\(showMarketStats \|\| autoTurnoverEnabled\) && tradeCount24h\?\.scope/);
  assert.match(ui,/if \(!showMarketStats && !autoTurnoverEnabled\) return/);
  assert.match(ui,/if \(showMarketStats && benchmark/);
