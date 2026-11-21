@@ -441,9 +441,12 @@ async function startServer() {
     }
     res.setHeader('Cache-Control', 'public, max-age=30');
     try {
-      const trades24h = await fetch24hTradeCount(exchange, market as MarketType, symbol);
+      // AUTO with the footer hidden only needs cached quote turnover. Do NOT
+      // trigger per-symbol Binance REST trade-count fallback for these charts.
+      const volumeOnly = req.query.volumeOnly === '1';
+      const trades24h = volumeOnly ? null : await fetch24hTradeCount(exchange, market as MarketType, symbol);
       const volume24hUsd = marketTickerFeed.getCached24hVolumeUsd(exchange as ExchangeId, market as MarketType, symbol);
-      res.json({ success: true, trades24h, volume24hUsd, source: exchange === 'binance' ? 'binance_24h_ticker' : 'not_available' });
+      res.json({ success: true, trades24h, volume24hUsd, source: volumeOnly ? 'cached_ticker_quote' : exchange === 'binance' ? 'binance_24h_ticker' : 'not_available' });
     } catch {
       res.json({ success: true, trades24h: null, volume24hUsd: marketTickerFeed.getCached24hVolumeUsd(exchange as ExchangeId, market as MarketType, symbol), source: 'unavailable' });
     }

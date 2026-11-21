@@ -897,12 +897,14 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         },
       ));
     }
-    // Shared public turnover is required by AUTO even when its footer is hidden.
-    // One existing 60s cached ticker request per exchange/market/symbol, not per chart.
+    // AUTO needs only the server's existing ticker cache; avoid Binance REST
+    // trade-count fallback when the stats footer is not displayed.
     {
+      const volumeOnly = !showMarketStats;
       const params = new URLSearchParams({ exchange, market: marketType, symbol: cleanedSymbol });
+      if (volumeOnly) params.set('volumeOnly', '1');
       stops.push(sharedPublicChartPolling.subscribe(
-        ['trades24h', exchange, marketType, cleanedSymbol].join(':'),
+        ['trades24h', exchange, marketType, cleanedSymbol, volumeOnly ? 'volume-only' : 'with-count'].join(':'),
         () => fetchSharedChartJson('/api/chart/trades24h?' + params),
         {
           onData: data => {

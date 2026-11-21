@@ -13,5 +13,8 @@ test('AUTO ticker input is independent of the statistics footer',()=>{
  assert.match(ui,/\(showMarketStats \|\| autoTurnoverEnabled\) && tradeCount24h\?\.scope/);
  assert.match(ui,/if \(!showMarketStats && !autoTurnoverEnabled\) return/);
  assert.match(ui,/if \(showMarketStats && benchmark/);
- assert.match(ui,/\['trades24h', exchange, marketType, cleanedSymbol\]/);
+ assert.match(ui,/\['trades24h', exchange, marketType, cleanedSymbol, volumeOnly \? 'volume-only' : 'with-count'\]/);
+ const server=readFileSync(new URL('../server.ts',import.meta.url),'utf8');
+ assert.match(server,/volumeOnly \? null : await fetch24hTradeCount/);
+ assert.match(server,/marketTickerFeed\.getCached24hVolumeUsd/);
 });
