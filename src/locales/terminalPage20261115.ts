@@ -3,6 +3,66 @@ import type { SupportedLanguage } from './types';
 
 export const terminalPagePhraseRows = [
   [
+    "Премаркет",
+    "Pre-market",
+    "Премаркет",
+    "Premarket"
+  ],
+  [
+    "Розгорнути премаркет США",
+    "Expand US pre-market",
+    "Развернуть премаркет США",
+    "Rozwiń premarket USA"
+  ],
+  [
+    "Згорнути премаркет США",
+    "Collapse US pre-market",
+    "Свернуть премаркет США",
+    "Zwiń premarket USA"
+  ],
+  [
+    "Премаркет акцій США · Nasdaq",
+    "US equities pre-market · Nasdaq",
+    "Премаркет акций США · Nasdaq",
+    "Premarket akcji USA · Nasdaq"
+  ],
+  [
+    "Премаркет триває",
+    "Pre-market is open",
+    "Премаркет идёт",
+    "Premarket trwa"
+  ],
+  [
+    "Наступний премаркет",
+    "Next pre-market",
+    "Следующий премаркет",
+    "Następny premarket"
+  ],
+  [
+    "Відкриття",
+    "Opens",
+    "Открытие",
+    "Otwarcie"
+  ],
+  [
+    "Закриття",
+    "Closes",
+    "Закрытие",
+    "Zamknięcie"
+  ],
+  [
+    "Премаркет Nasdaq: 04:00–09:30 за Нью-Йорком у торгові будні; свята не враховано. Це акції США, не криптобіржа.",
+    "Nasdaq pre-market: 04:00–09:30 New York time on trading weekdays; holidays not included. This is US equities, not a crypto exchange.",
+    "Премаркет Nasdaq: 04:00–09:30 по Нью-Йорку в торговые будни; праздники не учтены. Это акции США, не криптобиржа.",
+    "Premarket Nasdaq: 04:00–09:30 czasu Nowego Jorku w dni handlowe; bez świąt. Dotyczy akcji USA, nie giełd kryptowalut."
+  ],
+  [
+    "Типові сесії світових фінансових центрів у будні, без урахування свят. Орієнтир регіональної активності; криптовалюти торгуються цілодобово.",
+    "Typical weekday sessions of global financial centers, excluding holidays. A guide to regional activity; crypto trades 24/7.",
+    "Типичные сессии мировых финансовых центров в будни, без учёта праздников. Ориентир региональной активности; криптовалюты торгуются круглосуточно.",
+    "Типowe sesje światowych centrów finansowych w dni robocze, bez uwzględnienia świąt. Wskazówka aktywności regionalnej; kryptowaluty są notowane 24/7."
+  ],
+  [
     "AV 1m",
     "AV 1m",
     "AV 1m",

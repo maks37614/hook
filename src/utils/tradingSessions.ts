@@ -5,6 +5,14 @@ export const TRADING_SESSIONS = [
   { id: 'new-york', city: 'Нью-Йорк', country: 'США', flag: '🇺🇸', region: 'Американська', timeZone: 'America/New_York', opens: 8, closes: 17 },
 ] as const;
 
+// US stock-market pre-market is distinct from New York's regional activity
+// window above. Nasdaq's official regular pre-market is 04:00–09:30 America/New_York
+// on trading weekdays; the exchange calendar can exclude holidays/early closes.
+// https://www.nasdaq.com/market-activity/stock-market-holiday-schedule
+export const US_EQUITIES_PREMARKET = {
+  timeZone: 'America/New_York', opens: 4, closes: 9.5,
+} as const;
+
 // Conventional regional activity windows, not opening hours of crypto exchanges.
 // https://www.oanda.com/us-en/skills-and-insights/education/trading-asset-classes/forex/when-is-the-best-time-for-forex-trading/
 export type TradingSession = typeof TRADING_SESSIONS[number];
@@ -133,7 +141,11 @@ function zonedParts(date: Date, timeZone: string) {
 
 // Convert local wall time with that date's IANA offset, including DST in each region.
 function localHourToDate(day: Date, hour: number, timeZone: string): Date {
-  const target = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour);
+  // Half-hour boundaries (Nasdaq closes its pre-market at 09:30 ET) must
+  // retain their minutes through IANA conversions and DST changes.
+  const fullHour = Math.floor(hour);
+  const minute = Math.round((hour - fullHour) * 60);
+  const target = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), fullHour, minute);
   let timestamp = target;
   for (let i = 0; i < 4; i++) {
     const parts = zonedParts(new Date(timestamp), timeZone);
@@ -145,7 +157,9 @@ function localHourToDate(day: Date, hour: number, timeZone: string): Date {
   return new Date(timestamp);
 }
 
-export function getSessionWindow(session: TradingSession, now: Date) {
+type SessionHours = { readonly timeZone: string; readonly opens: number; readonly closes: number };
+
+function getTradingWindow(session: SessionHours, now: Date) {
   const today = zonedParts(now, session.timeZone);
   const localDay = Date.UTC(today.year, today.month - 1, today.day);
   for (let offset = 0; offset <= 7; offset++) {
@@ -160,6 +174,19 @@ export function getSessionWindow(session: TradingSession, now: Date) {
       progress: active ? (now.getTime() - startsAt.getTime()) / (endsAt.getTime() - startsAt.getTime()) : 0 };
   }
   throw new Error('No upcoming trading session');
+}
+
+/** Typical weekday activity windows (unchanged for Sydney/Tokyo/London/NY). */
+export function getSessionWindow(session: TradingSession, now: Date) {
+  return getTradingWindow(session, now);
+}
+
+/**
+ * Nasdaq US equities pre-market, 04:00–09:30 New York local time.
+ * Holidays/early closes are intentionally not inferred from weekday schedules.
+ */
+export function getUsEquitiesPremarketWindow(now: Date) {
+  return getTradingWindow(US_EQUITIES_PREMARKET, now);
 }
 
 type SessionLanguage = 'uk' | 'en' | 'ru' | 'pl';
