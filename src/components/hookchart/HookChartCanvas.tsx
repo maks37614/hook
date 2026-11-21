@@ -657,8 +657,8 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   const density24hQuoteRef = useRef<number | null>(null);
   const liveFeed = useOriginalHookChartLiveFeed({
     exchange, marketType, symbol, settings: runtimeSettings, candles, replay,
-    volume24hQuoteRef: density24hQuoteRef,
-    lightweight: ecoActive || archiveMode, needsFunding: activeStrategy?.config.kind === 'overheat',
+    lightweight: ecoActive || archiveMode,
+    volume24hQuoteRef: density24hQuoteRef, needsFunding: activeStrategy?.config.kind === 'overheat',
     // Presets using order-book imbalance keep their evidence when the density overlay is off.
     needsStrategyBook: activeStrategy?.config.kind === 'breakout' ||
       activeStrategy?.config.kind === 'reaction' || activeStrategy?.config.kind === 'density',
