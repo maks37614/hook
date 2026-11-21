@@ -1274,7 +1274,9 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
     }
   });
    const densityQuote = densities.length ? hookChartDensityQuote(symbol) : null;
-   if(densityQuote && (showDensityLines||showDensityLabels))for(const d of densities){
+   if(showDensityLines||showDensityLabels)for(const d of densities){
+     // Unsupported quote/contract units must not be mislabeled as USDT.
+     if(!densityQuote)continue;
      // Same inclusive price gate and original order, without a temporary
      // visible-depth array on every full DPR Canvas paint.
      if(!(d.p>=g.lo&&d.p<=g.hi))continue;
