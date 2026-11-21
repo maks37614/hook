@@ -10,5 +10,6 @@ export type ChartDepthPacket = {
   update?: BookUpdate;
 };
 
-export const chartDepthScope = (exchange: ExchangeId, market: MarketType, symbol: string) =>
-  `${exchange}:${market}:${normalizeExchangeSymbol(symbol)}`;
+export const supportsChartRpi = (exchange: ExchangeId, market: MarketType) => exchange === 'bybit' || (exchange === 'binance' && market === 'futures');
+export const chartDepthScope = (exchange: ExchangeId, market: MarketType, symbol: string, includeRpi = false) =>
+  `${exchange}:${market}:${normalizeExchangeSymbol(symbol)}${includeRpi ? ':rpi' : ''}`;

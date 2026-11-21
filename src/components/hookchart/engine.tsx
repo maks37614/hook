@@ -24,6 +24,7 @@ import { createChartTouchHold, isChartControlTarget } from './touchHold';
 import { CrosshairTimeLabel } from './CrosshairTimeLabel';
 import type { ChartCrosshairStore, CrosshairPosition } from './crosshairState';
 import { quantile, atr, formatUsd, type AutoLevel, type MarketPrint } from './marketAnalytics';
+import { formatDensityUsdCompact, formatDensityUsdExact } from '../../utils/densityNotional';
 import { aggregateMarketPrintsByCandle, filterMarketPrintCandleBuckets } from './marketPrintBuckets';
 import { createSupportResistanceCalculator } from './supportResistance';
 import { createChartDayOverlayCalculator } from './chartDayOverlays';
@@ -47,7 +48,7 @@ import { HOOKCHART_PRICE_SCALE_WIDTH, HOOKCHART_PRICE_LABEL_HEIGHT, hookChartPlo
 export interface HookChartHandle { takeScreenshot(): string | null; takeArchiveScreenshot?(): string | null; captureArchiveSnapshot?(): import('../../types').ArchivedChartSnapshot | null; takeArchiveDensityScene?(): import('../../types').ArchivedDensityScene | undefined; takeArchiveOverlayScene?(): ArchivedAutoOverlayScene | undefined; takeArchiveVisibleSrMarkers?(): boolean; fitContent(): void; zoomToLatest(): void; focusLatest(): void; zoom(factor: number): void; }
 export type Candle={t:number,o:number,h:number,l:number,c:number,v:number,n:number,tb?:number};
 
-export type Density={id:string,side:'ASK'|'BID',p:number,q:number,usd:number,peakUsd:number,first:number,last:number,active:boolean,reacted?:boolean,reaction?:number,touches:number,lastTouch:number,replenishments:number,updates:number,score:number,mmScore:number;reactionScore?:number;reactionTier?:'strong'|'potential';executedUsd90s?:number;lastAbsorptionAt?:number;unexplainedReductions?:number};
+export type Density={rpiInclusive?:boolean;displayExact?:boolean;id:string,side:'ASK'|'BID',p:number,q:number,usd:number,peakUsd:number,first:number,last:number,active:boolean,reacted?:boolean,reaction?:number,touches:number,lastTouch:number,replenishments:number,updates:number,score:number,mmScore:number;reactionScore?:number;reactionTier?:'strong'|'potential';executedUsd90s?:number;lastAbsorptionAt?:number;unexplainedReductions?:number};
 
 export type Liquidation={id:string,side:'LONG'|'SHORT',t:number,p:number,q:number,usd:number};
 
@@ -1281,8 +1282,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
      const age=Math.max(0,Math.floor((now-d.first)/1000));
      const potential=highlightDensityReaction && d.reactionTier==='potential';
      const strong=highlightDensityReaction && !potential;
-     const lineColor=potential?'#F2C35A':densityLineColor;
-     const labelColor=potential?'#FFE3A0':densityLabelColor;
+     const lineColor=d.rpiInclusive?'#EAB308':potential?'#F2C35A':densityLineColor;
+     const labelColor=d.rpiInclusive?'#FDE68A':potential?'#FFE3A0':densityLabelColor;
      if(showDensityLines){
        q.strokeStyle=lineColor;
        q.lineWidth=potential?Math.max(1.5,densityLineWidth*1.8):Math.max(.5,densityLineWidth)*(d.active?1:.75);
@@ -1295,8 +1296,8 @@ export function Chart({candles,symbol,tf,interactionScope,tool,drawings,setDrawi
        q.font=`${potential?'700':'600'} ${Math.max(8,densityLabelSize)}px system-ui`;
        const ageTxt=age<60?`${age}s`:age<3600?`${Math.floor(age/60)}m`:`${Math.floor(age/3600)}h`;
        const core=potential?`★ ${d.side} ${d.reactionScore ?? 0}/100`:d.touches>0?`x${d.touches}`:d.side;
-       const details=showDensityAmounts?` · ${formatUsd(d.usd)} · ${ageTxt}`:'';
-       const txt=`${core}${details}`;
+       const details=showDensityAmounts?` · ${d.displayExact ? formatDensityUsdExact(d.usd,language) : formatDensityUsdCompact(d.usd,language)} · ${ageTxt}`:'';
+       const txt=`${d.rpiInclusive ? 'Σ+RPI '+d.side : core}${details}`;
        const tw=q.measureText(txt).width;
        const lx=Math.max(5,Math.min(g.plotW-tw-5,origin<0?6:origin+4));
        q.fillStyle=labelColor;q.globalAlpha=d.active?(strong ? .75 : 1):.55;

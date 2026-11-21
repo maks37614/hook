@@ -811,7 +811,8 @@ export async function fetchOrderBook(
   exchange: ExchangeId = 'binance',
   market: MarketType = 'futures',
   symbol: string = 'BTCUSDT',
-  limit: number = 500
+  limit: number = 500,
+  includeRpi = false,
 ): Promise<OrderBookData> {
   const cleanSymbol = normalizeExchangeSymbol(symbol);
   const safeLimit = Math.min(Math.max(limit, 20), 1000);
@@ -851,7 +852,7 @@ export async function fetchOrderBook(
 
   // Binance (Futures or Spot with multi-mirror)
   const mirrors = market === 'futures'
-    ? [`https://fapi.binance.com/fapi/v1/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`]
+    ? [`https://fapi.binance.com/fapi/v1/${includeRpi ? 'rpiDepth' : 'depth'}?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`]
     : [
         `https://data-api.binance.vision/api/v3/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,
         `https://api.binance.com/api/v3/depth?symbol=${encodeURIComponent(cleanSymbol)}&limit=${safeLimit}`,

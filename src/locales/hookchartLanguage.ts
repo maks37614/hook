@@ -10,6 +10,10 @@ export const hookChartLanguagePacks: Record<SupportedLanguage, Record<string, st
 
 // These controls were added after the supplied packs. Keep the original JSON files intact.
 const additions = [
+  ['Показувати щільності з RPI','Show densities including RPI','Показывать плотности с RPI','Pokazuj skupiska z RPI'],
+  ['Золоті мітки Σ+RPI — загальна сума на рівні, не додаткова заявка. Binance Futures: 1000 рівнів, Bybit: 50. Binance Spot не підтримується. За втрати потоку залишаються звичайні щільності.','Gold Σ+RPI labels show the total level, not an additional order. Binance Futures: 1000 levels, Bybit: 50. Binance Spot is unsupported. Regular densities remain if the feed is lost.','Золотые метки Σ+RPI — общая сумма уровня, не дополнительная заявка. Binance Futures: 1000 уровней, Bybit: 50. Binance Spot не поддерживается. При потере потока остаются обычные плотности.','Złote etykiety Σ+RPI pokazują sumę poziomu, nie dodatkowe zlecenie. Binance Futures: 1000 poziomów, Bybit: 50. Binance Spot nie jest obsługiwany. Po utracie strumienia pozostają zwykłe skupiska.'],
+  ['Точні суми щільностей','Exact density amounts','Точные суммы плотностей','Dokładne kwoty skupisk'],
+  ['Показує суму до копійок замість компактного округлення.','Displays amounts to cents instead of compact rounding.','Показывает сумму до копеек вместо компактного округления.','Pokazuje kwotę z dokładnością do groszy zamiast skróconego zaokrąglenia.'],
   // Shared canvas controls and strategy status: never hardcode one language in JSX.
   ['Керування масштабом графіка', 'Chart zoom controls', 'Управление масштабом графика', 'Sterowanie skalą wykresu'],
   ['Збільшити масштаб', 'Zoom in', 'Увеличить масштаб', 'Powiększ wykres'],

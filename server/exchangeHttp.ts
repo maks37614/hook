@@ -65,6 +65,7 @@ function estimatedWeight(scope: ExchangeScope, url: URL): number {
     return scope === 'binance-spot' ? 80 : 40;
   }
   if (path.endsWith('/ticker') && !url.searchParams.has('symbol')) return 80;
+  if (path.endsWith('/rpiDepth')) return 30; // documented weight 20, safety margin
   if (path.endsWith('/depth')) {
     const limit = Number(url.searchParams.get('limit') || 100);
     // USD-M Futures documents IP weights 2 / 5 / 10 / 20 for

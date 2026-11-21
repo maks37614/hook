@@ -2,11 +2,12 @@ import type { Server } from 'node:http';
 import WebSocket, { WebSocketServer } from 'ws';
 import type { ExchangeId, MarketType } from '../src/types';
 import type { BookUpdate } from '../src/utils/binanceOrderBook';
-import { chartDepthScope, type ChartDepthPacket } from '../src/utils/hookChartDepthProtocol';
+import { chartDepthScope, supportsChartRpi, type ChartDepthPacket } from '../src/utils/hookChartDepthProtocol';
 import { isFreshDepthTime, ORDER_BOOK_MAX_AGE_MS, parseDepthLevels } from '../src/utils/orderBookValidation';
 import { normalizeExchangeSymbol } from '../src/utils/marketSymbols';
 import { applyDepthSide } from '../src/components/hookchart/depthBestPrice';
 import { acquireExchangeStream } from './surveillance/sharedExchangeStream';
+import { ExchangeStreamClient } from './surveillance/exchangeStream';
 
 export interface ChartDepthSource {
   status: string;
@@ -15,7 +16,7 @@ export interface ChartDepthSource {
   resyncOrderBook(): void;
   destroy(): void;
 }
-type SourceFactory = (symbol: string, exchange: ExchangeId, market: MarketType) => ChartDepthSource;
+type SourceFactory = (symbol: string, exchange: ExchangeId, market: MarketType, includeRpi?: boolean) => ChartDepthSource;
 type Entry = {
   scope: string; source: ChartDepthSource; clients: Set<WebSocket>;
   status: ChartDepthPacket['status'];
@@ -26,7 +27,7 @@ type Entry = {
 
 /** Public exchange depth only; personal surveillance data never enters this stream. */
 export function installHookChartDepthStream(server: Server, createSource: SourceFactory =
-  (symbol, exchange, market) => acquireExchangeStream(symbol, exchange, market, true)) {
+  (symbol, exchange, market, includeRpi) => includeRpi ? new ExchangeStreamClient(symbol, exchange, market, true, {}, true) : acquireExchangeStream(symbol, exchange, market, true)) {
   const entries = new Map<string, Entry>();
   // Default limits are unchanged; override only after measuring VPS capacity.
   const boundedLimit = (key: string, fallback: number, ceiling: number) => {
@@ -91,7 +92,9 @@ export function installHookChartDepthStream(server: Server, createSource: Source
         !/^[\p{L}\p{M}\p{N}]{1,64}$/u.test(symbol)) {
       client.close(1008, 'Invalid exchange, market or symbol'); return;
     }
-    const scope = chartDepthScope(exchange as ExchangeId, market as MarketType, symbol);
+    const includeRpi = query.get('rpi') === '1';
+    if (includeRpi && !supportsChartRpi(exchange as ExchangeId, market as MarketType)) { client.close(1008, 'RPI depth unavailable for this market'); return; }
+    const scope = chartDepthScope(exchange as ExchangeId, market as MarketType, symbol, includeRpi);
     if (sockets.clients.size > maxDepthClients || (!entries.has(scope) && entries.size >= maxDepthMarkets)) {
       client.close(1013, 'Depth capacity reached'); return;
     }
@@ -100,7 +103,7 @@ export function installHookChartDepthStream(server: Server, createSource: Source
     let entry = entries.get(scope);
     if (!entry) {
       try {
-        const source = createSource(symbol, exchange as ExchangeId, market as MarketType);
+        const source = createSource(symbol, exchange as ExchangeId, market as MarketType, includeRpi);
         entry = { scope, source, status: source.status === 'ERROR' ? 'ERROR' : 'SYNCING', clients: new Set(), bids: new Map(), asks: new Map(), bestBid: -Infinity, bestAsk: Infinity, sequence: 0, eventTime: 0, receivedAt: 0 };
         entries.set(scope, entry);
         const current = entry;

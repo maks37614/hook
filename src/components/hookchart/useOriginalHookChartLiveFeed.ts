@@ -5,7 +5,7 @@ import { getSharedMarketPrints, subscribeMarketTrades } from './marketTradeStrea
 import { EMPTY_FUNDING, subscribeSharedHookChartFunding, type FundingSnapshot } from './sharedFundingStream';
 import { calcCascadeRisk, type Candle, type Density, type Liquidation } from './engine';
 import { normalizeExchangeSymbol } from '../../utils/marketSymbols';
-import type { ChartDepthStatus } from '../../utils/hookChartDepthProtocol';
+import { supportsChartRpi, type ChartDepthStatus } from '../../utils/hookChartDepthProtocol';
 import { connectSharedHookChartDepth } from './sharedDepthStream';
 import { sharedChartClock } from './sharedChartClock';
 import { sharedLiquidationViews } from './sharedLiquidationView';
@@ -82,6 +82,9 @@ export function useOriginalHookChartLiveFeed({
   const [depthReady, setDepthReady] = useState(false);
   const [depthStatus, setDepthStatus] = useState<ChartDepthStatus>('connecting');
   const depthScopeRef = useRef('');
+  const rpiEnabled = depthEnabled && settings.densityIncludeRpi === true && settings.densityAnalysis !== false && (settings.showDensityLines !== false || settings.showDensityLabels !== false) && supportsChartRpi(exchange, marketType);
+  const rpiScope = `${exchange}:${marketType}:${symbol}`;
+  const [rpiView, setRpiView] = useState<{scope:string; rows:Density[]}|null>(null);
   const depthScope = `${exchange}:${marketType}:${symbol}:${replay}`;
   const priceRef = useRef(0);
   const atrRef = useRef(0);
@@ -219,6 +222,43 @@ export function useOriginalHookChartLiveFeed({
     exchange, marketType, symbol, replay, lightweight, depthEnabled, depthScope,
   ]);
 
+  // Separate chart-only inclusive book; never add to regular depth or strategy evidence.
+  useEffect(() => {
+    if (!rpiEnabled || !/^[\p{L}\p{M}\p{N}]+$/u.test(symbol)) { setRpiView(null); return; }
+    const inclusiveBook = new HookChartDensityBook();
+    let dead = false;
+    let lastPublish = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const publish = () => {
+      if (dead) return;
+      lastPublish = Date.now();
+      const view = inclusiveBook.read(settingsRef.current, atrRef.current);
+      setRpiView(previous => view.depthReady && view.densities.length
+        ? {scope:rpiScope, rows:view.densities.map(row => ({...row, rpiInclusive:true}))}
+        : previous === null ? previous : null);
+    };
+    const stop = connectSharedHookChartDepth({exchange, marketType, symbol, includeRpi:true,
+      onBook: update => {
+        if (dead || !inclusiveBook.apply(update)) return false;
+        if (timer === null) {
+          const wait = Math.max(0, 200 - (Date.now() - lastPublish));
+          if (!wait) publish();
+          else timer = setTimeout(() => { timer = null; publish(); }, wait);
+        }
+        return true;
+      },
+      onStatus: status => {
+        if (!dead && status !== 'live') {
+          inclusiveBook.clear();
+          if (timer !== null) { clearTimeout(timer); timer = null; }
+          setRpiView(null);
+        }
+      },
+    });
+    const stopClock = sharedChartClock.subscribe(publish);
+    return () => { dead = true; stop(); stopClock(); if (timer !== null) clearTimeout(timer); inclusiveBook.clear(); };
+  }, [rpiEnabled, rpiScope, exchange, marketType, symbol]);
+
   // Market prints can run without the depth engine. A market-trade stream is
   // only needed by the depth absorption analysis or the explicit print overlay.
   // Candle price updates have their own independently managed upstream feed.
@@ -339,6 +379,7 @@ export function useOriginalHookChartLiveFeed({
   const currentDepth = depthEnabled && depthScopeRef.current === depthScope && depthReady;
   return {
     densities: !lightweight && currentDepth ? densities : EMPTY_DENSITIES,
+    rpiDensities: rpiEnabled && rpiView?.scope === rpiScope ? rpiView.rows : EMPTY_DENSITIES,
     marketPrints: lightweight || tradeIntegrity !== 'verified' ? EMPTY_MARKET_PRINTS : marketPrints,
     tradeIntegrity: lightweight ? 'verified' as const : tradeIntegrity,
     liquidations: visibleLiquidations,

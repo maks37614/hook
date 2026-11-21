@@ -133,6 +133,10 @@ export class HookChartDensityBook {
           if (bid && price > this.bestBid) this.bestBid = price;
           if (!bid && price < this.bestAsk) this.bestAsk = price;
         } else if (target.delete(price)) {
+          // Reset age even if the wall returns between two visual frames.
+          const id = `${bid ? 'BID' : 'ASK'}:${price}`;
+          this.tracked.delete(id);
+          this.executions.delete(id);
           if (price === (bid ? this.bestBid : this.bestAsk)) removedBest = true;
         }
       }

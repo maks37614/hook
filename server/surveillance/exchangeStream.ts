@@ -63,6 +63,7 @@ export class ExchangeStreamClient extends EventEmitter {
     public readonly marketType: MarketType,
     private readonly depthOnly = false,
     private readonly dependencies: StreamDependencies = {},
+    private readonly includeRpi = false,
   ) {
     super();
     this.binanceBook = new BinanceOrderBookSync(marketType, update => {
@@ -76,7 +77,7 @@ export class ExchangeStreamClient extends EventEmitter {
       this.lastDepthReceivedAt = Date.now();
       this.setStatus('LIVE');
       this.emit('depth', update);
-    }, () => this.requestBookResync());
+    }, () => this.requestBookResync(), includeRpi);
     this.connect();
     this.startWatchdog();
   }
@@ -119,7 +120,7 @@ export class ExchangeStreamClient extends EventEmitter {
     this.lastDepthReceivedAt = 0;
     this.connectionStartedAt = Date.now();
 
-    const urls = this.exchange === 'binance' ? binanceStreamUrls(this.symbol, this.marketType) : [this.getWebSocketUrl()];
+    const urls = this.exchange === 'binance' ? (this.includeRpi ? [`wss://fstream.binance.com/public/stream?streams=${encodeURIComponent(this.cleanSymbol().toLowerCase())}@rpiDepth@500ms`] : binanceStreamUrls(this.symbol, this.marketType)) : [this.getWebSocketUrl()];
     this.setStatus('CONNECTING');
 
     try {
@@ -143,7 +144,7 @@ export class ExchangeStreamClient extends EventEmitter {
             const sym = this.cleanSymbol();
             const subscribeMsg = {
               op: 'subscribe',
-              args: this.depthOnly ? [`orderbook.1000.${sym}`] : [`tickers.${sym}`, `publicTrade.${sym}`, `orderbook.1000.${sym}`],
+              args: this.includeRpi ? [`orderbook.rpi.${sym}`] : this.depthOnly ? [`orderbook.1000.${sym}`] : [`tickers.${sym}`, `publicTrade.${sym}`, `orderbook.1000.${sym}`],
             };
             this.ws?.send(JSON.stringify(subscribeMsg));
 
@@ -192,7 +193,7 @@ export class ExchangeStreamClient extends EventEmitter {
     this.snapshotInFlight = true;
     const generation = this.generation;
     try {
-      const snapshot = await (this.dependencies.fetchBook || fetchOrderBook)('binance', this.marketType, this.symbol, 1000);
+      const snapshot = await (this.dependencies.fetchBook || fetchOrderBook)('binance', this.marketType, this.symbol, 1000, this.includeRpi);
       if (this.isDestroyed || generation !== this.generation) return;
       if (snapshot.lastUpdateId && snapshot.bids.length && snapshot.asks.length) {
         this.binanceBook.setSnapshot({ bids: snapshot.bids, asks: snapshot.asks, sequence: snapshot.lastUpdateId, eventTime: snapshot.timestamp });

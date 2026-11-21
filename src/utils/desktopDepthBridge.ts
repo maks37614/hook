@@ -10,6 +10,7 @@ import type { DesktopKlineChannel, DesktopKlineLock } from './desktopKlineBridge
 export type DesktopDepthOptions = {
   exchange: ExchangeId; marketType: MarketType; symbol: string;
   origin?: string;
+  includeRpi?: boolean;
   onBook: (update: BookUpdate) => boolean;
   onStatus: (status: ChartDepthStatus) => void;
 };
@@ -46,7 +47,7 @@ export function isBridgeableDepthScope(
   alreadyActive = false,
 ): boolean {
   const key = (options.origin || '') + '|' +
-    chartDepthScope(options.exchange, options.marketType, options.symbol);
+    chartDepthScope(options.exchange, options.marketType, options.symbol, options.includeRpi);
   return key.length <= MAX_SCOPE_LENGTH &&
     ['binance', 'bybit'].includes(options.exchange) &&
     ['futures', 'spot'].includes(options.marketType) &&

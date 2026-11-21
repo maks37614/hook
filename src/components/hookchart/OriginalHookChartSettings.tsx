@@ -133,6 +133,8 @@ export const ORIGINAL_HOOKCHART_DEFAULTS: HookChartPreferences = {
   trendIntervals: ['1h', '4h', '1d'],
   trendHistory: 300,
   densityAnalysis: true,
+  densityIncludeRpi: false,
+  densityExactAmounts: false,
   densityTop: true,
   densityBaseVolume: false,
   densityImbalance: false,
@@ -1135,6 +1137,8 @@ export function OriginalHookChartSettings({
 
           <Section title="Щільності">
             <SwitchRow label="Аналіз великих лімітних заявок (щільностей)" value={prefs.densityAnalysis !== false} onChange={value => set('densityAnalysis', value)} />
+            <SwitchRow label="Показувати щільності з RPI" desc="Золоті мітки Σ+RPI — загальна сума на рівні, не додаткова заявка. Binance Futures: 1000 рівнів, Bybit: 50. Binance Spot не підтримується. За втрати потоку залишаються звичайні щільності." value={prefs.densityIncludeRpi === true} onChange={value => set('densityIncludeRpi', value)} />
+            <SwitchRow label="Точні суми щільностей" desc="Показує суму до копійок замість компактного округлення." value={prefs.densityExactAmounts === true} onChange={value => set('densityExactAmounts', value)} />
             <SwitchRow label="Показувати дисбаланс" desc="Сума лімітних ордерів у межах вибраної різниці від ціни для кожної сторони." value={!!prefs.densityImbalance} onChange={value => set('densityImbalance', value)} />
             <Setting label="Щільності на графіку" desc="Незалежно керуйте лініями, мітками та відображенням суми всередині мітки."><div className="densityVisibilityRow">
               {([['showDensityLines', 'Лінії'], ['showDensityLabels', 'Мітки'], ['showDensityAmounts', 'Суми']] as const).map(([key, label]) => <label key={key}><span>{label}</span><input type="checkbox" checked={!!prefs[key]} onChange={event => set(key, event.target.checked)} /></label>)}

@@ -177,3 +177,15 @@ for (const market of ['spot', 'futures'] as const) {
     assert.equal(book.read(manual, 0, now).densities.find(d => d.p === 99)?.usd, 989_901);
   });
 }
+
+test('zero and reinsertion between visual refreshes resets wall age', () => {
+  const book = new HookChartDensityBook();
+  book.apply(snapshot(), now);
+  const settings = {...manual, densityTimeoutMin: 1/60};
+  book.read(settings,0,now);
+  assert.ok(book.read(settings,0,now+1100).densities.some(d=>d.p===99));
+  book.apply({sequence:101,bids:[[99,0]],asks:[]},now+1200);
+  book.apply({sequence:102,bids:[[99,2000]],asks:[]},now+1250);
+  assert.ok(!book.read(settings,0,now+1300).densities.some(d=>d.p===99));
+  assert.equal(book.read(settings,0,now+2350).densities.find(d=>d.p===99)?.usd,198000);
+});

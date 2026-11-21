@@ -672,6 +672,13 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     () => visibleChartDensities(liveFeed.densities, settings.densityMode, settings.densityAutoDisplay),
     [liveFeed.densities, settings.densityMode, settings.densityAutoDisplay],
   );
+  const renderedDensities = useMemo(() => {
+    if (!liveFeed.rpiDensities.length && !runtimeSettings.densityExactAmounts) return chartDensities;
+    const byLevel = new Map(chartDensities.map(row => [row.id, row]));
+    // Replace, never add inclusive totals at the same exact level.
+    for (const row of liveFeed.rpiDensities) byLevel.set(row.id, row);
+    return [...byLevel.values()].map(row => runtimeSettings.densityExactAmounts ? {...row, displayExact:true} : row);
+  }, [chartDensities, liveFeed.rpiDensities, runtimeSettings.densityExactAmounts]);
   // Passive reader only: never enables an indicator or changes chart state,
   // subscriptions, polling, Canvas or DPR. No work when the monitor is off.
   const terminalEvidence = useRef<() => ChartEvidence>(() => ({ manualLevels: [], densityEnabled: false, densities: [], oi: [] }));
@@ -2127,7 +2134,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
         onSelectPriceAlert={archiveMode ? undefined : choosePriceMarker}
         onCreatePriceAlert={(price) => { if (!replay && !archiveMode) void createTelegramPriceAlert(price); }}
         setAlerts={setAlerts}
-        densities={archiveMode ? archivedDensities : replay ? [] : chartDensities}
+        densities={archiveMode ? archivedDensities : replay ? [] : renderedDensities}
         marketPrints={replay ? [] : liveFeed.marketPrints}
         liquidations={replay ? [] : liveFeed.liquidations}
         liquidationHeatmap={mapChartData}

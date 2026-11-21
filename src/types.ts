@@ -660,6 +660,8 @@ export interface HookChartPreferences {
   trendHistory?: number;
 
   densityAnalysis?: boolean;
+  densityIncludeRpi?: boolean;
+  densityExactAmounts?: boolean;
   densityTop?: boolean;
   densityBaseVolume?: boolean;
   densityImbalance?: boolean;

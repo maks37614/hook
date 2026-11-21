@@ -43,7 +43,7 @@ export function createSharedDepthSubscriptions(connect: Connector = connectHookC
   const active = new Map<string, Entry>();
 
   const subscribe = (options: Options): (() => void) => {
-    const scope = chartDepthScope(options.exchange, options.marketType, options.symbol);
+    const scope = chartDepthScope(options.exchange, options.marketType, options.symbol, options.includeRpi);
     const key = (options.origin || '') + '|' + scope;
     const listener: Subscriber = { onBook: options.onBook, onStatus: options.onStatus };
     let entry = active.get(key);
