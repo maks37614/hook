@@ -105,3 +105,45 @@ test('manual USDT thresholds override AUTO for every price and liquidity scale',
     assert.equal(book.read({ ...auto, densityMode: 'manual', densityThreshold: 5000 }, 0, now).densities.length, 1);
   }
 });
+
+
+test('AUTO retains a real thin-market wall after a 400k sell impulse', () => {
+  const book = new HookChartDensityBook();
+  book.apply(makeBook(100,1000,{4:50_000}),now);
+  book.recordAggressiveTrade({id:'impulse-1',t:now,p:99.9,usd:400_000,side:'SELL'},now);
+  const state=book.read(auto,0,now);
+  assert.ok(state.densityCut < 50_000);
+  assert.ok(state.densities.some(d=>d.side==='BID' && Math.abs(d.usd-50_000)<.001));
+});
+
+test('AUTO keeps six distinct large neighboring walls without aggregating them',()=>{
+  const book=new HookChartDensityBook();
+  book.apply(makeBook(100,1000,Object.fromEntries([3,4,5,6,7,8].map(i=>[i,50_000]))),now);
+  const state=book.read(auto,0,now);
+  assert.equal(state.densities.filter(d=>d.side==='BID').length,6);
+  assert.equal(new Set(state.densities.map(d=>d.p)).size,6);
+});
+
+test('existing 24h turnover raises a noisy threshold without suppressing the clear wall',()=>{
+  const book=new HookChartDensityBook();
+  book.apply(makeBook(100,1000,{4:50_000,6:10_000}),now);
+  const first=book.read(auto,0,now);
+  const daily=book.read(auto,0,now+5001,1_000_000_000);
+  assert.ok(daily.densityCut>first.densityCut);
+  assert.ok(daily.densityCut<=first.densityCut*5);
+  assert.equal(daily.densities.some(d=>Math.abs(d.usd-50_000)<.001),true);
+  assert.equal(daily.densities.some(d=>Math.abs(d.usd-10_000)<.001),false);
+});
+
+test('a cancelled wall returning between 200ms visual frames gets a new age',()=>{
+ const book=new HookChartDensityBook();
+ book.apply(makeBook(100,1000,{4:50_000}),now);
+ const hold={...auto,densityTimeoutMin:2/60};
+ assert.equal(book.read(hold,0,now).densities.length,0);
+ assert.equal(book.read(hold,0,now+2000).densities.length,1);
+ const price=100*(1-5*.0005);
+ book.apply({sequence:2,bids:[[price,0]],asks:[]},now+2100);
+ book.apply({sequence:3,bids:[[price,50000/price]],asks:[]},now+2200);
+ assert.equal(book.read(hold,0,now+2300).densities.length,0);
+ assert.equal(book.read(hold,0,now+4300).densities.length,1);
+});
