@@ -174,9 +174,9 @@ test('30s stays available in the shared Terminal grid without inventing older ex
   assert.match(widget, /terminalMode=\{useIntegratedHookChartToolbar\}/);
   assert.match(wrapper, /terminalMode=\{terminalMode\}/);
   assert.match(wrapper, /terminalThirtySecondMode=\{terminalThirtySecondMode\}/);
-  assert.match(chart, /const terminalTradeCandles = timeframe === '30s' && \(terminalMode \|\| terminalThirtySecondMode\)/);
-  assert.match(hook, /timeframe === '30s' \|\| \(terminalMode && historyRetry === 0\)/);
-  assert.match(hook, /if \(timeframe === '30s'\) continue;/);
+  assert.match(chart, /const terminalTradeCandles = \(timeframe === '30s' \|\| timeframe === '5s'\) && \(terminalMode \|\| terminalThirtySecondMode\)/);
+  assert.match(hook, /\(timeframe === '5s' \|\| timeframe === '30s'\) \|\| \(terminalMode && historyRetry === 0\)/);
+  assert.match(hook, /if \(\(timeframe === '5s' \|\| timeframe === '30s'\)\) continue;/);
 });
 
 test('30s transport status stays connected without trades and ignores candle-open age', async () => {
@@ -226,7 +226,7 @@ test('30s transport status stays connected without trades and ignores candle-ope
 test('30s UI uses actual WS connection state instead of an inactive market candle timestamp', async () => {
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(new URL('../src/components/TradingViewChart.tsx', import.meta.url), 'utf8');
-  const section = source.slice(source.indexOf('// Terminal-only 30s OHLCV uses'),
+  const section = source.slice(source.indexOf('// Trade-based Terminal timeframes share exchange WebSockets.'),
     source.indexOf('// Update latest price ref and initialize active candle'));
   assert.match(section, /connected => \{/);
   assert.match(section, /setIsLiveConnected\(connected\)/);
