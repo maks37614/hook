@@ -232,3 +232,20 @@ test('Shared Binance socket does not accept symbol mismatch or negative volume',
     globalThis.WebSocket = originalSocket;
   }
 });
+
+test('opt-in verifier restarts after cooldown and verifies only a new continuous window',async()=>{
+  let now=Date.now();
+  const accepted:string[]=[]; const states:string[]=[];
+  const feed=createVerifiedBinanceTrades({accept:t=>accepted.push(t.id),onIntegrity:s=>states.push(s),
+    load:async()=>[],restartAfterMs:60_000,warmupMs:300_000,now:()=>now});
+  const send=(id:number)=>feed.push({...trade(id),t:now});
+  send(100);send(105);await new Promise(r=>setImmediate(r));
+  assert.equal(feed.getIntegrity(),'incomplete');
+  send(106);assert.deepEqual(accepted,['100']);
+  now+=60_000;send(107);assert.equal(feed.getIntegrity(),'recovering');
+  now+=299_999;send(108);assert.equal(feed.getIntegrity(),'recovering');
+  now+=1;send(109);assert.equal(feed.getIntegrity(),'verified');
+  assert.deepEqual(accepted,['100','107','108','109']);
+  assert.deepEqual(states,['recovering','incomplete','recovering','verified']);
+  feed.close();
+});

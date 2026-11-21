@@ -69,6 +69,7 @@ export function useOriginalHookChartLiveFeed({
   const sessionTotals = useSyncExternalStore(sessionSubscription.subscribe, sessionSubscription.snapshot, () => EMPTY_SESSION_LIQUIDATIONS);
   const [densities, setDensities] = useState<Density[]>(EMPTY_DENSITIES);
   const [marketPrints, setMarketPrints] = useState<MarketPrint[]>(EMPTY_MARKET_PRINTS);
+  const tradeIntegrityRef = useRef<'verified' | 'recovering' | 'incomplete'>('verified');
   const [tradeIntegrity, setTradeIntegrity] = useState<'verified' | 'recovering' | 'incomplete'>('verified');
   const [liquidations, setLiquidations] = useState<Liquidation[]>(EMPTY_LIQUIDATIONS);
   const [cascadeClock, setCascadeClock] = useState(() => Date.now());
@@ -144,7 +145,7 @@ export function useOriginalHookChartLiveFeed({
     };
     const applyBook = () => {
       if (dead) return false;
-      const next = depthBook.read(settingsRef.current, atrRef.current);
+      const next = depthBook.read(settingsRef.current, atrRef.current, Date.now(), tradeIntegrityRef.current === 'verified');
       // Holding-time and reaction scores need a periodic refresh only while
       // a complete, fresh book exists. Otherwise an empty Terminal chart
       // would run an unnecessary per-second JS timer indefinitely.
@@ -268,6 +269,7 @@ export function useOriginalHookChartLiveFeed({
     const exchangeSymbol = /^[\p{L}\p{M}\p{N}]+$/u.test(symbol);
     if (!tradesEnabled || !exchangeSymbol) {
       setMarketPrints(EMPTY_MARKET_PRINTS);
+      tradeIntegrityRef.current = 'verified';
       setTradeIntegrity('verified');
       return;
     }
@@ -279,6 +281,7 @@ export function useOriginalHookChartLiveFeed({
       {
         onTrade: trade => {
           if (!dead) depthBookRef.current?.recordAggressiveTrade(trade);
+          applyBookRef.current?.();
         },
         onPrints: prints => {
           if (!dead && settingsRef.current.showMarketPrintSums === true)
@@ -287,11 +290,11 @@ export function useOriginalHookChartLiveFeed({
         wantsPrints: () => settingsRef.current.showMarketPrintSums === true,
         onIntegrity: status => {
           if (dead) return;
+          tradeIntegrityRef.current = status;
           setTradeIntegrity(status);
           if (status === 'incomplete') {
             depthBookRef.current?.clearTradeEvidence();
             setMarketPrints(EMPTY_MARKET_PRINTS);
-            applyBookRef.current?.();
           }
         },
       },
