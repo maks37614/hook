@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { translatePhrase } from '../../locales';
 import { ChevronDown, Clock3, Globe2, X } from 'lucide-react';
-import { TRADING_SESSIONS, formatSessionCountdown, formatTimeZoneOffset, formatZonedTime, getSessionWindow, getUsEquitiesPremarketWindow, resolveTimeZone, sessionDateLabel } from '../../utils/tradingSessions';
+import { TRADING_SESSIONS, formatSessionCountdown, formatTimeZoneOffset, formatZonedTime, getSessionWindow, getUsEquitiesPremarketWindow, getUsPreopenActivityReference, resolveTimeZone, sessionDateLabel } from '../../utils/tradingSessions';
 
 interface Props {
   timeZone?: string;
@@ -23,6 +23,7 @@ export function TerminalClock({ timeZone: selectedTimeZone, open, buttonRef, onO
   // No extra browser/server polling: reuse the existing clock tick and the
   // already selected profile time zone for all displayed pre-market hours.
   const preMarket = open && preMarketExpanded ? getUsEquitiesPremarketWindow(now) : null;
+  const preOpenReference = preMarket ? getUsPreopenActivityReference(now) : null;
 
   useEffect(() => {
     const refresh = () => setNow(new Date());
@@ -146,6 +147,22 @@ export function TerminalClock({ timeZone: selectedTimeZone, open, buttonRef, onO
               </div>
               <p className="mt-1 text-[10px] text-slate-400">{sessionDateLabel(preMarket.startsAt, preMarket.endsAt, timeZone, language)} · {timeZone}</p>
               <p className="mt-1 text-[10px] leading-4 text-slate-500">{translatePhrase(language, 'Премаркет Nasdaq: 04:00–09:30 за Нью-Йорком у торгові будні; свята не враховано. Це акції США, не криптобіржа.')}</p>
+              {preOpenReference && (
+                <div data-us-preopen-reference className="mt-2 border-t border-slate-700/80 pt-2">
+                  <p className="text-[11px] font-semibold text-cyan-200">
+                    {translatePhrase(language, 'Орієнтир активності перед відкриттям США')}
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-slate-100">
+                    {formatZonedTime(preOpenReference.startsAt, timeZone)} — {formatZonedTime(preOpenReference.endsAt, timeZone)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    {sessionDateLabel(preOpenReference.startsAt, preOpenReference.endsAt, timeZone, language)} · {timeZone}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                    {translatePhrase(language, '07:30–09:30 за Нью-Йорком: орієнтир для спостереження за ринком, не офіційне відкриття та не гарантія підвищеної активності.')}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>)}

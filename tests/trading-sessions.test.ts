@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { terminalPagePhraseRows } from '../src/locales/terminalPage20261115';
 import { readFileSync } from 'node:fs';
-import { TRADING_SESSIONS, formatSessionCountdown, formatTimeZoneOffset, formatZonedTime, getSessionWindow, getUsEquitiesPremarketWindow, getTimeZoneChoices, resolveTimeZone, sessionDateLabel } from '../src/utils/tradingSessions';
+import { TRADING_SESSIONS, formatSessionCountdown, formatTimeZoneOffset, formatZonedTime, getSessionWindow, getUsEquitiesPremarketWindow, getUsPreopenActivityReference, getTimeZoneChoices, resolveTimeZone, sessionDateLabel } from '../src/utils/tradingSessions';
 
 const session = (id: string) => TRADING_SESSIONS.find(item => item.id === id)!;
 
@@ -177,5 +177,59 @@ test('US pre-market expansion labels exist in Ukrainian, English, Russian and Po
     assert.ok(row, `Missing pre-market translation: ${key}`);
     assert.equal(row!.length, 4, `All four languages required for ${key}`);
     for (const translation of row!) assert.ok(translation.trim().length > 0);
+  }
+});
+
+// A pre-open watch marker does not change the official Nasdaq premarket.
+test('07:30 NY pre-open reference converts for profile zones across US/EU DST', () => {
+  const winter = getUsPreopenActivityReference(new Date('2026-01-05T00:00:00Z'));
+  assert.equal(winter.startsAt.toISOString(), '2026-01-05T12:30:00.000Z');
+  assert.equal(winter.endsAt.toISOString(), '2026-01-05T14:30:00.000Z');
+  assert.equal(formatZonedTime(winter.startsAt, 'America/New_York'), '07:30');
+  assert.equal(formatZonedTime(winter.startsAt, 'Europe/Moscow'), '15:30');
+  assert.equal(formatZonedTime(winter.endsAt, 'Europe/Moscow'), '17:30');
+  assert.equal(formatZonedTime(winter.startsAt, 'Europe/Warsaw'), '13:30');
+  assert.equal(formatZonedTime(winter.startsAt, 'Asia/Tokyo'), '21:30');
+  const summer = getUsPreopenActivityReference(new Date('2026-07-06T00:00:00Z'));
+  assert.equal(summer.startsAt.toISOString(), '2026-07-06T11:30:00.000Z');
+  assert.equal(formatZonedTime(summer.startsAt, 'Europe/Moscow'), '14:30');
+  assert.equal(formatZonedTime(summer.endsAt, 'Europe/Moscow'), '16:30');
+  assert.equal(formatZonedTime(summer.startsAt, 'Europe/Warsaw'), '13:30');
+  const march = getUsPreopenActivityReference(new Date('2026-03-16T00:00:00Z'));
+  assert.equal(formatZonedTime(march.startsAt, 'Europe/Warsaw'), '12:30');
+  assert.equal(formatZonedTime(march.endsAt, 'Europe/Warsaw'), '14:30');
+  assert.equal(formatZonedTime(
+    getUsEquitiesPremarketWindow(new Date('2026-01-05T00:00:00Z')).startsAt, 'America/New_York'), '04:00');
+});
+
+test('07:30 NY reference changes at its start and next session, skipping weekends', () => {
+  assert.equal(getUsPreopenActivityReference(new Date('2026-01-05T12:29:59Z')).active, false);
+  assert.equal(getUsPreopenActivityReference(new Date('2026-01-05T12:30:00Z')).active, true);
+  assert.equal(getUsPreopenActivityReference(new Date('2026-01-05T14:30:00Z')).startsAt.toISOString(),
+    '2026-01-06T12:30:00.000Z');
+  const saturday = getUsPreopenActivityReference(new Date('2026-11-21T10:00:00Z'));
+  assert.equal(saturday.active, false);
+  assert.equal(saturday.startsAt.toISOString(), '2026-11-23T12:30:00.000Z');
+});
+
+test('pre-open reference renders using saved profile zone with four localized labels', () => {
+  const clock = readFileSync(new URL('../src/components/terminal/TerminalClock.tsx', import.meta.url), 'utf8');
+  const terminal = readFileSync(new URL('../src/components/TerminalPage.tsx', import.meta.url), 'utf8');
+  const profile = readFileSync(new URL('../src/components/UserProfileModal.tsx', import.meta.url), 'utf8');
+  assert.match(terminal, /<TerminalClock timeZone=\{profile\?\.timeZone\}/);
+  assert.match(profile, /updateProfileData\(patch\)/);
+  assert.match(clock, /data-us-preopen-reference/);
+  assert.match(clock, /formatZonedTime\(preOpenReference\.startsAt, timeZone\)/);
+  assert.match(clock, /formatZonedTime\(preOpenReference\.endsAt, timeZone\)/);
+  assert.match(clock, /getUsPreopenActivityReference\(now\)/);
+  assert.doesNotMatch(clock, /fetch\(|new WebSocket\(/);
+  for (const label of [
+    'Орієнтир активності перед відкриттям США',
+    '07:30–09:30 за Нью-Йорком: орієнтир для спостереження за ринком, не офіційне відкриття та не гарантія підвищеної активності.',
+  ]) {
+    const row = terminalPagePhraseRows.find(entry => entry[0] === label);
+    assert.ok(row);
+    assert.equal(row!.length, 4);
+    assert.ok(row!.every(value => value.length > 0));
   }
 });

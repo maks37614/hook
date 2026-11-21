@@ -3,6 +3,18 @@ import type { SupportedLanguage } from './types';
 
 export const terminalPagePhraseRows = [
   [
+    "Орієнтир активності перед відкриттям США",
+    "US pre-open activity reference",
+    "Ориентир активности перед открытием США",
+    "Orientacyjny okres aktywności przed otwarciem USA"
+  ],
+  [
+    "07:30–09:30 за Нью-Йорком: орієнтир для спостереження за ринком, не офіційне відкриття та не гарантія підвищеної активності.",
+    "07:30–09:30 New York time: a monitoring reference, not an official market opening or a guarantee of increased activity.",
+    "07:30–09:30 по Нью-Йорку: ориентир для наблюдения за рынком, не официальное открытие и не гарантия повышенной активности.",
+    "07:30–09:30 czasu Nowego Jorku: orientacyjny okres obserwacji, a nie oficjalne otwarcie rynku ani gwarancja większej aktywności."
+  ],
+  [
     "Премаркет",
     "Pre-market",
     "Премаркет",

@@ -13,6 +13,12 @@ export const US_EQUITIES_PREMARKET = {
   timeZone: 'America/New_York', opens: 4, closes: 9.5,
 } as const;
 
+// Optional watch period chosen for traders, NOT an official exchange opening.
+// Begins 07:30 New York local (15:30 Moscow in winter) and tracks US DST.
+export const US_PREOPEN_ACTIVITY_REFERENCE = {
+  timeZone: 'America/New_York', opens: 7.5, closes: 9.5,
+} as const;
+
 // Conventional regional activity windows, not opening hours of crypto exchanges.
 // https://www.oanda.com/us-en/skills-and-insights/education/trading-asset-classes/forex/when-is-the-best-time-for-forex-trading/
 export type TradingSession = typeof TRADING_SESSIONS[number];
@@ -187,6 +193,11 @@ export function getSessionWindow(session: TradingSession, now: Date) {
  */
 export function getUsEquitiesPremarketWindow(now: Date) {
   return getTradingWindow(US_EQUITIES_PREMARKET, now);
+}
+
+/** Informational 07:30–09:30 New York watch period; never a separate exchange session. */
+export function getUsPreopenActivityReference(now: Date) {
+  return getTradingWindow(US_PREOPEN_ACTIVITY_REFERENCE, now);
 }
 
 type SessionLanguage = 'uk' | 'en' | 'ru' | 'pl';
