@@ -13,7 +13,7 @@ import {
 import { TpSlConstructorChart, type BuilderLevels } from './TpSlConstructorChart';
 
 type LevelKey = keyof BuilderLevels;
-const intervals: Record<Timeframe, number> = { '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+const intervals: Record<Timeframe, number> = { '5s': 5, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
 const selectStyle = 'w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100';
 const finite = (n: number) => Number.isFinite(n) && n > 0;
 

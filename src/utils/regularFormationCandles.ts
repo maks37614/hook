@@ -1,6 +1,6 @@
 import type { Kline, ScannedCoin, Timeframe } from '../types';
 
-export const CANDLE_SECONDS: Record<Timeframe, number> = { '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+export const CANDLE_SECONDS: Record<Timeframe, number> = { '5s': 5, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
 
 function isFreshCollection(collectedAt: number, now: number): boolean {
   return Number.isFinite(collectedAt) && Number.isFinite(now)

@@ -88,7 +88,7 @@ export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
       && marketId(block.symbol) && marketId(block.baseAsset) && marketId(block.quoteAsset)
       && ['binance', 'bybit'].includes(String(block.exchange))
       && ['spot', 'futures'].includes(String(block.marketType))
-      && ['30s', '1m', '5m', '15m', '1h', '4h', '1d'].includes(String(block.timeframe))
+      && ['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'].includes(String(block.timeframe))
       && (block.colSpan == null || [1, 2, 3, 4, 'full'].includes(block.colSpan as number | string))
       && (block.heightPx == null || (typeof block.heightPx === 'number'
         && Number.isFinite(block.heightPx) && block.heightPx >= 180 && block.heightPx <= 2400));
@@ -131,7 +131,7 @@ export function parseTerminalWorkspaceBackup(json: string): WorkspaceSnapshot {
   if (typeof source.showFormations === 'boolean') config.showFormations = source.showFormations;
   if (['compact', 'medium', 'large'].includes(String(source.blockHeight)))
     config.blockHeight = source.blockHeight as TerminalWorkspaceConfig['blockHeight'];
-  if (['30s', '1m', '5m', '15m', '1h', '4h', '1d'].includes(String(source.globalTimeframe)))
+  if (['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'].includes(String(source.globalTimeframe)))
     config.globalTimeframe = source.globalTimeframe as TerminalWorkspaceConfig['globalTimeframe'];
   if (['all', 'binance', 'bybit'].includes(String(source.coinPresetExchange)))
     config.coinPresetExchange = source.coinPresetExchange as TerminalWorkspaceConfig['coinPresetExchange'];

@@ -1,6 +1,6 @@
 import type { Kline, Timeframe } from '../types';
 
-const SECONDS_PER_CANDLE: Record<Timeframe, number> = { '30s': 30,
+const SECONDS_PER_CANDLE: Record<Timeframe, number> = { '5s': 5, '30s': 30,
   '1m': 60,
   '5m': 300,
   '15m': 900,

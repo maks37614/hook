@@ -156,7 +156,7 @@ const GUIDE_BUTTON_LABELS: Record<string, { title: string; aria: string }> = {
   ru: { title: 'Гид по графику HookChart', aria: 'Открыть интерактивный гид по HookChart' },
 };
 const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
-const TERMINAL_TIMEFRAMES: Timeframe[] = ['30s', ...TIMEFRAMES];
+const TERMINAL_TIMEFRAMES: Timeframe[] = ['5s', '30s', ...TIMEFRAMES];
 const TF_MS: Record<string, number> = { '1s': 1000, '5s': 5000, '15s': 15000, '30s': 30_000, '1m': 60_000, '5m': 300_000, '15m': 900_000, '30m': 1_800_000, '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000 };
 const LEVEL_TFS = new Set<LevelTf>(['5m', '15m', '30m', '1h', '4h', '1d']);
 // 30m levels use exchange-native 30m candles; the chart timeframe selector is unchanged.
@@ -558,6 +558,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // Archive page is intentionally bounded to 5k exchange candles, regardless
   // of the normal Screener/Terminal history limit. Other charts are unchanged.
   const maxChartCandles = archiveMode ? 5000
+    : (terminalMode || visualContext === 'terminalLarge') && timeframe === '5s' ? 2880
     : settings.maxChartCandles === undefined ? undefined : clampHookChartHistory(settings.maxChartCandles);
   const candles = useMemo(() => {
     if (replay) {
@@ -614,7 +615,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     const normalizedSymbol = normalizeExchangeSymbol(symbol);
     // Compact Terminal charts request older pages only when the user pans back;
     // Settings > retry can still explicitly request the configured full history.
-    if (replay || archiveMode || hasExternalData || timeframe === '30s' || (terminalMode && historyRetry === 0) || !maxChartCandles || !hasInitialKlines ||
+    if (replay || archiveMode || hasExternalData || (timeframe === '5s' || timeframe === '30s') || (terminalMode && historyRetry === 0) || !maxChartCandles || !hasInitialKlines ||
         !isValidExchangeSymbol(normalizedSymbol)) return;
     const key = [exchange, marketType, normalizedSymbol, timeframe, maxChartCandles, historyRetry].join(':');
     if (historyRequestKey.current === key) return;
@@ -787,7 +788,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
       }
       // The 30s trade feed contains only a recent, potentially sparse window.
       // Never present its partial 1m/5m aggregates as full exchange candles.
-      if (timeframe === '30s') continue;
+      if ((timeframe === '5s' || timeframe === '30s')) continue;
       if (replay || hasExternalData) {
         const aggregated = aggregateHookChartCandles(candles, timeframe, tf);
         if (aggregated.length) series[tf] = aggregated;
@@ -882,7 +883,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
     if (!/^[A-Z0-9]{3,30}$/.test(cleanedSymbol)) return;
     const stops: Array<() => void> = [];
     // A single BTC benchmark fetch serves every chart of this market/TF.
-    if (showMarketStats && benchmark && benchmark !== cleanedSymbol && timeframe !== '30s') {
+    if (showMarketStats && benchmark && benchmark !== cleanedSymbol && (timeframe !== '5s' && timeframe !== '30s')) {
       const params = new URLSearchParams({
         exchange, market: marketType, symbol: benchmark, timeframe, limit: '250',
       });
@@ -923,7 +924,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   }, [statsScope, exchange, marketType, symbol, timeframe, showMarketStats, autoTurnoverEnabled]);
 
   const btcCorrelation = useMemo(() => {
-    if (!showMarketStats || ecoActive || timeframe === '30s' || !TF_MS[timeframe]) return null;
+    if (!showMarketStats || ecoActive || (timeframe === '5s' || timeframe === '30s') || !TF_MS[timeframe]) return null;
     const benchmark = btcBenchmarkSymbol(normalizeExchangeSymbol(symbol));
     if (!benchmark) return null;
     // BTC compared with itself has +1 correlation if enough valid closed bars.
@@ -1435,7 +1436,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
   // Replay is deliberately isolated: only the simulator's visible candles are passed to the engine.
   const needHistory = useCallback(async (timestamp: number) => {
     const { externalData, klines } = chartHistorySourcesRef.current;
-    if (replay || timestamp > Date.now() || timeframe === '30s') return false;
+    if (replay || timestamp > Date.now() || (timeframe === '5s' || timeframe === '30s')) return false;
     if (externalData) return externalData.onNeedHistory(timestamp);
     if (archiveMode && archiveOnNeedHistory) return archiveOnNeedHistory(timestamp);
     if (archiveMode) {
@@ -1526,7 +1527,7 @@ const HookChartCanvas = forwardRef<HookChartHandle, HookChartCanvasProps>(functi
 
   const showOi = !archiveMode && (indicators.includes('oi') || !!activeStrategy?.config.oiWindow);
   useEffect(() => {
-    if (!showOi || replay || hasExternalData || timeframe === '30s' || marketType !== 'futures') {
+    if (!showOi || replay || hasExternalData || (timeframe === '5s' || timeframe === '30s') || marketType !== 'futures') {
       oiEvidenceScope.current = '';
       setOi(EMPTY_OI); setOiError(false); return;
     }

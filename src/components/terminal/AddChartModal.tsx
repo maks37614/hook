@@ -136,7 +136,7 @@ export const AddChartModal: React.FC<AddChartModalProps> = ({
   const lastFormationTimeframe = useRef(selectedTimeframe);
   // 30s is not a formation-scan timeframe; use the closest supported 1m data
   // without altering the selected chart's own timeframe.
-  const formationTimeframe = selectedTimeframe === '30s' ? '1m' : selectedTimeframe;
+  const formationTimeframe = (['5s', '30s'].includes(selectedTimeframe)) ? '1m' : selectedTimeframe;
 
   useEffect(() => {
     if (isOpen) {

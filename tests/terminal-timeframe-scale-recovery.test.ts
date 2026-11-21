@@ -37,7 +37,7 @@ test('Terminal viewport responds to seed-to-history transition, not live candle 
   assert.match(engine,/oldSignature\?\.startsWith\(\`\$\{profilePrefix\}:seed:\`\)\&\&historyPhase==='ready'/);
   assert.match(engine,/fitAllScopeRef\.current===fitAllScopeKey/);
   assert.match(page,/updateBlocks\(previous => applyTerminalTimeframe\(previous, tf\)\)/);
-  assert.match(page,/\['30s', '1m', '5m', '15m', '1h', '4h', '1d'\]/);
+  assert.match(page,/\['5s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'\]/);
   assert.match(widget,/terminalInitialView=\{useIntegratedHookChartToolbar \? terminalInitialView : undefined\}/);
   assert.match(wrapper,/key=\{\`\$\{exchange\}:\$\{marketType\}:\$\{symbol\}:\$\{timeframe\}\`\}/);
   // This fix must not change exchange subscriptions or 1-minute live ticks.

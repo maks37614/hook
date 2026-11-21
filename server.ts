@@ -63,6 +63,7 @@ import { requireUserAuth } from './server/userAuth';
 import { sendUserTelegramMessage, startTelegramDeliveryWorker } from './server/telegramDelivery';
 import { installHookChartDepthStream } from './server/hookChartDepth';
 import { installHookChartKlineRelay } from './server/hookChartKlineRelay';
+import { installTerminalFiveSecondHistory } from './server/terminalFiveSecondHistory';
 import { installLiquidationStream } from './server/liquidationFeed';
 import { installLiquidationArchiveRoutes } from './server/liquidationArchiveRoutes';
 import { installOpsMetrics } from './server/opsMetrics';
@@ -87,6 +88,7 @@ async function startServer() {
   });
   installPostgresIdentityRoutes(app);
   installReplayProfileRoutes(app);
+  installTerminalFiveSecondHistory(app);
   // Opt-in Desktop channel: user-scoped and idle when no Desktop is connected.
   installDesktopLinkRelay(app);
 

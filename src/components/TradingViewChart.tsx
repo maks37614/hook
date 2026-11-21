@@ -43,6 +43,7 @@ import type { HookChartHandle } from './hookchart/engine';
 import { subscribeSharedKlines } from './hookchart/sharedKlineStream';
 import { subscribeMarketTrades } from './hookchart/marketTradeStream';
 import { subscribeTerminalThirtySecondCandles } from './hookchart/terminalThirtySecondCandles';
+import { subscribeTerminalFiveSecondCandles } from './hookchart/terminalFiveSecondCandles';
 import { fetchSharedLiveFallbackKline, shouldApplyLiveFallbackKline } from './hookchart/sharedLiveFallback';
 import { createLiveCandlePublisher } from './hookchart/liveCandlePublisher';
 import type { VisualChartProfile, VisualContextId } from './hookchart/visualProfiles';
@@ -231,7 +232,9 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   const tp = (source: string, values: Record<string, string | number>) => interpolate(tr(source), values);
   const savedChartProvider = useChartProvider();
   const chartProvider = forceHookChart ? 'hookchart' : savedChartProvider;
-  const terminalTradeCandles = timeframe === '30s' && (terminalMode || terminalThirtySecondMode);
+  const terminalTradeCandles = (timeframe === '30s' || timeframe === '5s') && (terminalMode || terminalThirtySecondMode);
+  const terminalFiveSecondCandles = terminalTradeCandles && timeframe === '5s';
+  const [fiveSecondHistoryStatus, setFiveSecondHistoryStatus] = useState<'loading' | 'ready' | 'partial' | 'unavailable' | 'error'>('loading');
   const hookChartRef = useRef<HookChartHandle | null>(null);
   const onCrosshairPriceChangeRef = useRef(onCrosshairPriceChange);
   onCrosshairPriceChangeRef.current = onCrosshairPriceChange;
@@ -480,10 +483,8 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
     };
   }, [symbol, timeframe, exchange, marketType, historyLimit, historyManagedByParent, hasParentHistory, terminalTradeCandles, receiveHistory]);
 
-  // Terminal-only 30s OHLCV uses the deduplicated market trade stream.
-  // Keep accumulating every exchange trade, but obey the user's Terminal
-  // refresh/ECO preference for React paints. A new preference does not
-  // reconnect the exchange WebSocket; buffered OHLCV remains authoritative.
+  // Trade-based Terminal timeframes share exchange WebSockets. Unlike 30s,
+  // 5s fetches up to four hours of genuine exchange 1s candles on demand.
   const terminalThirtySecondPriceRef = useRef(onLivePriceUpdate);
   terminalThirtySecondPriceRef.current = onLivePriceUpdate;
   const terminalThirtySecondUiMsRef = useRef(0);
@@ -493,44 +494,48 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
   useEffect(() => {
     if (!terminalTradeCandles) return;
     let disposed = false;
+    let history: Kline[] = [];
+    let live: Kline[] = [];
     let pending: Kline[] | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastRenderedAt = 0;
+    const controller = new AbortController();
+    const scopedRows = (): Kline[] => {
+      if (!terminalFiveSecondCandles) return live;
+      const from = Math.floor((Date.now() - 4 * 60 * 60_000) / 5_000) * 5;
+      const prior = history.filter(bar => bar.time >= from);
+      const latestHistory = prior.at(-1)?.time ?? -Infinity;
+      return [...prior, ...live.filter(bar => bar.time > latestHistory && bar.time >= from)].slice(-2_880);
+    };
     const flush = () => {
       if (disposed || !pending) return;
       const rows = pending;
       pending = null;
       lastRenderedAt = Date.now();
       setEffectiveKlines(rows);
-      const last = rows[rows.length - 1];
+      const last = rows.at(-1);
       if (last) terminalThirtySecondPriceRef.current?.(last.close);
-      // Status comes from the shared exchange WebSocket, not candle-open time.
-      // Quiet but connected markets must not be labelled offline.
     };
-    const unsubscribe = subscribeTerminalThirtySecondCandles(
+    const schedule = (immediate = false) => {
+      pending = scopedRows();
+      const remaining = lastRenderedAt + terminalThirtySecondUiMsRef.current - Date.now();
+      if (immediate || remaining <= 0) {
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+        flush();
+      } else if (timer === null) {
+        timer = setTimeout(() => { timer = null; flush(); }, remaining);
+      }
+    };
+    const subscribe = terminalFiveSecondCandles
+      ? subscribeTerminalFiveSecondCandles : subscribeTerminalThirtySecondCandles;
+    const unsubscribe = subscribe(
       { exchange, marketType, symbol: normalizeExchangeSymbol(symbol) },
       rows => {
         if (disposed) return;
-        // An integrity loss must clear displayed candles without a 5s wait.
-        if (!rows.length) {
-          if (timer !== null) clearTimeout(timer);
-          timer = null;
-          pending = rows;
-          flush();
-          return;
-        }
-        pending = rows;
-        const remaining = lastRenderedAt + terminalThirtySecondUiMsRef.current - Date.now();
-        if (remaining <= 0) {
-          if (timer !== null) clearTimeout(timer);
-          timer = null;
-          flush();
-        } else if (timer === null) {
-          timer = setTimeout(() => {
-            timer = null;
-            flush();
-          }, remaining);
-        }
+        live = rows;
+        // WebSocket interruption must not wipe verified historical candles.
+        schedule(rows.length === 0);
       },
       connected => {
         if (disposed) return;
@@ -538,13 +543,36 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
         if (connected) setLiveMode('ws');
       },
     );
+    if (terminalFiveSecondCandles) {
+      setFiveSecondHistoryStatus('loading');
+      const params = new URLSearchParams({ exchange, market: marketType,
+        symbol: normalizeExchangeSymbol(symbol) });
+      void fetch('/api/terminal/5s-history?' + params, { signal: controller.signal })
+        .then(async response => {
+          if (!response.ok) throw new Error('five_second_history_http_' + response.status);
+          return response.json() as Promise<{ success?: boolean; complete?: boolean; data?: Kline[]; reason?: string }>;
+        })
+        .then(result => {
+          if (disposed) return;
+          if (!result.success || !Array.isArray(result.data) || !result.data.length) {
+            setFiveSecondHistoryStatus('unavailable');
+            return;
+          }
+          history = result.data;
+          setInitialHistoryLoaded(true);
+          setFiveSecondHistoryStatus(result.complete ? 'ready' : 'partial');
+          schedule(true);
+        })
+        .catch(() => { if (!disposed) setFiveSecondHistoryStatus('error'); });
+    }
     return () => {
       disposed = true;
+      controller.abort();
       unsubscribe();
       if (timer !== null) clearTimeout(timer);
       pending = null;
     };
-  }, [terminalTradeCandles, exchange, marketType, symbol]);
+  }, [terminalTradeCandles, terminalFiveSecondCandles, exchange, marketType, symbol]);
 
   useEffect(() => {
     klinesLengthRef.current = effectiveKlines.length;
@@ -1470,14 +1498,34 @@ const ScopedTradingViewChart: React.FC<TradingViewChartProps> = ({
           necklineToggle={necklineToolbarToggle}
           toolbarActions={hookchartToolbarActions} toolbarOverlays={hookchartToolbarOverlays}
           chartActions={showNavigationControls ? chartActions : null} />
-          {terminalTradeCandles && effectiveKlines.length === 0 && (
+          {terminalTradeCandles && ((terminalFiveSecondCandles && fiveSecondHistoryStatus !== 'ready') || effectiveKlines.length === 0) && (
             <div role="status" className="pointer-events-none absolute inset-x-4 top-12 z-20 rounded-lg border border-cyan-500/30 bg-slate-950/90 p-2 text-center text-xs text-cyan-200">
-              {({
-                uk: '30s · Накопичення реальних свічок із біржових угод. Перший неповний інтервал приховано.',
-                en: '30s · Building real candles from exchange trades. The first partial interval is hidden.',
-                pl: '30s · Tworzenie prawdziwych świec z transakcji giełdowych. Pierwszy niepełny interwał jest ukryty.',
-                ru: '30s · Формирование реальных свечей из биржевых сделок. Первый неполный интервал скрыт.',
-              } as Record<string, string>)[language] || '30s · Live trade candles are being collected.'}
+              {terminalFiveSecondCandles
+                ? ({
+                    uk: { loading: '5s · Завантаження реальної історії за 4 години…', ready: '',
+                      partial: '5s · Біржа надала менше 4 годин перевіреної історії.',
+                      unavailable: '5s · Повна історія 4 годин для цієї біржі недоступна. Показано лише реальні живі угоди.',
+                      error: '5s · Не вдалося завантажити історію з біржі. Показано лише реальні живі угоди.' },
+                    en: { loading: '5s · Loading four hours of real history…', ready: '',
+                      partial: '5s · Less than four hours of verified history is available.',
+                      unavailable: '5s · Four-hour history is unavailable for this exchange. Live trades only.',
+                      error: '5s · Historical data could not be loaded. Live trades only.' },
+                    pl: { loading: '5s · Ładowanie czterech godzin prawdziwej historii…', ready: '',
+                      partial: '5s · Dostępne jest mniej niż cztery godziny zweryfikowanej historii.',
+                      unavailable: '5s · Historia czterech godzin nie jest dostępna na tej giełdzie. Tylko transakcje na żywo.',
+                      error: '5s · Nie udało się pobrać historii. Tylko transakcje na żywo.' },
+                    ru: { loading: '5s · Загрузка четырёх часов реальной истории…', ready: '',
+                      partial: '5s · Доступно менее четырёх часов проверенной истории.',
+                      unavailable: '5s · История за четыре часа для этой биржи недоступна. Только реальные текущие сделки.',
+                      error: '5s · Не удалось загрузить историю. Только реальные текущие сделки.' },
+                  } as Record<string, Record<typeof fiveSecondHistoryStatus, string>>)[language]?.[fiveSecondHistoryStatus]
+                  || '5s · Historical data not available'
+                : ({
+                    uk: '30s · Накопичення реальних свічок із біржових угод. Перший неповний інтервал приховано.',
+                    en: '30s · Building real candles from exchange trades. The first partial interval is hidden.',
+                    pl: '30s · Tworzenie prawdziwych świec z transakcji giełdowych. Pierwszy niepełny interwał jest ukryty.',
+                    ru: '30s · Формирование реальных свечей из биржевых сделок. Первый неполный интервал скрыт.',
+                  } as Record<string, string>)[language] || '30s · Live trade candles are being collected.'}
             </div>
           )}</> : <div
           ref={chartContainerRef}

@@ -35,7 +35,7 @@ export interface EarlyFormationCandidate {
 }
 const roundPrice = (p: number) => Number(p.toPrecision(9));
 export const EARLY_EXECUTION_COST_PER_SIDE = 0.001; // Illustrative 0.1% fee/slippage allowance each way.
-const TIMEFRAME_SECONDS: Record<Timeframe, number> = { '30s': 30,
+const TIMEFRAME_SECONDS: Record<Timeframe, number> = { '5s': 5, '30s': 30,
   '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400,
 };
 const SUPPORTED_INTERVALS = new Set(Object.values(TIMEFRAME_SECONDS));
